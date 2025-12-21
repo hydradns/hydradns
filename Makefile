@@ -1,5 +1,5 @@
 build:
-	go build -o ./bin/ ./cmd/scanner/main.go
+	go build -o bin/scanner/scanner ./cmd/scanner
 
 run:
-	./bin/scanner
+	./bin/scanner/scanner
