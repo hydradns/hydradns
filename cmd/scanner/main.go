@@ -15,6 +15,7 @@ import (
 
 func main() {
 	r := gin.Default()
+	resolver, err := SystemResolver("/etc/resolv.conf")
 
 	r.GET("/scan", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(
@@ -30,10 +31,12 @@ func main() {
 		default:
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "Scan endpoint"})
+		c.JSON(http.StatusOK, gin.H{
+			"message":           "Scan endpoint",
+			"detected_resolver": resolver.String(),
+		})
 	})
 
-	resolver, err := SystemResolver("/etc/resolv.conf")
 	if err != nil {
 		panic(err)
 	}
