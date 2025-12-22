@@ -8,7 +8,11 @@ import (
 	"github.com/miekg/dns"
 )
 
-type DNSResolutionResult struct {
+type UDPResolutionCheck struct {
+	Domain string
+}
+
+type DNSResult struct {
 	Domain   string
 	Resolver net.IP
 	QType    string
@@ -20,9 +24,15 @@ type DNSResolutionResult struct {
 	Answers []string
 }
 
-func UDPResolutionCheck(ctx context.Context, resolver net.IP) DNSResolutionResult {
-	domain := "www.google.com"
-	result := &DNSResolutionResult{
+func (c *UDPResolutionCheck) Run(ctx context.Context, resolver net.IP) (Result, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	domain := c.Domain
+	if domain == "" {
+		domain = "www.google.com"
+	}
+	result := &DNSResult{
 		Domain:   domain,
 		Resolver: resolver,
 		QType:    "A",
@@ -34,8 +44,7 @@ func UDPResolutionCheck(ctx context.Context, resolver net.IP) DNSResolutionResul
 	msg.RecursionDesired = true
 
 	client := &dns.Client{
-		Net:     "udp",
-		Timeout: 2 * time.Second,
+		Net: "udp",
 	}
 
 	start := time.Now()
@@ -50,21 +59,50 @@ func UDPResolutionCheck(ctx context.Context, resolver net.IP) DNSResolutionResul
 
 	go func() {
 		r, _, err := client.Exchange(msg, net.JoinHostPort(resolver.String(), "53"))
-		ch <- response{r: r, err: err}
+		select {
+		case ch <- response{r: r, err: err}:
+		case <-ctx.Done():
+		}
 	}()
 
 	select {
 	case <-ctx.Done():
-		return DNSResolutionResult{}
+		return Result{
+			Status:   "fail",
+			Evidence: map[string]interface{}{"error": ctx.Err().Error()},
+		}, nil
 	case resp := <-ch:
 		result.Success = resp.err == nil
-		result.Error = resp.err
+		if resp.err != nil {
+			result.Error = resp.err
+		}
 		if resp.r != nil {
 			for _, ans := range resp.r.Answer {
-				result.Answers = append(result.Answers, ans.String())
+				if a, ok := ans.(*dns.A); ok {
+					result.Answers = append(result.Answers, a.A.String())
+				}
 			}
 		}
 		result.RTT = time.Since(start)
 	}
-	return *result
+
+	status := "fail"
+	if result.Success {
+		status = "pass"
+	}
+
+	return Result{
+		Status: status,
+		Evidence: map[string]interface{}{
+			"domain":   domain,
+			"resolver": resolver.String(),
+			"qtype":    "A",
+			"rtt_ms":   result.RTT.Milliseconds(),
+			"answers":  result.Answers,
+		},
+	}, nil
+}
+
+func (c *UDPResolutionCheck) Name() string {
+	return "udp_resolution"
 }
