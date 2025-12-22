@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PhantomDNS/scanner/internal/checks"
 	"github.com/PhantomDNS/scanner/internal/scanner"
 	"github.com/gin-gonic/gin"
 )
@@ -31,10 +32,22 @@ func main() {
 		default:
 		}
 
-		c.JSON(http.StatusOK, gin.H{
+		udpResolution := checks.UDPResolutionCheck(ctx, resolver)
+
+		resp := gin.H{
 			"message":           "Scan endpoint",
 			"detected_resolver": resolver.String(),
-		})
+			"domain":            udpResolution.Domain,
+			"qtype":             udpResolution.QType,
+			"success":           udpResolution.Success,
+			"error":             "",
+			"rtt":               udpResolution.RTT.String(),
+			"answers":           udpResolution.Answers,
+		}
+		if udpResolution.Error != nil {
+			resp["error"] = udpResolution.Error.Error()
+		}
+		c.JSON(http.StatusOK, resp)
 	})
 
 	if err != nil {
