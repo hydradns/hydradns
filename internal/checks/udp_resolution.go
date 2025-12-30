@@ -12,18 +12,6 @@ type UDPResolutionCheck struct {
 	Domain string
 }
 
-type DNSResult struct {
-	Domain   string
-	Resolver net.IP
-	QType    string
-
-	Success bool
-	Error   error
-	RTT     time.Duration
-
-	Answers []string
-}
-
 func (c *UDPResolutionCheck) Run(ctx context.Context, resolver net.IP) (Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
@@ -32,10 +20,11 @@ func (c *UDPResolutionCheck) Run(ctx context.Context, resolver net.IP) (Result, 
 	if domain == "" {
 		domain = "www.google.com"
 	}
-	result := &DNSResult{
-		Domain:   domain,
-		Resolver: resolver,
-		QType:    "A",
+	result := map[string]interface{}{
+		"domain":   domain,
+		"resolver": resolver.String(),
+		"qtype":    "A",
+		"answers":  []string{},
 	}
 
 	// build dns message
@@ -72,22 +61,21 @@ func (c *UDPResolutionCheck) Run(ctx context.Context, resolver net.IP) (Result, 
 			Evidence: map[string]interface{}{"error": ctx.Err().Error()},
 		}, nil
 	case resp := <-ch:
-		result.Success = resp.err == nil
 		if resp.err != nil {
-			result.Error = resp.err
+			result["error"] = resp.err.Error()
 		}
 		if resp.r != nil {
 			for _, ans := range resp.r.Answer {
 				if a, ok := ans.(*dns.A); ok {
-					result.Answers = append(result.Answers, a.A.String())
+					result["answers"] = append(result["answers"].([]string), a.A.String())
 				}
 			}
 		}
-		result.RTT = time.Since(start)
+		result["rtt_ms"] = time.Since(start).Milliseconds()
 	}
 
 	status := "fail"
-	if result.Success {
+	if result["error"] == nil && len(result["answers"].([]string)) > 0 {
 		status = "pass"
 	}
 
@@ -97,8 +85,8 @@ func (c *UDPResolutionCheck) Run(ctx context.Context, resolver net.IP) (Result, 
 			"domain":   domain,
 			"resolver": resolver.String(),
 			"qtype":    "A",
-			"rtt_ms":   result.RTT.Milliseconds(),
-			"answers":  result.Answers,
+			"rtt_ms":   result["rtt_ms"],
+			"answers":  result["answers"],
 		},
 	}, nil
 }

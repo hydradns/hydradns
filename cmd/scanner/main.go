@@ -19,15 +19,8 @@ func main() {
 		)
 		defer cancel()
 
-		select {
-		case <-ctx.Done():
-			c.JSON(http.StatusRequestTimeout, gin.H{"error": "Request timed out"})
-			return
-		default:
-		}
-
-		scanner := &scanner.Scanner{}
-		result, err := scanner.Scan(ctx)
+		s := &scanner.Scanner{}
+		result, err := s.Scan(ctx)
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -45,7 +38,4 @@ func main() {
 	})
 
 	r.Run(":8080")
-
-	s := &scanner.Scanner{}
-	_, _ = s.Scan(context.Background())
 }
