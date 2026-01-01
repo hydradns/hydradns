@@ -12,7 +12,7 @@ type UDPResolutionCheck struct {
 	Domain string
 }
 
-func (c *UDPResolutionCheck) Run(ctx context.Context, resolver net.IP) (Result, error) {
+func (c *UDPResolutionCheck) Run(ctx context.Context, resolver Resolver) (Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
@@ -22,7 +22,7 @@ func (c *UDPResolutionCheck) Run(ctx context.Context, resolver net.IP) (Result, 
 	}
 	result := map[string]interface{}{
 		"domain":   domain,
-		"resolver": resolver.String(),
+		"resolver": resolver.IP.String(),
 		"qtype":    "A",
 		"answers":  []string{},
 	}
@@ -47,7 +47,7 @@ func (c *UDPResolutionCheck) Run(ctx context.Context, resolver net.IP) (Result, 
 	ch := make(chan response, 1)
 
 	go func() {
-		r, _, err := client.Exchange(msg, net.JoinHostPort(resolver.String(), "53"))
+		r, _, err := client.Exchange(msg, net.JoinHostPort(resolver.IP.String(), "53"))
 		select {
 		case ch <- response{r: r, err: err}:
 		case <-ctx.Done():
@@ -74,16 +74,16 @@ func (c *UDPResolutionCheck) Run(ctx context.Context, resolver net.IP) (Result, 
 		result["rtt_ms"] = time.Since(start).Milliseconds()
 	}
 
-	status := "fail"
+	status := StatusFail
 	if result["error"] == nil && len(result["answers"].([]string)) > 0 {
-		status = "pass"
+		status = StatusPass
 	}
 
 	return Result{
 		Status: status,
 		Evidence: map[string]interface{}{
 			"domain":   domain,
-			"resolver": resolver.String(),
+			"resolver": resolver.IP.String(),
 			"qtype":    "A",
 			"rtt_ms":   result["rtt_ms"],
 			"answers":  result["answers"],

@@ -27,11 +27,9 @@ func main() {
 			return
 		}
 
-		udpResolution := result.Checks[0]
-
 		resp := gin.H{
 			"resolver": result.Resolver,
-			"checks":   udpResolution,
+			"checks":   result.Checks,
 		}
 
 		c.JSON(http.StatusOK, resp)

@@ -6,13 +6,15 @@ import (
 	"net"
 	"os"
 	"strings"
+
+	"github.com/PhantomDNS/scanner/internal/checks"
 )
 
 // SystemResolver returns the first nameserver entry found in a resolv.conf file.
-func SystemResolver(path string) (net.IP, error) {
+func SystemResolver(path string) (checks.Resolver, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return checks.Resolver{}, err
 	}
 	defer f.Close()
 
@@ -29,14 +31,14 @@ func SystemResolver(path string) (net.IP, error) {
 		if len(fields) >= 2 && fields[0] == "nameserver" {
 			ip := net.ParseIP(fields[1])
 			if ip != nil {
-				return ip, nil
+				return checks.Resolver{IP: ip, Port: 53}, nil
 			}
 		}
 	}
 
 	if scanner.Err() != nil {
-		return nil, scanner.Err()
+		return checks.Resolver{}, scanner.Err()
 	}
 
-	return nil, errors.New("System resolver not found at " + path)
+	return checks.Resolver{}, errors.New("System resolver not found at " + path)
 }

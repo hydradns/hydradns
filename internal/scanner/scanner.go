@@ -10,7 +10,7 @@ import (
 
 type ScannerResult struct {
 	Resolver string
-	Checks   []checks.Result
+	Checks   map[string]checks.Result
 }
 
 // 1. Call resolver detection
@@ -31,16 +31,25 @@ func (s *Scanner) Scan(ctx context.Context) (ScannerResult, error) {
 		return ScannerResult{}, err
 	}
 
-	udpCheck := checks.UDPResolutionCheck{}
-
-	result, err := udpCheck.Run(ctx, resolver)
-
-	if err != nil {
-		return ScannerResult{}, err
+	checkSet := []checks.Check{
+		&checks.UDPResolutionCheck{},
 	}
 
+	results := make(map[string]checks.Result)
+
+	for _, check := range checkSet {
+		res, err := check.Run(ctx, resolver)
+		if err != nil {
+			results[check.Name()] = checks.Result{
+				Status: checks.StatusError,
+				Reason: err.Error(),
+			}
+			continue
+		}
+		results[check.Name()] = res
+	}
 	return ScannerResult{
-		Resolver: resolver.String(),
-		Checks:   []checks.Result{result},
+		Resolver: fmt.Sprintf("%s:%d", resolver.IP.String(), resolver.Port),
+		Checks:   results,
 	}, nil
 }
