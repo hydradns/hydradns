@@ -25,7 +25,7 @@ export function HeroSection() {
             </p>
             <div className="mt-8 flex flex-wrap gap-4 justify-center lg:justify-start">
               <a
-                href="https://github.com/lopster568/HydraDNS"
+                href="https://github.com/hydradns"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors glow-primary"
@@ -34,7 +34,7 @@ export function HeroSection() {
                 Get Started — It's Free
               </a>
               <a
-                href="https://github.com/lopster568/HydraDNS#readme"
+                href="https://docs.hydradns.app"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-border text-foreground font-medium hover:bg-muted/50 transition-colors"
