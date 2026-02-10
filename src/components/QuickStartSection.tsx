@@ -1,7 +1,7 @@
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 const code = `# Clone and launch
-git clone https://github.com/lopster568/HydraDNS.git
+git clone https://github.com/hydradns/hydra-core.git
 cd HydraDNS
 docker-compose up --build
 

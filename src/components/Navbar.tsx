@@ -49,7 +49,7 @@ export function Navbar() {
           {/* CTAs */}
           <div className="hidden md:flex items-center gap-3">
             <a
-              href="https://github.com/lopster568/HydraDNS"
+              href="https://github.com/hydradns"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -58,7 +58,7 @@ export function Navbar() {
               Star on GitHub
             </a>
             <a
-              href="https://github.com/lopster568/HydraDNS"
+              href="https://github.com/hydradns"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
@@ -93,7 +93,7 @@ export function Navbar() {
             ))}
             <div className="pt-3 border-t border-border/50 flex flex-col gap-2">
               <a
-                href="https://github.com/lopster568/HydraDNS"
+                href="https://github.com/hydradns"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium"

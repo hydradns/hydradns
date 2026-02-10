@@ -1,10 +1,10 @@
 import logo from "@/assets/hydradns-logo.png";
 
 const links = [
-  { label: "GitHub", href: "https://github.com/lopster568/HydraDNS" },
-  { label: "Documentation", href: "https://github.com/lopster568/HydraDNS#readme" },
-  { label: "Contributing", href: "https://github.com/lopster568/HydraDNS/blob/main/CONTRIBUTING.md" },
-  { label: "License", href: "https://github.com/lopster568/HydraDNS/blob/main/LICENSE" },
+  { label: "GitHub", href: "https://github.com/hydradns" },
+  { label: "Documentation", href: "https://docs.hydradns.app" },
+  { label: "Contributing", href: "https://github.com/hydradns/hydra-core/blob/main/CONTRIBUTING.md" },
+  { label: "License", href: "https://github.com/hydradns/hydra-core/blob/main/LICENSE" },
 ];
 
 export function Footer() {
