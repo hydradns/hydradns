@@ -1,0 +1,12 @@
+[submodule "apps/core"]
+	path = apps/core
+	url = https://github.com/hydradns/hydra-core
+[submodule "apps/ui"]
+	path = apps/ui
+	url = https://github.com/hydradns/hydra-ui
+[submodule "apps/scanner"]
+	path = apps/scanner
+	url = https://github.com/hydradns/scanner
+[submodule "apps/landing"]
+	path = apps/landing
+	url = https://github.com/hydradns/hydradns-landing
