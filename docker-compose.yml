@@ -1,0 +1,76 @@
+services:
+  # -------------------------------------------------------------------------
+  # CORE (Combined controlplane + dataplane)
+  # -------------------------------------------------------------------------
+  core:
+    build:
+      context: ./apps/core
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"     # Control plane API
+      - "53:1053/udp"   # DNS (UDP)
+      - "53:1053/tcp"   # DNS (TCP)
+    environment:
+      - PHANTOM_CONFIG=/app/configs/config.yaml
+      - PHANTOM_DB=/app/data/phantomdns.db
+      - PHANTOM_POLICIES=/app/configs/policies.json
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+    volumes:
+      - core-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - hydra-net
+
+  # -------------------------------------------------------------------------
+  # ADMIN UI (Dashboard)
+  # -------------------------------------------------------------------------
+  ui:
+    build:
+      context: ./apps/ui
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8080
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+    depends_on:
+      core:
+        condition: service_healthy
+    networks:
+      - hydra-net
+
+  # -------------------------------------------------------------------------
+  # SCANNER (Network Scanner Worker)
+  # -------------------------------------------------------------------------
+  scanner:
+    build:
+      context: ./apps/scanner
+      dockerfile: Dockerfile
+    depends_on:
+      - core
+    networks:
+      - hydra-net
+
+  # -------------------------------------------------------------------------
+  # LANDING PAGE (Marketing)
+  # -------------------------------------------------------------------------
+  landing:
+    build:
+      context: ./apps/landing
+      dockerfile: Dockerfile
+    ports:
+      - "3001:80"
+    networks:
+      - hydra-net
+
+networks:
+  hydra-net:
+    driver: bridge
+
+volumes:
+  core-data:
