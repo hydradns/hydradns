@@ -1,12 +1,15 @@
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 const code = `# Clone and launch
-git clone https://github.com/hydradns/hydra-core.git
-cd HydraDNS
-docker-compose up --build
+git clone --recursive https://github.com/hydradns/hydradns.git
+cd hydradns
+docker compose up -d
 
 # Test it
-dig @localhost -p 1053 example.com`;
+dig @localhost -p 1053 example.com
+
+# Open the dashboard
+open http://localhost:3000`;
 
 export function QuickStartSection() {
   const ref = useScrollAnimation();
@@ -35,7 +38,7 @@ export function QuickStartSection() {
                 <span key={i} className="block">
                   {line.startsWith("#") ? (
                     <span className="text-muted-foreground/60">{line}</span>
-                  ) : line.startsWith("git") || line.startsWith("cd") || line.startsWith("docker") || line.startsWith("dig") ? (
+                  ) : line.startsWith("git") || line.startsWith("cd") || line.startsWith("docker") || line.startsWith("dig") || line.startsWith("open") ? (
                     <>
                       <span className="text-accent">$ </span>
                       <span className="text-foreground">{line}</span>
