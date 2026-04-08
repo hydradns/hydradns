@@ -3,8 +3,8 @@ import logo from "@/assets/hydradns-logo.png";
 const links = [
   { label: "GitHub", href: "https://github.com/hydradns" },
   { label: "Documentation", href: "https://docs.hydradns.app" },
-  { label: "Contributing", href: "https://github.com/hydradns/hydra-core/blob/main/CONTRIBUTING.md" },
-  { label: "License", href: "https://github.com/hydradns/hydra-core/blob/main/LICENSE" },
+  { label: "Contributing", href: "https://github.com/hydradns/hydradns/blob/main/CONTRIBUTING.md" },
+  { label: "License", href: "https://github.com/hydradns/hydradns/blob/main/LICENSE" },
 ];
 
 export function Footer() {
@@ -15,7 +15,7 @@ export function Footer() {
           <div className="flex items-center gap-2">
             <img src={logo} alt="HydraDNS" className="h-6 w-6" />
             <span className="text-sm text-muted-foreground">
-              © 2026 HydraDNS. Open-source under GPL-3.0.
+              © 2026 HydraDNS. Open-source under MIT.
             </span>
           </div>
 
