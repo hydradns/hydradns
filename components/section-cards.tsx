@@ -1,75 +1,77 @@
-import { IconTrendingDown, IconTrendingUp } from "@tabler/icons-react"
+"use client"
+
+import { IconShieldCheck, IconShieldX, IconActivity, IconPercentage } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
-import {
-  Card,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import type { DashboardSummary } from "@/lib/types"
 
-export function SectionCards() {
+export function SectionCards({ data }: { data: DashboardSummary | null }) {
+  const total = data?.total_queries ?? 0
+  const blocked = data?.blocked_queries ?? 0
+  const allowed = data?.allowed_queries ?? 0
+  const rate = data?.block_rate_percent ?? 0
+
   return (
-    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>Total Revenue</CardDescription>
-          <CardTitle className="text-2xl font-semibold text-white tabular-nums @[250px]/card:text-3xl">
-            $1,250.00
-          </CardTitle>
+          <CardTitle>Total Queries</CardTitle>
+          <IconActivity className="size-5 text-muted-foreground" />
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Trending up this month <IconTrendingUp className="size-4" />
+        <CardContent>
+          <div className="text-2xl font-bold tabular-nums @[250px]/card:text-3xl">
+            {total.toLocaleString()}
           </div>
-          <div className="text-muted-foreground">
-            Visitors for the last 6 months
-          </div>
+        </CardContent>
+        <CardFooter className="text-sm text-muted-foreground">
+          All DNS queries processed
         </CardFooter>
       </Card>
+
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>New Customers</CardDescription>
-          <CardTitle className="text-2xl font-semibold text-white tabular-nums @[250px]/card:text-3xl">
-            1,234
-          </CardTitle>
+          <CardTitle>Blocked</CardTitle>
+          <IconShieldX className="size-5 text-muted-foreground" />
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Down 20% this period <IconTrendingDown className="size-4" />
+        <CardContent>
+          <div className="text-2xl font-bold tabular-nums @[250px]/card:text-3xl">
+            {blocked.toLocaleString()}
           </div>
-          <div className="text-muted-foreground">
-            Acquisition needs attention
-          </div>
+        </CardContent>
+        <CardFooter className="text-sm text-muted-foreground">
+          <Badge variant="destructive" className="text-xs">Blocked</Badge>
+          <span className="ml-2">queries refused</span>
         </CardFooter>
       </Card>
+
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>Active Accounts</CardDescription>
-          <CardTitle className="text-2xl font-semibold text-white tabular-nums @[250px]/card:text-3xl">
-            45,678
-          </CardTitle>
+          <CardTitle>Allowed</CardTitle>
+          <IconShieldCheck className="size-5 text-muted-foreground" />
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Strong user retention <IconTrendingUp className="size-4" />
+        <CardContent>
+          <div className="text-2xl font-bold tabular-nums @[250px]/card:text-3xl">
+            {allowed.toLocaleString()}
           </div>
-          <div className="text-muted-foreground">Engagement exceed targets</div>
+        </CardContent>
+        <CardFooter className="text-sm text-muted-foreground">
+          Forwarded to upstream
         </CardFooter>
       </Card>
+
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>Growth Rate</CardDescription>
-          <CardTitle className="text-2xl font-semibold text-white tabular-nums @[250px]/card:text-3xl">
-            4.5%
-          </CardTitle>
+          <CardTitle>Block Rate</CardTitle>
+          <IconPercentage className="size-5 text-muted-foreground" />
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Steady performance increase <IconTrendingUp className="size-4" />
+        <CardContent>
+          <div className="text-2xl font-bold tabular-nums @[250px]/card:text-3xl">
+            {rate.toFixed(1)}%
           </div>
-          <div className="text-muted-foreground">Meets growth projections</div>
+        </CardContent>
+        <CardFooter className="text-sm text-muted-foreground">
+          Of total queries blocked
         </CardFooter>
       </Card>
     </div>

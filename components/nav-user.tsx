@@ -1,13 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   RiMore2Line,
-  RiTimer2Line,
-  RiUserLine,
-  RiPulseLine,
-  RiFindReplaceLine,
   RiLogoutCircleLine,
 } from "@remixicon/react";
+import { clearToken } from "@/lib/auth";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -33,6 +31,12 @@ export function NavUser({
   };
 }) {
   const { isMobile } = useSidebar();
+  const router = useRouter();
+
+  function handleLogout() {
+    clearToken();
+    router.push("/login");
+  }
 
   return (
     <SidebarMenu>
@@ -61,39 +65,7 @@ export function NavUser({
             align="end"
             sideOffset={4}
           >
-            <DropdownMenuItem className="gap-3 px-1">
-              <RiTimer2Line
-                size={20}
-                className="text-muted-foreground/70"
-                aria-hidden="true"
-              />
-              <span>Dashboard</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-3 px-1">
-              <RiUserLine
-                size={20}
-                className="text-muted-foreground/70"
-                aria-hidden="true"
-              />
-              <span>Profile</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-3 px-1">
-              <RiPulseLine
-                size={20}
-                className="text-muted-foreground/70"
-                aria-hidden="true"
-              />
-              <span>Changelog</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-3 px-1">
-              <RiFindReplaceLine
-                size={20}
-                className="text-muted-foreground/70"
-                aria-hidden="true"
-              />
-              <span>History</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-3 px-1">
+            <DropdownMenuItem className="gap-3 px-1" onClick={handleLogout}>
               <RiLogoutCircleLine
                 size={20}
                 className="text-muted-foreground/70"
