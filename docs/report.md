@@ -323,6 +323,46 @@ See [critique-003.md](critique-003.md) for full review findings.
 
 ---
 
+## MCP Go-Live Session (2026-04-10)
+
+**Goal:** Get MCP server working end-to-end with a real AI client (Gemini CLI).
+
+### What was done
+
+**1. MCP Protocol Fixes**
+- Fixed: server was sending response to `notifications/initialized` — notifications must get no response
+- Fixed: JSON responses could have null fields that fail Zod schema validation in MCP SDK clients
+- Added custom `MarshalJSON` that ensures exactly `result` OR `error` in each response, never both
+
+**2. Submodule Registration**
+- `apps/cli` was a working git submodule internally but missing from `.gitmodules`
+- `git pull --recurse-submodules` on other machines didn't fetch CLI code
+- Registered `hydra-cli` in `.gitmodules` and setup.sh
+
+**3. New MCP Tool: `create_policy`**
+- AI was calling `block_domain` 7 times for "block social media" — creating 7 separate policies
+- Added `create_policy` tool that accepts name, action, domains array, and priority
+- AI now creates one grouped policy (e.g. "Block Social Media" with all domains)
+
+**4. Live Verification**
+- MCP server connected to Gemini CLI: 🟢 hydradns - Ready (9 tools)
+- Tested: "Check status, block all social media, show policies" — Gemini called get_status, create_policy, list_policies correctly
+- DNS blocking confirmed: `dig @localhost facebook.com` returns REFUSED after AI-created policy
+
+### Key metrics
+- **MCP tools:** 8 → 9 (added create_policy)
+- **Protocol fixes:** 2 (notification response, JSON serialization)
+- **Verified with:** Gemini CLI (Google)
+- **End-to-end:** AI prompt → MCP tool call → DNS policy created → domain blocked on network
+
+### Lessons learned
+1. MCP notifications must get zero response — even `{"id":null}` breaks Zod validation
+2. MCP SDK clients validate response JSON strictly — use custom marshaling to prevent null fields
+3. AI defaults to calling single-item tools N times — provide batch tools with clear descriptions to guide it
+4. Submodules must be in `.gitmodules` for recursive clone/pull — internal `.git/modules/` isn't enough
+
+---
+
 ## Deferred Items (Tech Debt)
 
 These are known issues that were intentionally deferred. Track them here so they don't get lost.

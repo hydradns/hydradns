@@ -34,12 +34,15 @@ Single Go binary (`hydra`) with two modes:
 |---|---|---|
 | `get_status` | Get DNS engine status and query stats | none |
 | `toggle_engine` | Enable or disable DNS engine | enabled: bool |
-| `block_domain` | Block a domain | domain: string |
+| `block_domain` | Block a single domain | domain: string |
+| `create_policy` | Create a policy with multiple domains | name: string, action: string, domains: string[], priority?: int |
 | `unblock_domain` | Remove a block policy | policy_id: string |
 | `list_policies` | List all DNS policies | none |
 | `list_blocklists` | List blocklist sources | none |
 | `get_query_logs` | Get recent DNS query logs | none |
 | `get_metrics` | Get DNS query performance metrics | none |
+
+**Verified live with Gemini CLI (2026-04-10).** 9 tools connected, AI can manage DNS policies conversationally.
 
 ## Tech Stack
 - Go + cobra for CLI
