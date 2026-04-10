@@ -136,6 +136,9 @@ Then try to visit `tiktok.com` on their browser. It fails. Show the block entry 
 
 | Problem | Quick Fix |
 |---------|-----------|
+| Blocked sites still opening in browser | Browser cached the page. Use InPrivate/Incognito window. Also flush DNS: `ipconfig /flushdns` |
+| Blocking not working at all | Remove secondary DNS from router. When HydraDNS returns REFUSED, Windows falls back to the secondary DNS (e.g. 8.8.8.8) which resolves it. **Set only HydraDNS IP as DNS, no fallback.** |
+| Browser bypassing DNS filter | Disable Secure DNS / DNS-over-HTTPS in browser settings. Also block DoH providers via policy (dns.google, cloudflare-dns.com, etc.) |
 | Pi won't boot | Have a backup Pi or run from your laptop via Docker |
 | Dashboard shows "API unreachable" | Wait 60 seconds for Docker containers to start. Check `docker compose logs core` |
 | DNS queries not being blocked | Check router DNS settings point to Pi IP. Try `dig @<pi-ip> ads.google.com` to confirm |

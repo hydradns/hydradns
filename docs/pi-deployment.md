@@ -91,6 +91,22 @@ Point your router's DNS server to your Pi's IP address. This makes every device 
 4. Set **Secondary DNS** to `8.8.8.8`
 5. Save
 
+## Critical: DNS Configuration
+
+**Do NOT set a secondary/fallback DNS** (like 8.8.8.8) on the router. When HydraDNS blocks a domain by returning REFUSED, the operating system will try the secondary DNS server, which resolves the domain normally — bypassing the filter entirely.
+
+- **Primary DNS:** Your HydraDNS server IP
+- **Secondary DNS:** Leave empty (or set to the same HydraDNS IP)
+
+Also create a policy to block DNS-over-HTTPS providers, which browsers use to bypass system DNS:
+
+```bash
+TOKEN="your-token-here"
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  http://<server-ip>:8080/api/v1/policies \
+  -d '{"id":"block-doh","name":"Block DNS-over-HTTPS","action":"BLOCK","domains":["dns.google","dns.google.com","cloudflare-dns.com","mozilla.cloudflare-dns.com","doh.opendns.com","dns.quad9.net","doh.cleanbrowsing.org","dns.adguard.com","dns.nextdns.io","doh.dns.sb"],"priority":200}'
+```
+
 ## Verify It's Working
 
 From any device on the network:
