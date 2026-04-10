@@ -27,6 +27,23 @@ type Response struct {
 	Error   *Error `json:"error,omitempty"`
 }
 
+// MarshalJSON ensures only result OR error is present, never both or neither
+func (r Response) MarshalJSON() ([]byte, error) {
+	type Alias Response
+	if r.Error != nil {
+		return json.Marshal(struct {
+			JSONRPC string `json:"jsonrpc"`
+			ID      any    `json:"id"`
+			Error   *Error `json:"error"`
+		}{r.JSONRPC, r.ID, r.Error})
+	}
+	return json.Marshal(struct {
+		JSONRPC string `json:"jsonrpc"`
+		ID      any    `json:"id"`
+		Result  any    `json:"result"`
+	}{r.JSONRPC, r.ID, r.Result})
+}
+
 type Error struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
@@ -182,6 +199,11 @@ func (s *Server) Run() error {
 			continue
 		}
 
+		// Notifications (no ID) get no response
+		if strings.HasPrefix(req.Method, "notifications/") {
+			continue
+		}
+
 		resp := s.handleRequest(req)
 		s.writeResponse(writer, resp)
 	}
@@ -209,10 +231,6 @@ func (s *Server) handleRequest(req Request) Response {
 				},
 			},
 		}
-
-	case "notifications/initialized":
-		// No response for notifications
-		return Response{JSONRPC: "2.0", ID: req.ID}
 
 	case "tools/list":
 		return Response{
