@@ -69,14 +69,24 @@ type Tool struct {
 }
 
 type InputSchema struct {
-	Type       string              `json:"type"`
-	Properties map[string]Property `json:"properties,omitempty"`
-	Required   []string            `json:"required,omitempty"`
+	Type       string         `json:"type"`
+	Properties map[string]any `json:"properties,omitempty"`
+	Required   []string       `json:"required,omitempty"`
 }
 
 type Property struct {
 	Type        string `json:"type"`
 	Description string `json:"description"`
+}
+
+type ArrayProperty struct {
+	Type        string   `json:"type"`
+	Description string   `json:"description"`
+	Items       ItemType `json:"items"`
+}
+
+type ItemType struct {
+	Type string `json:"type"`
 }
 
 type ToolsListResult struct {
@@ -120,8 +130,8 @@ func (s *Server) tools() []Tool {
 			Description: "Enable or disable the DNS engine",
 			InputSchema: InputSchema{
 				Type: "object",
-				Properties: map[string]Property{
-					"enabled": {Type: "boolean", Description: "true to enable, false to disable"},
+				Properties: map[string]any{
+					"enabled": Property{Type: "boolean", Description: "true to enable, false to disable"},
 				},
 				Required: []string{"enabled"},
 			},
@@ -131,10 +141,24 @@ func (s *Server) tools() []Tool {
 			Description: "Block a domain by creating a block policy",
 			InputSchema: InputSchema{
 				Type: "object",
-				Properties: map[string]Property{
-					"domain": {Type: "string", Description: "Domain name to block (e.g. ads.example.com)"},
+				Properties: map[string]any{
+					"domain": Property{Type: "string", Description: "Domain name to block (e.g. ads.example.com)"},
 				},
 				Required: []string{"domain"},
+			},
+		},
+		{
+			Name:        "create_policy",
+			Description: "Create a DNS policy to block, allow, or redirect multiple domains in one rule. Use this instead of block_domain when handling multiple domains (e.g. 'block all social media').",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"name":     Property{Type: "string", Description: "Human-readable policy name (e.g. 'Block Social Media')"},
+					"action":   Property{Type: "string", Description: "BLOCK, ALLOW, or REDIRECT"},
+					"domains":  ArrayProperty{Type: "array", Description: "List of domains to apply the policy to", Items: ItemType{Type: "string"}},
+					"priority": Property{Type: "integer", Description: "Priority (higher wins). Default 100."},
+				},
+				Required: []string{"name", "action", "domains"},
 			},
 		},
 		{
@@ -142,8 +166,8 @@ func (s *Server) tools() []Tool {
 			Description: "Remove a block policy by its ID",
 			InputSchema: InputSchema{
 				Type: "object",
-				Properties: map[string]Property{
-					"policy_id": {Type: "string", Description: "The policy ID to remove"},
+				Properties: map[string]any{
+					"policy_id": Property{Type: "string", Description: "The policy ID to remove"},
 				},
 				Required: []string{"policy_id"},
 			},
@@ -275,6 +299,8 @@ func (s *Server) callTool(params CallToolParams) CallToolResult {
 		return s.toolToggleEngine(params.Arguments)
 	case "block_domain":
 		return s.toolBlockDomain(params.Arguments)
+	case "create_policy":
+		return s.toolCreatePolicy(params.Arguments)
 	case "unblock_domain":
 		return s.toolUnblockDomain(params.Arguments)
 	case "list_policies":
@@ -352,6 +378,40 @@ func (s *Server) toolBlockDomain(args json.RawMessage) CallToolResult {
 	}
 
 	return textResult(fmt.Sprintf("Blocked domain %s (policy: %s)", p.Domain, id))
+}
+
+func (s *Server) toolCreatePolicy(args json.RawMessage) CallToolResult {
+	var p struct {
+		Name     string   `json:"name"`
+		Action   string   `json:"action"`
+		Domains  []string `json:"domains"`
+		Priority int      `json:"priority"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return errorResult(fmt.Errorf("invalid arguments: %w", err))
+	}
+
+	if p.Priority == 0 {
+		p.Priority = 100
+	}
+
+	// Generate a slug ID from the name
+	id := "mcp-" + strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(p.Name, " ", "-"), "'", ""))
+
+	_, err := s.client.CreatePolicy(map[string]interface{}{
+		"id":       id,
+		"name":     p.Name,
+		"action":   strings.ToUpper(p.Action),
+		"domains":  p.Domains,
+		"priority": p.Priority,
+		"category": "mcp",
+	})
+	if err != nil {
+		return errorResult(err)
+	}
+
+	return textResult(fmt.Sprintf("Created policy '%s' (%s) with %d domains: %s",
+		p.Name, strings.ToUpper(p.Action), len(p.Domains), strings.Join(p.Domains, ", ")))
 }
 
 func (s *Server) toolUnblockDomain(args json.RawMessage) CallToolResult {
