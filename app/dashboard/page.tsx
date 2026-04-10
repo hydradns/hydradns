@@ -38,8 +38,8 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    fetchData()
     const interval = setInterval(fetchData, 5000)
+    void fetchData()
     return () => clearInterval(interval)
   }, [])
 
