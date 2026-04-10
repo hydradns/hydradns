@@ -10,3 +10,6 @@
 [submodule "apps/landing"]
 	path = apps/landing
 	url = https://github.com/hydradns/hydradns-landing
+[submodule "apps/cli"]
+	path = apps/cli
+	url = https://github.com/hydradns/hydra-cli

@@ -20,8 +20,7 @@ git submodule add https://github.com/hydradns/scanner apps/scanner
 echo "Adding landing page submodule..."
 git submodule add https://github.com/hydradns/hydradns-landing apps/landing
 
-# CLI submodule — uncomment when the repo is available
-# echo "Adding CLI submodule..."
-# git submodule add https://github.com/hydradns/hydra-cli apps/cli
+echo "Adding CLI submodule..."
+git submodule add https://github.com/hydradns/hydra-cli apps/cli
 
 echo "Setup complete!"
