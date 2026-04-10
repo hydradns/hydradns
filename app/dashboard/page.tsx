@@ -39,6 +39,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const interval = setInterval(fetchData, 5000)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch before interval kicks in
     void fetchData()
     return () => clearInterval(interval)
   }, [])
