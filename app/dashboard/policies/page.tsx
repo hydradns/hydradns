@@ -7,11 +7,15 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import {
+  Drawer, DrawerClose, DrawerContent, DrawerDescription,
+  DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger,
+} from "@/components/ui/drawer"
 import { getPolicies, createPolicy, deletePolicy } from "@/lib/api"
 import type { Policy, PolicyListData } from "@/lib/types"
 import {
   Plus, Trash2, Shield, ShieldCheck, ArrowRightLeft,
-  Globe, ScrollText, ChevronDown,
+  Globe, ChevronDown,
 } from "lucide-react"
 
 const actionConfig: Record<string, { label: string; badge: string; icon: string; bg: string }> = {
@@ -54,12 +58,9 @@ export default function PoliciesPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   // Form state
-  const [formId, setFormId] = useState("")
   const [formName, setFormName] = useState("")
-  const [formDescription, setFormDescription] = useState("")
   const [formAction, setFormAction] = useState("BLOCK")
   const [formDomains, setFormDomains] = useState("")
-  const [formCategory, setFormCategory] = useState("")
   const [formPriority, setFormPriority] = useState("100")
 
   const [error, setError] = useState<string | null>(null)
@@ -71,30 +72,26 @@ export default function PoliciesPage() {
   useEffect(() => { fetchData() }, [])
 
   const resetForm = () => {
-    setFormId("")
     setFormName("")
-    setFormDescription("")
     setFormAction("BLOCK")
     setFormDomains("")
-    setFormCategory("")
     setFormPriority("100")
     setFormError(null)
   }
 
   const handleCreate = async () => {
     const domains = formDomains.split(/[,\n]/).map((d) => d.trim()).filter(Boolean)
-    if (!formId || !formName || domains.length === 0) {
-      setFormError("ID, Name, and at least one domain are required")
+    if (!formName || domains.length === 0) {
+      setFormError("Name and at least one domain are required")
       return
     }
+    const id = formName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
     setSubmitting(true)
     setFormError(null)
     try {
       await createPolicy({
-        id: formId,
+        id,
         name: formName,
-        description: formDescription || undefined,
-        category: formCategory || undefined,
         action: formAction,
         domains,
         priority: parseInt(formPriority) || 100,
@@ -119,6 +116,9 @@ export default function PoliciesPage() {
     }
   }
 
+  const inputClass = "w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:border-[#00D4AA] transition-colors placeholder:text-muted-foreground/50 text-sm"
+  const labelClass = "block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2"
+
   return (
     <>
       <header className="flex flex-wrap gap-3 min-h-20 py-4 shrink-0 items-center border-b border-border">
@@ -139,13 +139,99 @@ export default function PoliciesPage() {
             </Breadcrumb>
           </div>
         </div>
-        <button
-          onClick={() => { setShowForm(!showForm); if (showForm) resetForm() }}
-          className="flex items-center gap-2 bg-[#00D4AA] text-background font-bold px-4 py-2 rounded-lg text-sm hover:bg-[#00f5c4] transition-colors shadow-lg shadow-[#00D4AA]/20"
-        >
-          <Plus className="w-4 h-4" />
-          {showForm ? "Cancel" : "Add Policy"}
-        </button>
+
+        <Drawer direction="right" open={showForm} onOpenChange={(open) => { setShowForm(open); if (!open) resetForm() }}>
+          <DrawerTrigger asChild>
+            <button
+              className="flex items-center gap-2 bg-[#00D4AA] text-background font-bold px-4 py-2 rounded-lg text-sm hover:bg-[#00f5c4] transition-colors shadow-lg shadow-[#00D4AA]/20"
+            >
+              <Plus className="w-4 h-4" />
+              Add Policy
+            </button>
+          </DrawerTrigger>
+          <DrawerContent className="data-[vaul-drawer-direction=right]:sm:max-w-md">
+            <DrawerHeader className="border-b border-border">
+              <DrawerTitle className="font-headline text-xl font-bold">Add Policy</DrawerTitle>
+              <DrawerDescription>Create a new DNS policy rule</DrawerDescription>
+            </DrawerHeader>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {formError && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                  {formError}
+                </div>
+              )}
+
+              <div>
+                <label className={labelClass}>Name</label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  placeholder="e.g. Block Social Media"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>Action</label>
+                <div className="relative">
+                  <select
+                    className={`${inputClass} appearance-none`}
+                    value={formAction}
+                    onChange={(e) => setFormAction(e.target.value)}
+                  >
+                    <option value="BLOCK">Block</option>
+                    <option value="ALLOW">Allow</option>
+                    <option value="REDIRECT">Redirect</option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 absolute right-3 top-3.5 text-muted-foreground pointer-events-none" />
+                </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>Domains (one per line)</label>
+                <textarea
+                  className={`${inputClass} font-mono leading-relaxed`}
+                  placeholder={"facebook.com\ntiktok.com\nads.example.net"}
+                  rows={5}
+                  value={formDomains}
+                  onChange={(e) => setFormDomains(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>Priority</label>
+                <input
+                  type="number"
+                  className={inputClass}
+                  value={formPriority}
+                  onChange={(e) => setFormPriority(e.target.value)}
+                />
+                <p className="text-[10px] text-muted-foreground mt-2 italic">Higher numbers override lower priorities.</p>
+              </div>
+            </div>
+
+            <DrawerFooter className="border-t border-border flex-row justify-end gap-3">
+              <DrawerClose asChild>
+                <button
+                  type="button"
+                  className="px-6 py-3 border border-border text-muted-foreground font-bold rounded-lg hover:bg-card transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+              </DrawerClose>
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={submitting}
+                className="px-8 py-3 bg-[#00D4AA] text-background font-bold rounded-lg hover:bg-[#00f5c4] transition-colors text-sm disabled:opacity-50 shadow-lg shadow-[#00D4AA]/20"
+              >
+                {submitting ? "Saving..." : "Save Policy"}
+              </button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
       </header>
 
       <div className="flex flex-1 flex-col gap-6 py-6">
@@ -154,136 +240,6 @@ export default function PoliciesPage() {
           <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
             {error}
           </div>
-        )}
-
-        {/* Inline Add Form */}
-        {showForm && (
-          <section>
-            <div className="bg-card rounded-xl border border-border overflow-hidden relative">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#00D4AA] to-[#0EA5E9]" />
-              <div className="p-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <ScrollText className="w-5 h-5 text-[#00D4AA]" />
-                  <h2 className="font-headline text-xl font-bold text-foreground">Configure New Policy</h2>
-                </div>
-
-                {formError && (
-                  <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
-                    {formError}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                  <div className="md:col-span-4">
-                    <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
-                      Policy ID
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:border-[#00D4AA] transition-colors placeholder:text-muted-foreground/50 text-sm"
-                      placeholder="e.g. block-social"
-                      value={formId}
-                      onChange={(e) => setFormId(e.target.value)}
-                    />
-                  </div>
-                  <div className="md:col-span-4">
-                    <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
-                      Policy Name
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:border-[#00D4AA] transition-colors placeholder:text-muted-foreground/50 text-sm"
-                      placeholder="e.g. Block Social Media"
-                      value={formName}
-                      onChange={(e) => setFormName(e.target.value)}
-                    />
-                  </div>
-                  <div className="md:col-span-4">
-                    <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
-                      Action
-                    </label>
-                    <div className="relative">
-                      <select
-                        className="w-full appearance-none bg-background border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:border-[#00D4AA] transition-colors text-sm"
-                        value={formAction}
-                        onChange={(e) => setFormAction(e.target.value)}
-                      >
-                        <option value="BLOCK">Block</option>
-                        <option value="ALLOW">Allow</option>
-                        <option value="REDIRECT">Redirect</option>
-                      </select>
-                      <ChevronDown className="w-4 h-4 absolute right-3 top-3.5 text-muted-foreground pointer-events-none" />
-                    </div>
-                  </div>
-                  <div className="md:col-span-12">
-                    <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
-                      Domains (one per line)
-                    </label>
-                    <textarea
-                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:border-[#00D4AA] transition-colors placeholder:text-muted-foreground/50 font-mono text-sm leading-relaxed"
-                      placeholder={"facebook.com\ntiktok.com\nads.example.net"}
-                      rows={4}
-                      value={formDomains}
-                      onChange={(e) => setFormDomains(e.target.value)}
-                    />
-                  </div>
-                  <div className="md:col-span-3">
-                    <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
-                      Priority
-                    </label>
-                    <input
-                      type="number"
-                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:border-[#00D4AA] transition-colors text-sm"
-                      value={formPriority}
-                      onChange={(e) => setFormPriority(e.target.value)}
-                    />
-                    <p className="text-[10px] text-muted-foreground mt-2 italic">Higher numbers override lower priorities.</p>
-                  </div>
-                  <div className="md:col-span-3">
-                    <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
-                      Category
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:border-[#00D4AA] transition-colors placeholder:text-muted-foreground/50 text-sm"
-                      placeholder="e.g. social, security"
-                      value={formCategory}
-                      onChange={(e) => setFormCategory(e.target.value)}
-                    />
-                  </div>
-                  <div className="md:col-span-6">
-                    <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
-                      Description
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:border-[#00D4AA] transition-colors placeholder:text-muted-foreground/50 text-sm"
-                      placeholder="Optional description"
-                      value={formDescription}
-                      onChange={(e) => setFormDescription(e.target.value)}
-                    />
-                  </div>
-                  <div className="md:col-span-12 flex items-end justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => { setShowForm(false); resetForm() }}
-                      className="px-6 py-3 border border-border text-muted-foreground font-bold rounded-lg hover:bg-card transition-colors text-sm"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCreate}
-                      disabled={submitting}
-                      className="px-8 py-3 bg-[#00D4AA] text-background font-bold rounded-lg hover:bg-[#00f5c4] transition-colors text-sm disabled:opacity-50 shadow-lg shadow-[#00D4AA]/20"
-                    >
-                      {submitting ? "Saving..." : "Save Policy"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
         )}
 
         {/* Policy list header */}
