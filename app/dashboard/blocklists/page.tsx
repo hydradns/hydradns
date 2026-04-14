@@ -11,10 +11,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Drawer, DrawerClose, DrawerContent, DrawerDescription,
+  DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger,
+} from "@/components/ui/drawer"
 import { getBlocklists, createBlocklist, deleteBlocklist } from "@/lib/api"
 import type { Blocklist, BlocklistListData } from "@/lib/types"
 import {
-  Plus, Trash2, ShieldCheck, List, RefreshCw, X,
+  Plus, Trash2, ShieldCheck, List, RefreshCw,
 } from "lucide-react"
 
 function timeAgo(dateString: string): string {
@@ -38,11 +42,9 @@ export default function BlocklistsPage() {
   const [formError, setFormError] = useState<string | null>(null)
 
   // Form state
-  const [formId, setFormId] = useState("")
   const [formName, setFormName] = useState("")
   const [formUrl, setFormUrl] = useState("")
   const [formFormat, setFormFormat] = useState("hosts")
-  const [formCategory, setFormCategory] = useState("")
 
   const [error, setError] = useState<string | null>(null)
 
@@ -53,28 +55,26 @@ export default function BlocklistsPage() {
   useEffect(() => { fetchData() }, [])
 
   const resetForm = () => {
-    setFormId("")
     setFormName("")
     setFormUrl("")
     setFormFormat("hosts")
-    setFormCategory("")
     setFormError(null)
   }
 
   const handleCreate = async () => {
-    if (!formId || !formName || !formUrl) {
-      setFormError("ID, Name, and URL are required")
+    if (!formName || !formUrl) {
+      setFormError("Name and URL are required")
       return
     }
+    const id = formName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
     setSubmitting(true)
     setFormError(null)
     try {
       await createBlocklist({
-        id: formId,
+        id,
         name: formName,
         url: formUrl,
         format: formFormat,
-        category: formCategory || undefined,
       })
       resetForm()
       setShowForm(false)
@@ -118,23 +118,85 @@ export default function BlocklistsPage() {
             </Breadcrumb>
           </div>
         </div>
-        <Button
-          size="sm"
-          className="bg-[#00D4AA] hover:bg-[#00BD98] text-[#1A1D23] font-semibold gap-2"
-          onClick={() => { setShowForm(!showForm); if (showForm) resetForm() }}
-        >
-          {showForm ? (
-            <>
-              <X className="h-4 w-4" />
-              Cancel
-            </>
-          ) : (
-            <>
+        <Drawer direction="right" open={showForm} onOpenChange={(open) => { setShowForm(open); if (!open) resetForm() }}>
+          <DrawerTrigger asChild>
+            <Button
+              size="sm"
+              className="bg-[#00D4AA] hover:bg-[#00BD98] text-[#1A1D23] font-semibold gap-2"
+            >
               <Plus className="h-4 w-4" />
               Add Source
-            </>
-          )}
-        </Button>
+            </Button>
+          </DrawerTrigger>
+          <DrawerContent className="data-[vaul-drawer-direction=right]:sm:max-w-md">
+            <DrawerHeader>
+              <DrawerTitle className="font-headline text-lg">Add Blocklist Source</DrawerTitle>
+              <DrawerDescription>Add a URL to fetch blocked domains from</DrawerDescription>
+            </DrawerHeader>
+
+            <div className="flex-1 overflow-y-auto px-4">
+              {formError && (
+                <div className="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                  {formError}
+                </div>
+              )}
+              <div className="grid gap-5">
+                <div className="space-y-2">
+                  <Label htmlFor="bl-name" className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                    Name
+                  </Label>
+                  <Input
+                    id="bl-name"
+                    placeholder="e.g. StevenBlack Hosts"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    className="bg-background border-border rounded-lg"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bl-url" className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                    URL
+                  </Label>
+                  <Input
+                    id="bl-url"
+                    placeholder="https://raw.githubusercontent.com/..."
+                    value={formUrl}
+                    onChange={(e) => setFormUrl(e.target.value)}
+                    className="bg-background border-border rounded-lg font-mono text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bl-format" className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                    Format
+                  </Label>
+                  <Select value={formFormat} onValueChange={setFormFormat}>
+                    <SelectTrigger id="bl-format" className="bg-background border-border rounded-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hosts">Hosts</SelectItem>
+                      <SelectItem value="domains">Domains</SelectItem>
+                      <SelectItem value="adblock">Adblock</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <DrawerFooter className="flex-row justify-end gap-3">
+              <DrawerClose asChild>
+                <Button variant="ghost">Cancel</Button>
+              </DrawerClose>
+              <Button
+                className="bg-[#00D4AA] hover:bg-[#00BD98] text-[#1A1D23] font-semibold"
+                onClick={handleCreate}
+                disabled={submitting}
+              >
+                {submitting ? "Adding..." : "Save Source"}
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
       </header>
 
       <div className="flex flex-1 flex-col gap-6 py-6">
@@ -199,101 +261,6 @@ export default function BlocklistsPage() {
                   Every 6h
                 </h3>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Inline add form */}
-        {showForm && (
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h4 className="font-headline font-semibold text-lg mb-1">Add Blocklist Source</h4>
-            <p className="text-sm text-muted-foreground mb-5">
-              Add a new blocklist URL to fetch and block domains from.
-            </p>
-            {formError && (
-              <div className="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-                {formError}
-              </div>
-            )}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="bl-id" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  ID
-                </Label>
-                <Input
-                  id="bl-id"
-                  placeholder="e.g. steven-black"
-                  value={formId}
-                  onChange={(e) => setFormId(e.target.value)}
-                  className="bg-background border-border"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="bl-name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Name
-                </Label>
-                <Input
-                  id="bl-name"
-                  placeholder="e.g. StevenBlack Hosts"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="bg-background border-border"
-                />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="bl-url" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  URL
-                </Label>
-                <Input
-                  id="bl-url"
-                  placeholder="https://raw.githubusercontent.com/..."
-                  value={formUrl}
-                  onChange={(e) => setFormUrl(e.target.value)}
-                  className="bg-background border-border font-mono text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="bl-format" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Format
-                </Label>
-                <Select value={formFormat} onValueChange={setFormFormat}>
-                  <SelectTrigger id="bl-format" className="bg-background border-border">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hosts">Hosts</SelectItem>
-                    <SelectItem value="domains">Domains</SelectItem>
-                    <SelectItem value="adblock">Adblock</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="bl-category" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Category
-                </Label>
-                <Input
-                  id="bl-category"
-                  placeholder="e.g. ads, malware"
-                  value={formCategory}
-                  onChange={(e) => setFormCategory(e.target.value)}
-                  className="bg-background border-border"
-                />
-              </div>
-            </div>
-            <div className="mt-5 flex justify-end gap-3">
-              <Button
-                variant="ghost"
-                onClick={() => { setShowForm(false); resetForm() }}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="bg-[#00D4AA] hover:bg-[#00BD98] text-[#1A1D23] font-semibold"
-                onClick={handleCreate}
-                disabled={submitting}
-              >
-                {submitting ? "Adding..." : "Save Source"}
-              </Button>
             </div>
           </div>
         )}
