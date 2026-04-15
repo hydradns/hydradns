@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Shield,
@@ -79,9 +80,13 @@ function SidebarLogo() {
         href="/dashboard"
       >
         <span className="sr-only">HydraDNS</span>
-        <div className="flex items-center justify-center size-9 group-data-[collapsible=icon]:size-8 rounded-lg bg-[#00D4AA] text-gray-950 font-bold text-sm transition-[width,height] duration-200 ease-in-out">
-          <Shield className="size-5" />
-        </div>
+        <Image
+          src="/logo.png"
+          alt="HydraDNS"
+          width={36}
+          height={36}
+          className="size-9 group-data-[collapsible=icon]:size-8 rounded-lg transition-[width,height] duration-200 ease-in-out"
+        />
         <div className="flex flex-col group-data-[collapsible=icon]:hidden transition-opacity duration-200">
           <span className="font-semibold text-sm text-[#00D4AA]">
             HydraDNS

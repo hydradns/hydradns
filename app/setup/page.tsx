@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { setup, setToken, checkSetupStatus } from "@/lib/auth"
+import Image from "next/image"
 import {
-  Shield,
   Lock,
   KeyRound,
   ChevronRight,
@@ -174,7 +174,7 @@ export default function SetupPage() {
         <div className="text-xl font-black text-hydra-teal tracking-tight font-headline">
           HydraDNS
         </div>
-        <Shield className="h-5 w-5 text-slate-500" />
+        <Image src="/logo.png" alt="HydraDNS" width={24} height={24} className="h-6 w-6 rounded" />
       </header>
 
       <main className="w-full max-w-md">
@@ -182,9 +182,13 @@ export default function SetupPage() {
         <div className="bg-card border border-border rounded-xl shadow-2xl p-8 md:p-10">
           {/* Logo + Step indicator */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-hydra-teal/10 rounded-full flex items-center justify-center mb-6">
-              <ShieldCheck className="h-8 w-8 text-hydra-teal" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="HydraDNS"
+              width={64}
+              height={64}
+              className="w-16 h-16 rounded-xl mb-6"
+            />
 
             {/* Step dots */}
             <div className="flex gap-3 items-center mb-2">

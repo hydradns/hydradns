@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Shield, Lock, ArrowRight, Loader2, AlertTriangle } from "lucide-react"
+import Image from "next/image"
+import { Lock, ArrowRight, Loader2, AlertTriangle } from "lucide-react"
 import { login, setToken, checkSetupStatus, getToken } from "@/lib/auth"
 
 export default function LoginPage() {
@@ -79,9 +80,13 @@ export default function LoginPage() {
 
             {/* Card Header */}
             <div className="flex flex-col items-center text-center mb-10">
-              <div className="w-16 h-16 bg-[#1A1D23] border border-[#00D4AA]/20 rounded-xl flex items-center justify-center mb-4 shadow-inner">
-                <Shield className="w-8 h-8 text-[#00D4AA]" fill="currentColor" />
-              </div>
+              <Image
+                src="/logo.png"
+                alt="HydraDNS"
+                width={64}
+                height={64}
+                className="w-16 h-16 rounded-xl mb-4"
+              />
               <h1 className="font-headline text-3xl font-bold tracking-tight text-[#00D4AA] mb-1">
                 HydraDNS
               </h1>
