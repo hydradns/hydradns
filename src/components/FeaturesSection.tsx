@@ -8,57 +8,66 @@ import {
   FileText,
   Container,
   Plug,
+  Bot,
   ArrowRight,
 } from "lucide-react";
 
-const features = [
+type Badge = { label: string; tone: "teal" | "sky" };
+
+type Feature = {
+  icon: typeof Shield;
+  title: string;
+  desc: string;
+  badge?: Badge;
+};
+
+const features: Feature[] = [
   {
     icon: Shield,
     title: "Block at the DNS Layer",
     desc: "Malware, phishing, ads, and trackers get dropped before a connection is ever made. Nothing to install on the client.",
-    highlight: false,
   },
   {
     icon: Zap,
     title: "Sub-Millisecond Decisions",
     desc: "A Bloom filter sits in front of the policy engine, so most clean queries skip the lookup entirely and go straight to the upstream resolver.",
-    highlight: true,
+    badge: { label: "FAST PATH", tone: "teal" },
   },
   {
     icon: Lock,
     title: "Private by Default",
     desc: "Client IPs are hashed with HMAC-SHA256 before anything hits disk. No raw IPs in the logs, no phone-home, no third parties.",
-    highlight: false,
   },
   {
     icon: BarChart3,
     title: "Real-Time Dashboard",
     desc: "Queries, block rates, top domains, categories, and a 24-hour trend in one view. Built on a single API call so it stays quick.",
-    highlight: false,
   },
   {
     icon: ListFilter,
     title: "Rules That Fit Your Network",
     desc: "Exact domains, regex, priorities. Allow, block, redirect, or just log. Edits apply on the fly, no restarts.",
-    highlight: false,
   },
   {
     icon: FileText,
     title: "Bring Your Own Blocklists",
     desc: "Pull from the usual lists over HTTP with ETag caching. Hosts files, domain lists, and adblock formats all work.",
-    highlight: false,
+  },
+  {
+    icon: Bot,
+    title: "Run It by Asking",
+    desc: "A built-in MCP server exposes every action to AI assistants. Block a domain, tune a policy, or audit traffic by asking Claude or ChatGPT in plain English. No rule syntax to memorize.",
+    badge: { label: "AI-NATIVE", tone: "sky" },
   },
   {
     icon: Container,
     title: "One Command to Run",
-    desc: "docker compose up and you're live. Happy on a Raspberry Pi, a NAS, or a small VM. Multi-arch, non-root.",
-    highlight: false,
+    desc: "docker compose up and you're live. Happy on a mini-PC, a NAS, or a small VM. Multi-arch, non-root.",
   },
   {
     icon: Plug,
     title: "A REST API for Everything",
     desc: "17 endpoints cover the dashboard, DNS engine, policies, blocklists, and analytics. Script it, graph it, glue it into your stack.",
-    highlight: false,
   },
 ];
 
@@ -81,59 +90,62 @@ export function FeaturesSection() {
           {features.map((f, i) => (
             <FeatureCard key={i} feature={f} delay={i * 50} />
           ))}
-          <ViewAllCard delay={features.length * 50} />
+        </div>
+
+        <div className="mt-10 text-center fade-in-up">
+          <a
+            href="https://docs.hydradns.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 font-mono text-sm text-muted-foreground hover:text-brand-teal transition-colors"
+          >
+            The full feature list lives in the docs
+            <ArrowRight className="h-4 w-4" />
+          </a>
         </div>
       </div>
     </section>
   );
 }
 
-function FeatureCard({
-  feature,
-  delay,
-}: {
-  feature: (typeof features)[number];
-  delay: number;
-}) {
-  const { icon: Icon, title, desc, highlight } = feature;
+function FeatureCard({ feature, delay }: { feature: Feature; delay: number }) {
+  const { icon: Icon, title, desc, badge } = feature;
   const base =
     "group relative rounded-xl bg-surface-container p-7 border transition-all duration-300 fade-in-up";
-  const state = highlight
-    ? "border-brand-teal/30 glow-primary"
+  const state = badge
+    ? badge.tone === "sky"
+      ? "border-brand-sky/30 shadow-glow-sky"
+      : "border-brand-teal/30 glow-primary"
     : "border-outline-variant/25 hover:border-brand-teal/40 hover:bg-surface-container-high/80";
+
+  const badgeClasses =
+    badge?.tone === "sky"
+      ? "bg-brand-sky/15 border-brand-sky/30 text-brand-sky"
+      : "bg-brand-teal/15 border-brand-teal/30 text-brand-teal";
+
+  const iconTileClasses =
+    badge?.tone === "sky"
+      ? "bg-brand-sky/10 border-brand-sky/20"
+      : "bg-brand-teal/10 border-brand-teal/20";
+
+  const iconColor = badge?.tone === "sky" ? "text-brand-sky" : "text-brand-teal";
 
   return (
     <div className={`${base} ${state}`} style={{ transitionDelay: `${delay}ms` }}>
-      {highlight && (
-        <span className="absolute top-5 right-5 px-2 py-0.5 rounded-full bg-brand-teal/15 border border-brand-teal/30 font-mono text-[10px] tracking-wider text-brand-teal">
-          FAST PATH
+      {badge && (
+        <span
+          className={`absolute top-5 right-5 px-2 py-0.5 rounded-full border font-mono text-[10px] tracking-wider ${badgeClasses}`}
+        >
+          {badge.label}
         </span>
       )}
-      <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-brand-teal/10 border border-brand-teal/20">
-        <Icon className="h-5 w-5 text-brand-teal" strokeWidth={2} />
+      <div
+        className={`mb-5 inline-flex h-11 w-11 items-center justify-center rounded-lg border ${iconTileClasses}`}
+      >
+        <Icon className={`h-5 w-5 ${iconColor}`} strokeWidth={2} />
       </div>
       <h3 className="font-headline text-lg font-bold text-foreground mb-2">{title}</h3>
       <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
     </div>
-  );
-}
-
-function ViewAllCard({ delay }: { delay: number }) {
-  return (
-    <a
-      href="https://docs.hydradns.app"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group relative rounded-xl border border-dashed border-outline-variant/40 bg-surface-container-low/40 p-7 flex flex-col items-center justify-center text-center transition-all hover:border-brand-teal/40 hover:bg-surface-container/60 fade-in-up"
-      style={{ transitionDelay: `${delay}ms` }}
-    >
-      <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-surface-container-high/60 border border-outline-variant/30 group-hover:border-brand-teal/40 transition-colors">
-        <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-brand-teal transition-colors" />
-      </div>
-      <p className="font-mono text-sm text-muted-foreground group-hover:text-brand-teal transition-colors">
-        View all features →
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground/60">Docs · API · CLI · MCP</p>
-    </a>
   );
 }
