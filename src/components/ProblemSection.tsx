@@ -18,18 +18,18 @@ export function ProblemSection() {
             </h2>
             <div className="mt-8 space-y-5 text-muted-foreground leading-relaxed text-lg fade-in-up">
               <p>
-                Every website you visit, every app you open, every smart device in your
-                home — they all start with a DNS query. By default, those queries travel
-                unencrypted to your ISP, which can see, log, and sell your browsing history.
+                Every site you visit, every app you open, every smart thing in your
+                house. It all starts with a DNS query. By default those queries go
+                unencrypted to your ISP, who can log them, sell them, or hand them over.
               </p>
               <p>
-                Ads, trackers, and malware domains talk to your devices thousands of times a
-                day through DNS. Most people have zero visibility into any of it.
+                Ads, trackers, and malware talk to your devices through DNS all day.
+                Most people never see any of it.
               </p>
               <p>
-                HydraDNS sits between your network and the internet, inspecting every
-                query. Threats are blocked before a single byte of malicious data reaches
-                your devices.
+                HydraDNS sits between your network and the internet and looks at every
+                query on the way out. Bad domains get stopped at the gateway, not on
+                the device.
               </p>
             </div>
           </div>

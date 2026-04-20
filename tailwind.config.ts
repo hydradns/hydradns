@@ -47,7 +47,7 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // HydraDNS Security Theme — mirrors the dashboard palette
+        // HydraDNS Security Theme. Mirrors the dashboard palette.
         surface: {
           DEFAULT: "hsl(var(--surface))",
           container: "hsl(var(--surface-container))",

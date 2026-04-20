@@ -3,7 +3,7 @@
 # HydraDNS Landing Page
 
 ## Overview
-A modern, dark-themed, high-converting landing page for HydraDNS — an open-source DNS security gateway. Inspired by Linear.app and Vercel aesthetics: clean, moody, premium, with glass-morphism cards and subtle animations.
+A modern, dark-themed, high-converting landing page for HydraDNS, an open-source DNS security gateway. Inspired by Linear.app and Vercel aesthetics: clean, moody, premium, with glass-morphism cards and subtle animations.
 
 ## Design System
 - **Dark-only theme** with deep navy background (`#0A0F1C`), electric blue (`#3B82F6`) and cyan (`#06B6D4`) accents, purple (`#8B5CF6`) secondary accent

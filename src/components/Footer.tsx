@@ -1,4 +1,4 @@
-import { Shield } from "lucide-react";
+import logo from "@/assets/hydradns-logo.png";
 
 const productLinks = [
   { label: "Features", href: "#features" },
@@ -8,7 +8,7 @@ const productLinks = [
 ];
 
 const communityLinks = [
-  { label: "GitHub", href: "https://github.com/hydradns" },
+  { label: "GitHub", href: "https://github.com/hydradns/hydradns" },
   { label: "Documentation", href: "https://docs.hydradns.app" },
   { label: "Contributing", href: "https://github.com/hydradns/hydradns/blob/main/CONTRIBUTING.md" },
   { label: "Security", href: "https://github.com/hydradns/hydradns/security" },
@@ -23,16 +23,13 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <span className="w-9 h-9 rounded-lg bg-surface-container-high border border-outline-variant/40 flex items-center justify-center">
-                <Shield className="h-[18px] w-[18px] text-brand-teal" strokeWidth={2.25} />
-              </span>
+              <img src={logo} alt="HydraDNS" className="h-9 w-9 rounded-full" />
               <span className="font-headline text-[15px] font-bold tracking-tighter uppercase text-foreground">
                 HydraDNS
               </span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
-              © 2026 HydraDNS. Open-source DNS-layer security for anyone who wants their
-              network back.
+              © 2026 HydraDNS. DNS security for people who want their network back.
             </p>
             <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground/70">
               DNS-layer · Self-hosted · Zero telemetry

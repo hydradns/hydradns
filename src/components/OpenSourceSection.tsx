@@ -20,23 +20,19 @@ export function OpenSourceSection() {
           <span className="text-gradient">Owned by the community.</span>
         </h2>
         <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto fade-in-up">
-          HydraDNS is free and open-source under GPL-3.0. No telemetry, no tracking, no
-          vendor lock-in. Your DNS, your rules. We welcome contributors of all experience
-          levels.
+          HydraDNS is GPL-3.0. The whole stack is on GitHub, nothing phones home,
+          and the roadmap lives in public issues. Fork it, break it, send a PR.
         </p>
 
         <div className="mt-10 flex flex-wrap gap-4 justify-center fade-in-up">
           <a
-            href="https://github.com/hydradns"
+            href="https://github.com/hydradns/hydradns"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary inline-flex items-center gap-2.5 px-7 py-3.5 rounded-md font-semibold shadow-[0_0_30px_rgba(0,212,170,0.25)] hover:shadow-[0_0_40px_rgba(0,212,170,0.4)] transition-shadow"
           >
             <Star className="h-5 w-5" fill="currentColor" />
             Star on GitHub
-            <span className="ml-1 px-2 py-0.5 rounded-full bg-[hsl(var(--primary-foreground))]/20 font-mono text-xs">
-              1.2k
-            </span>
           </a>
           <a
             href="https://github.com/hydradns/hydradns/blob/main/CONTRIBUTING.md"

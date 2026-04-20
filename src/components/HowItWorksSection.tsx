@@ -5,36 +5,36 @@ const steps = [
   {
     icon: Terminal,
     num: "01",
-    title: "Deploy",
+    title: "Run it",
     desc: (
       <>
         Run{" "}
         <code className="font-mono text-xs text-brand-sky bg-surface-container-lowest px-1.5 py-0.5 rounded">
           docker compose up -d
         </code>{" "}
-        on any machine. HydraDNS starts a DNS server and admin API in seconds.
+        on any box. The DNS server and admin API are up in a few seconds.
       </>
     ),
   },
   {
     icon: Router,
     num: "02",
-    title: "Point Your DNS",
+    title: "Point your router at it",
     desc: (
       <>
-        Set your router's DNS to your HydraDNS server. Every device on the network is now
-        protected — phones, laptops, IoT, everything.
+        Set your router's DNS to the HydraDNS box. Phones, laptops, smart TVs, the
+        fridge. Every device on the network now goes through it.
       </>
     ),
   },
   {
     icon: BarChart3,
     num: "03",
-    title: "Monitor & Control",
+    title: "Watch what happens",
     desc: (
       <>
-        Use the dashboard to see real-time queries, manage blocklists, create policies,
-        and track exactly what's happening on your network.
+        Open the dashboard to see queries land in real time, tune your blocklists,
+        write a policy, or just figure out which app keeps phoning home.
       </>
     ),
   },
@@ -49,9 +49,9 @@ export function HowItWorksSection() {
         <div className="text-center mb-16">
           <p className="eyebrow fade-in-up">HOW IT WORKS</p>
           <h2 className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground fade-in-up leading-[1.1]">
-            Three steps. Five minutes.
+            Three steps, five minutes,
             <br />
-            <span className="text-gradient">Full protection.</span>
+            <span className="text-gradient">whole network covered.</span>
           </h2>
         </div>
 
