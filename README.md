@@ -7,7 +7,7 @@ Block ads, malware, and trackers at the DNS level — before they ever reach you
 [![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go)](https://go.dev)
 [![Next.js](https://img.shields.io/badge/Next.js-16-000?logo=next.js)](https://nextjs.org)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)](https://docs.docker.com/compose/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
 ---
 
@@ -278,4 +278,4 @@ Then point your router's DNS server to `<pi-ip>`.
 
 ## License
 
-[MIT](LICENSE)
+[GPL-3.0](LICENSE)
