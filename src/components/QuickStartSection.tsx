@@ -39,7 +39,7 @@ export function QuickStartSection() {
   };
 
   return (
-    <section className="relative py-28 lg:py-36" ref={ref}>
+    <section className="relative py-20 sm:py-28 lg:py-36" ref={ref}>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <p className="eyebrow fade-in-up">QUICK START</p>

@@ -28,7 +28,7 @@ export function ComparisonSection() {
   const ref = useScrollAnimation();
 
   return (
-    <section id="comparison" className="relative py-28 lg:py-36" ref={ref}>
+    <section id="comparison" className="relative py-20 sm:py-28 lg:py-36" ref={ref}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
           <p className="eyebrow fade-in-up">HOW WE COMPARE</p>
@@ -41,8 +41,8 @@ export function ComparisonSection() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left border-collapse">
               <thead>
-                <tr className="border-b border-outline-variant/30 bg-surface-container-low/60">
-                  <HeaderCell align="left">Feature</HeaderCell>
+                <tr className="border-b border-outline-variant/30">
+                  <HeaderCell align="left" sticky>Feature</HeaderCell>
                   <HeaderCell align="center" highlight>
                     <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-brand-teal to-brand-teal-bright" />
                     <div className="inline-flex items-center gap-2">
@@ -63,7 +63,7 @@ export function ComparisonSection() {
                     key={i}
                     className="border-b border-outline-variant/10 last:border-b-0 hover:bg-surface-container-high/30 transition-colors"
                   >
-                    <td className="px-5 py-4 text-sm font-medium text-foreground">
+                    <td className="sticky left-0 z-[1] px-5 py-4 text-sm font-medium text-foreground bg-surface-container lg:bg-transparent lg:static">
                       {row.feature}
                     </td>
                     <td className="relative px-5 py-4 text-center bg-brand-teal/[0.04]">
@@ -83,6 +83,8 @@ export function ComparisonSection() {
               </tbody>
             </table>
           </div>
+          {/* Right-edge scroll hint, mobile/tablet only */}
+          <div className="lg:hidden absolute top-0 right-0 bottom-0 w-12 bg-gradient-to-l from-surface-container to-transparent pointer-events-none" />
         </div>
       </div>
     </section>
@@ -93,16 +95,21 @@ function HeaderCell({
   children,
   highlight,
   align,
+  sticky,
 }: {
   children: React.ReactNode;
   highlight?: boolean;
   align: "left" | "center";
+  sticky?: boolean;
 }) {
+  const stickyClasses = sticky
+    ? "sticky left-0 z-[2] bg-surface-container-low lg:bg-surface-container-low/60 lg:static"
+    : "bg-surface-container-low/60";
   return (
     <th
       className={`relative px-5 py-5 font-headline text-xs uppercase tracking-widest font-semibold ${
         align === "center" ? "text-center" : "text-left"
-      } ${highlight ? "bg-brand-teal/[0.04] text-brand-teal" : "text-muted-foreground"}`}
+      } ${highlight ? "bg-brand-teal/[0.04] text-brand-teal" : "text-muted-foreground"} ${stickyClasses}`}
     >
       {children}
     </th>
