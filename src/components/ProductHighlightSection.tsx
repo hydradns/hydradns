@@ -4,6 +4,7 @@ import overview from "@/assets/dashboard/overview.png";
 import queryLogs from "@/assets/dashboard/query-logs.png";
 import policies from "@/assets/dashboard/policies.png";
 
+
 type ChapterLink = {
   label: string;
   icon: typeof Terminal;
@@ -55,23 +56,6 @@ export function ProductHighlightSection() {
               position="right"
             />
             <FrontCard image={overview} alt="HydraDNS Dashboard overview" />
-
-            {/* Captions with connector lines */}
-            <Annotation
-              className="hidden xl:flex absolute -left-16 top-[18%]"
-              text="Live query stream, real SQLite"
-              align="right"
-            />
-            <Annotation
-              className="hidden xl:flex absolute -right-12 top-[40%]"
-              text="IPs hashed before they hit disk"
-              align="left"
-            />
-            <Annotation
-              className="hidden xl:flex absolute left-[8%] -bottom-6"
-              text="Sub-millisecond policy decisions"
-              align="right"
-            />
           </div>
 
           {/* Tablet/mobile: stack vertically */}
@@ -196,33 +180,3 @@ function WindowChrome({ title, live }: { title: string; live?: boolean }) {
   );
 }
 
-function Annotation({
-  text,
-  className,
-  align,
-}: {
-  text: string;
-  className?: string;
-  align: "left" | "right";
-}) {
-  return (
-    <div className={`z-40 items-center gap-3 ${className ?? ""}`}>
-      {align === "right" && (
-        <>
-          <span className="font-mono text-[11px] text-brand-teal/90 whitespace-nowrap tracking-wide">
-            {text}
-          </span>
-          <span className="h-px w-12 bg-gradient-to-r from-transparent via-brand-teal/60 to-brand-teal" />
-        </>
-      )}
-      {align === "left" && (
-        <>
-          <span className="h-px w-12 bg-gradient-to-l from-transparent via-brand-teal/60 to-brand-teal" />
-          <span className="font-mono text-[11px] text-brand-teal/90 whitespace-nowrap tracking-wide">
-            {text}
-          </span>
-        </>
-      )}
-    </div>
-  );
-}
