@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Menu, X, Github, Star, Shield } from "lucide-react";
+import { Menu, X, Github, Star } from "lucide-react";
+import logo from "@/assets/hydradns-logo.png";
 
 const navLinks = [
   { label: "Features", href: "#features" },
@@ -30,13 +31,11 @@ export function Navbar() {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <a href="#" className="flex items-center gap-3 group">
-            <span className="relative w-9 h-9 rounded-lg bg-surface-container-high border border-outline-variant/40 flex items-center justify-center overflow-hidden">
-              <Shield
-                className="h-[18px] w-[18px] text-brand-teal transition-transform group-hover:scale-110"
-                strokeWidth={2.25}
-              />
-              <span className="absolute inset-0 bg-brand-teal/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </span>
+            <img
+              src={logo}
+              alt="HydraDNS"
+              className="h-9 w-9 rounded-full shadow-[0_0_20px_rgba(0,212,170,0.25)] transition-transform group-hover:scale-105"
+            />
             <span className="font-headline text-[15px] font-bold tracking-tighter uppercase text-foreground">
               HydraDNS
             </span>
@@ -58,19 +57,16 @@ export function Navbar() {
           {/* CTAs */}
           <div className="hidden md:flex items-center gap-3">
             <a
-              href="https://github.com/hydradns"
+              href="https://github.com/hydradns/hydradns"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-outline-variant/40 bg-surface-container/60 text-sm font-medium text-brand-sky hover:bg-surface-container-high/80 transition-colors"
             >
               <Star className="h-3.5 w-3.5" />
               <span>Star on GitHub</span>
-              <span className="px-1.5 py-0.5 rounded-full bg-surface-container-high text-[11px] font-mono text-muted-foreground">
-                1.2k
-              </span>
             </a>
             <a
-              href="https://github.com/hydradns"
+              href="https://github.com/hydradns/hydradns"
               target="_blank"
               rel="noopener noreferrer"
               className="btn-primary inline-flex items-center gap-2 px-5 py-2 rounded-md text-sm font-semibold shadow-[0_0_20px_rgba(0,212,170,0.25)] hover:shadow-[0_0_28px_rgba(0,212,170,0.4)] transition-shadow"
@@ -105,7 +101,7 @@ export function Navbar() {
             ))}
             <div className="pt-3 border-t border-outline-variant/40 flex flex-col gap-2">
               <a
-                href="https://github.com/hydradns"
+                href="https://github.com/hydradns/hydradns"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-primary inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-semibold"

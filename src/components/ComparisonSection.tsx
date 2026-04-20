@@ -17,7 +17,7 @@ const rows: Row[] = [
   { feature: "Policy Engine", hydra: "Priority + Regex", pihole: false, nextdns: "Limited", adguard: "Limited" },
   { feature: "IP Anonymization", hydra: "HMAC-SHA256", pihole: false, nextdns: false, adguard: false },
   { feature: "Architecture", hydra: "Microservices + gRPC", pihole: "Monolith", nextdns: "Cloud SaaS", adguard: "Monolith" },
-  { feature: "Language", hydra: "Go", pihole: "PHP + Shell", nextdns: "—", adguard: "Go" },
+  { feature: "Language", hydra: "Go", pihole: "PHP + Shell", nextdns: "N/A", adguard: "Go" },
   { feature: "Hot-Reload Policies", hydra: true, pihole: false, nextdns: false, adguard: false },
   { feature: "REST API", hydra: "17 endpoints", pihole: false, nextdns: true, adguard: "Limited" },
   { feature: "Bloom Filter Engine", hydra: true, pihole: false, nextdns: false, adguard: false },

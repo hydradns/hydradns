@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
- * HydraDNS Landing — design tokens mirror the dashboard's "HydraDNS Security Theme".
+ * HydraDNS Landing design tokens. These mirror the dashboard's "HydraDNS Security Theme".
  * Palette: teal primary (#00D4AA), sky secondary (#89CEFF), amber tertiary (#F59E0B),
  * neutral dark surface stack (#101319 → #32353b). Dark-only, dashboard-consistent.
  */

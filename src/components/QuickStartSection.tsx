@@ -56,7 +56,7 @@ export function QuickStartSection() {
               <span className="w-3 h-3 rounded-full bg-brand-amber/80" />
               <span className="w-3 h-3 rounded-full bg-brand-green/80" />
             </div>
-            <span className="font-mono text-xs text-muted-foreground">Terminal — zsh</span>
+            <span className="font-mono text-xs text-muted-foreground">zsh</span>
             <button
               onClick={copy}
               aria-label="Copy commands"
@@ -102,7 +102,7 @@ export function QuickStartSection() {
         </div>
 
         <p className="mt-6 text-center text-sm text-muted-foreground fade-in-up">
-          That's it. No config files to edit, no dependencies to install.
+          No config files to edit. No dependencies to install. That's the whole setup.
         </p>
       </div>
     </section>

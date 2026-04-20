@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 
 /**
  * Subtle teal-on-dark dot field. Tuned to match the HydraDNS dashboard aesthetic:
- * restrained, calm, security-first — not a gimmicky particle demo.
+ * restrained, calm, security-first. Not a gimmicky particle demo.
  */
 export function ParticleBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);

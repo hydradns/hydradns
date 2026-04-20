@@ -29,7 +29,7 @@ export function HeroSection() {
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-teal" />
               </span>
               <span className="font-mono text-xs text-muted-foreground tracking-wide">
-                v1.0 — Protecting 50k+ devices
+                v1.0 · GPL-3.0 · Self-hosted
               </span>
             </div>
 
@@ -41,21 +41,23 @@ export function HeroSection() {
             </h1>
 
             <p className="mt-6 text-lg lg:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              HydraDNS is an open-source DNS security gateway that protects every device
-              on your network — without installing anything on them.{" "}
-              <span className="text-foreground/85">Self-hosted. Private. Blazing fast.</span>
+              HydraDNS is an open-source DNS gateway that filters every device on your
+              network without touching any of them.{" "}
+              <span className="text-foreground/85">
+                You run it. You own the logs.
+              </span>
             </p>
 
             {/* CTAs */}
             <div className="mt-9 flex flex-wrap gap-4 justify-center lg:justify-start">
               <a
-                href="https://github.com/hydradns"
+                href="https://github.com/hydradns/hydradns"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-primary inline-flex items-center gap-2.5 px-7 py-3.5 rounded-md font-semibold shadow-[0_0_30px_rgba(0,212,170,0.25)] hover:shadow-[0_0_40px_rgba(0,212,170,0.4)] transition-shadow"
               >
                 <Github className="h-5 w-5" />
-                Get Started — It's Free
+                Get the code
               </a>
               <a
                 href="https://docs.hydradns.app"
