@@ -9,7 +9,7 @@ export function OpenSourceSection() {
   return (
     <section
       id="open-source"
-      className="relative py-28 lg:py-36 border-t border-outline-variant/10 bg-gradient-to-b from-background to-[hsl(var(--surface-container-lowest))]"
+      className="relative py-20 sm:py-28 lg:py-36 border-t border-outline-variant/10 bg-gradient-to-b from-background to-[hsl(var(--surface-container-lowest))]"
       ref={ref}
     >
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

@@ -19,7 +19,7 @@ export function HeroSection() {
       <div className="absolute bottom-0 inset-x-0 h-40 bg-gradient-to-b from-transparent to-background pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-2 gap-14 lg:gap-20 items-center">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-20 items-center">
           {/* Left content */}
           <div className="text-center lg:text-left">
             {/* Status pill */}
@@ -34,7 +34,7 @@ export function HeroSection() {
             </div>
 
             {/* Headline */}
-            <h1 className="mt-6 font-headline text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tightest text-foreground leading-[1.05]">
+            <h1 className="mt-6 font-headline text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tightest text-foreground leading-[1.05]">
               Block threats before
               <br />
               <span className="text-gradient">they ever connect.</span>

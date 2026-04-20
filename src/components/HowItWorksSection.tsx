@@ -44,7 +44,7 @@ export function HowItWorksSection() {
   const ref = useScrollAnimation();
 
   return (
-    <section id="how-it-works" className="relative py-28 lg:py-36" ref={ref}>
+    <section id="how-it-works" className="relative py-20 sm:py-28 lg:py-36" ref={ref}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <p className="eyebrow fade-in-up">HOW IT WORKS</p>

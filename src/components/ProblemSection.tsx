@@ -5,7 +5,7 @@ export function ProblemSection() {
   const ref = useScrollAnimation();
 
   return (
-    <section id="why" className="relative py-28 lg:py-36" ref={ref}>
+    <section id="why" className="relative py-20 sm:py-28 lg:py-36" ref={ref}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-16 lg:gap-20 items-center">
           {/* Narrative */}

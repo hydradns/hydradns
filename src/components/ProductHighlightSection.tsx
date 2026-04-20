@@ -21,7 +21,7 @@ export function ProductHighlightSection() {
   const ref = useScrollAnimation();
 
   return (
-    <section id="highlights" className="relative py-28 lg:py-36 overflow-hidden" ref={ref}>
+    <section id="highlights" className="relative py-20 sm:py-28 lg:py-36 overflow-hidden" ref={ref}>
       {/* Ambient glow behind the stack */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/3 w-[70%] max-w-[900px] aspect-square rounded-full bg-brand-teal/[0.06] blur-3xl pointer-events-none" />
       <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-gradient-to-r from-transparent via-outline-variant/30 to-transparent pointer-events-none" />
