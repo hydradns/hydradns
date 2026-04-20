@@ -42,19 +42,19 @@ export function ComparisonSection() {
             <table className="w-full min-w-[760px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-outline-variant/30 bg-surface-container-low/60">
-                  <HeaderCell>Feature</HeaderCell>
-                  <HeaderCell highlight>
+                  <HeaderCell align="left">Feature</HeaderCell>
+                  <HeaderCell align="center" highlight>
                     <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-brand-teal to-brand-teal-bright" />
-                    <div className="flex items-center gap-2">
+                    <div className="inline-flex items-center gap-2">
                       <span className="text-brand-teal">HydraDNS</span>
                       <span className="hidden sm:inline px-1.5 py-0.5 rounded-full bg-brand-teal/15 border border-brand-teal/30 font-mono text-[9px] tracking-wider text-brand-teal">
                         RECOMMENDED
                       </span>
                     </div>
                   </HeaderCell>
-                  <HeaderCell>Pi-hole</HeaderCell>
-                  <HeaderCell>NextDNS</HeaderCell>
-                  <HeaderCell>AdGuard Home</HeaderCell>
+                  <HeaderCell align="center">Pi-hole</HeaderCell>
+                  <HeaderCell align="center">NextDNS</HeaderCell>
+                  <HeaderCell align="center">AdGuard Home</HeaderCell>
                 </tr>
               </thead>
               <tbody>
@@ -92,15 +92,17 @@ export function ComparisonSection() {
 function HeaderCell({
   children,
   highlight,
+  align,
 }: {
   children: React.ReactNode;
   highlight?: boolean;
+  align: "left" | "center";
 }) {
   return (
     <th
       className={`relative px-5 py-5 font-headline text-xs uppercase tracking-widest font-semibold ${
-        highlight ? "bg-brand-teal/[0.04] text-brand-teal" : "text-muted-foreground"
-      }`}
+        align === "center" ? "text-center" : "text-left"
+      } ${highlight ? "bg-brand-teal/[0.04] text-brand-teal" : "text-muted-foreground"}`}
     >
       {children}
     </th>
