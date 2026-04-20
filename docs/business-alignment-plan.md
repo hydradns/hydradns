@@ -26,7 +26,7 @@ All 5 critical items shipped in Tier 1:
 | Auto-update blocklists | DONE | 6hr ticker, ETag caching, sources from DB only |
 | Pi deployment (arm64) | DONE | Multi-arch Docker, install script, router docs for Indian ISPs |
 
-Also shipped: CLI auth (`hydra login`), CI/CD pipeline, cross-compiled binaries, MIT license.
+Also shipped: CLI auth (`hydra login`), CI/CD pipeline, cross-compiled binaries, GPL-3.0 license.
 
 ### Not Built Yet (Demo Polish — Tier 2)
 These make the demo professional instead of just functional:
@@ -189,5 +189,5 @@ End of May               Target: 2-3 demos done, 1 paying customer (stretch)
 | Pi SD card reliability | Use USB SSD boot or high-endurance SD card. Document for clients. |
 | Router DNS redirect varies wildly | Build a cheat sheet for top 5 router brands in India. Offer to configure it during install. |
 | School/hospital procurement is slow | Offer a free 2-week trial. Decision is easier when it's already running. |
-| Single point of failure (one Pi) | For v1, accept it. Failover to upstream DNS if Pi is down (configure on router as secondary DNS). |
+| Single point of failure (one Pi) | For v1, accept it. **Do not** configure a router secondary DNS as fallback — any fallback resolver silently bypasses HydraDNS blocking (OS retries on REFUSED). If the Pi is down, clients get no DNS until it's back; mitigate with reliable hardware (USB SSD boot) and remote monitoring alerts (Tier 3). |
 | You're one person | Don't take more than 5-10 clients until remote management exists. |
