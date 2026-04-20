@@ -1,39 +1,63 @@
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { Github, BookOpen } from "lucide-react";
+import { BookOpen, Star } from "lucide-react";
+
+const techStack = ["Go 1.24", "gRPC", "Docker", "SQLite", "React 19"];
 
 export function OpenSourceSection() {
   const ref = useScrollAnimation();
 
   return (
-    <section id="open-source" className="py-24 lg:py-32" ref={ref}>
+    <section
+      id="open-source"
+      className="relative py-28 lg:py-36 border-t border-outline-variant/10 bg-gradient-to-b from-background to-[hsl(var(--surface-container-lowest))]"
+      ref={ref}
+    >
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <p className="text-sm font-semibold uppercase tracking-widest text-accent mb-4 fade-in-up">Open Source</p>
-        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground fade-in-up">
-          Built in the open.<br />
+        <p className="eyebrow fade-in-up">OPEN SOURCE</p>
+        <h2 className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground fade-in-up leading-[1.1]">
+          Built in the open.
+          <br />
           <span className="text-gradient">Owned by the community.</span>
         </h2>
-        <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto fade-in-up">
-          HydraDNS is free and open-source under MIT. No telemetry, no tracking, no vendor lock-in. Your DNS, your rules. We welcome contributors of all experience levels.
+        <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto fade-in-up">
+          HydraDNS is free and open-source under GPL-3.0. No telemetry, no tracking, no
+          vendor lock-in. Your DNS, your rules. We welcome contributors of all experience
+          levels.
         </p>
-        <div className="mt-8 flex flex-wrap gap-4 justify-center fade-in-up">
+
+        <div className="mt-10 flex flex-wrap gap-4 justify-center fade-in-up">
           <a
             href="https://github.com/hydradns"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors glow-primary"
+            className="btn-primary inline-flex items-center gap-2.5 px-7 py-3.5 rounded-md font-semibold shadow-[0_0_30px_rgba(0,212,170,0.25)] hover:shadow-[0_0_40px_rgba(0,212,170,0.4)] transition-shadow"
           >
-            <Github className="h-5 w-5" />
+            <Star className="h-5 w-5" fill="currentColor" />
             Star on GitHub
+            <span className="ml-1 px-2 py-0.5 rounded-full bg-[hsl(var(--primary-foreground))]/20 font-mono text-xs">
+              1.2k
+            </span>
           </a>
           <a
             href="https://github.com/hydradns/hydradns/blob/main/CONTRIBUTING.md"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-border text-foreground font-medium hover:bg-muted/50 transition-colors"
+            className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-md border border-outline-variant/40 bg-surface-container/30 text-brand-sky font-medium hover:bg-surface-container-high/60 transition-colors"
           >
             <BookOpen className="h-5 w-5" />
             Read Contributing Guide
           </a>
+        </div>
+
+        <div className="mt-12 flex flex-wrap gap-2.5 justify-center fade-in-up">
+          {techStack.map((tech) => (
+            <span
+              key={tech}
+              className="px-3 py-1 rounded-full border border-outline-variant/30 bg-surface-container/60 font-mono text-xs text-muted-foreground"
+            >
+              {tech}
+            </span>
+          ))}
         </div>
       </div>
     </section>

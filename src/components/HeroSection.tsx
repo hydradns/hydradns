@@ -1,34 +1,58 @@
-import { Github, BookOpen } from "lucide-react";
+import { Github, BookOpen, Shield, Code, Scale, Server, Lock } from "lucide-react";
 import { ParticleBackground } from "./ParticleBackground";
 
-const chartData = [30, 45, 38, 52, 48, 65, 58, 72, 68, 85, 78, 90, 82, 75, 88, 92, 85, 78, 95, 88, 80, 72, 68, 60];
+const sparklineData = [20, 35, 25, 45, 30, 60, 40, 75, 55, 90, 60, 78, 48, 82, 70, 88];
+
+const trustBadges = [
+  { icon: Code, label: "Open Source" },
+  { icon: Scale, label: "GPL-3.0" },
+  { icon: Server, label: "Self-hosted" },
+  { icon: Lock, label: "No data leaves your network" },
+];
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-24 pb-16">
+      {/* Ambient radial glow + dot field */}
+      <div className="absolute inset-0 hero-ambient pointer-events-none" />
       <ParticleBackground />
+      <div className="absolute bottom-0 inset-x-0 h-40 bg-gradient-to-b from-transparent to-background pointer-events-none" />
 
-      {/* Gradient overlays */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background pointer-events-none" />
-
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid lg:grid-cols-2 gap-14 lg:gap-20 items-center">
           {/* Left content */}
           <div className="text-center lg:text-left">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
+            {/* Status pill */}
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-surface-container-low/80 border border-outline-variant/30">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-brand-teal opacity-75 animate-ping" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-teal" />
+              </span>
+              <span className="font-mono text-xs text-muted-foreground tracking-wide">
+                v1.0 — Protecting 50k+ devices
+              </span>
+            </div>
+
+            {/* Headline */}
+            <h1 className="mt-6 font-headline text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tightest text-foreground leading-[1.05]">
               Block threats before
               <br />
               <span className="text-gradient">they ever connect.</span>
             </h1>
-            <p className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              HydraDNS is an open-source DNS security gateway that protects every device on your network — without installing anything on them. Self-hosted. Private. Blazing fast.
+
+            <p className="mt-6 text-lg lg:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed">
+              HydraDNS is an open-source DNS security gateway that protects every device
+              on your network — without installing anything on them.{" "}
+              <span className="text-foreground/85">Self-hosted. Private. Blazing fast.</span>
             </p>
-            <div className="mt-8 flex flex-wrap gap-4 justify-center lg:justify-start">
+
+            {/* CTAs */}
+            <div className="mt-9 flex flex-wrap gap-4 justify-center lg:justify-start">
               <a
                 href="https://github.com/hydradns"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors glow-primary"
+                className="btn-primary inline-flex items-center gap-2.5 px-7 py-3.5 rounded-md font-semibold shadow-[0_0_30px_rgba(0,212,170,0.25)] hover:shadow-[0_0_40px_rgba(0,212,170,0.4)] transition-shadow"
               >
                 <Github className="h-5 w-5" />
                 Get Started — It's Free
@@ -37,68 +61,120 @@ export function HeroSection() {
                 href="https://docs.hydradns.app"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-border text-foreground font-medium hover:bg-muted/50 transition-colors"
+                className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-md border border-outline-variant/40 bg-surface-container/30 text-foreground font-medium hover:bg-surface-container-high/60 transition-colors"
               >
-                <BookOpen className="h-5 w-5" />
+                <BookOpen className="h-5 w-5 text-brand-sky" />
                 Read the Docs
               </a>
             </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              Open source · GPL-3.0 · Self-hosted · No data leaves your network
-            </p>
+
+            {/* Trust badges */}
+            <div className="mt-10 pt-8 border-t border-outline-variant/20 flex flex-wrap gap-x-7 gap-y-3 justify-center lg:justify-start">
+              {trustBadges.map((b) => (
+                <div
+                  key={b.label}
+                  className="inline-flex items-center gap-2 text-sm text-muted-foreground"
+                >
+                  <b.icon className="h-4 w-4 text-brand-teal" />
+                  <span>{b.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Right: Dashboard mockup */}
+          {/* Right: Dashboard preview window */}
           <div className="flex justify-center lg:justify-end">
-            <div className="glass glow-primary rounded-2xl p-6 w-full max-w-md animate-float">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-3 h-3 rounded-full bg-destructive/80" />
-                <div className="w-3 h-3 rounded-full bg-[hsl(45,93%,47%)]/80" />
-                <div className="w-3 h-3 rounded-full bg-[hsl(142,71%,45%)]/80" />
-                <span className="ml-2 text-xs text-muted-foreground">HydraDNS Dashboard</span>
-              </div>
+            <div className="relative w-full max-w-md">
+              {/* Glow halo */}
+              <div className="absolute -inset-4 bg-brand-teal/10 blur-3xl rounded-3xl pointer-events-none" />
 
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">Total Queries</p>
-                  <p className="text-xl font-bold text-foreground">124,847</p>
+              <div className="relative rounded-xl bg-surface-container border border-outline-variant/40 overflow-hidden glow-primary-strong animate-float">
+                {/* Window chrome */}
+                <div className="flex items-center justify-between h-11 px-4 bg-surface-container-highest border-b border-outline-variant/20">
+                  <div className="flex gap-2">
+                    <span className="w-3 h-3 rounded-full bg-surface-variant/80 border border-outline-variant/30" />
+                    <span className="w-3 h-3 rounded-full bg-surface-variant/80 border border-outline-variant/30" />
+                    <span className="w-3 h-3 rounded-full bg-surface-variant/80 border border-outline-variant/30" />
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-outline-variant/30 bg-surface-container-lowest">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-brand-teal opacity-75 animate-ping" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand-teal" />
+                    </span>
+                    <span className="font-mono text-[10px] font-semibold tracking-wider text-brand-teal">
+                      LIVE
+                    </span>
+                  </div>
                 </div>
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">Blocked</p>
-                  <p className="text-xl font-bold text-destructive">18,293</p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">Block Rate</p>
-                  <p className="text-xl font-bold text-accent">14.6%</p>
-                </div>
-              </div>
 
-              {/* Mini chart */}
-              <div className="bg-muted/30 rounded-lg p-3">
-                <p className="text-xs text-muted-foreground mb-2">24h Query Volume</p>
-                <svg viewBox="0 0 240 60" className="w-full h-12">
-                  <defs>
-                    <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(217, 91%, 60%)" stopOpacity="0.3" />
-                      <stop offset="100%" stopColor="hsl(217, 91%, 60%)" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <path
-                    d={`M0,${60 - chartData[0] * 0.6} ${chartData.map((v, i) => `L${(i / (chartData.length - 1)) * 240},${60 - v * 0.6}`).join(" ")} L240,60 L0,60 Z`}
-                    fill="url(#chartGrad)"
-                  />
-                  <path
-                    d={`M0,${60 - chartData[0] * 0.6} ${chartData.map((v, i) => `L${(i / (chartData.length - 1)) * 240},${60 - v * 0.6}`).join(" ")}`}
-                    fill="none"
-                    stroke="hsl(217, 91%, 60%)"
-                    strokeWidth="2"
-                  />
-                </svg>
+                {/* Body */}
+                <div className="p-5 space-y-4 bg-surface-container">
+                  {/* Stat tiles */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <StatTile label="Total Queries" value="124,847" tone="default" />
+                    <StatTile label="Blocked" value="18,293" tone="danger" />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 rounded-md bg-surface-container-low border border-outline-variant/20">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
+                        Block Rate
+                      </p>
+                      <p className="mt-0.5 font-headline text-2xl font-bold text-brand-teal">
+                        14.6%
+                      </p>
+                    </div>
+                    <div className="relative">
+                      <Shield className="h-10 w-10 text-brand-teal/20" strokeWidth={1.25} />
+                      <Shield className="absolute inset-0 h-10 w-10 text-brand-teal/60" strokeWidth={1.25} />
+                    </div>
+                  </div>
+
+                  {/* Sparkline */}
+                  <div className="p-4 rounded-md bg-surface-container-lowest border border-outline-variant/20">
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono mb-3">
+                      Query Volume · 24h
+                    </p>
+                    <div className="flex items-end gap-[3px] h-16">
+                      {sparklineData.map((v, i) => (
+                        <span
+                          key={i}
+                          className="flex-1 rounded-t-sm"
+                          style={{
+                            height: `${v}%`,
+                            background: `linear-gradient(to top, rgba(0,212,170,${
+                              0.2 + (v / 100) * 0.7
+                            }), rgba(70,241,197,${0.4 + (v / 100) * 0.5}))`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+type Tone = "default" | "danger";
+
+function StatTile({ label, value, tone }: { label: string; value: string; tone: Tone }) {
+  return (
+    <div className="p-4 rounded-md bg-surface-container-low border border-outline-variant/20">
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
+        {label}
+      </p>
+      <p
+        className={`mt-1 font-mono text-xl font-semibold ${
+          tone === "danger" ? "text-brand-red" : "text-foreground"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
   );
 }

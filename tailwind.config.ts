@@ -47,21 +47,45 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+        // HydraDNS Security Theme — mirrors the dashboard palette
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          container: "hsl(var(--surface-container))",
+          low: "hsl(var(--surface-container-low))",
+          high: "hsl(var(--surface-container-high))",
+          highest: "hsl(var(--surface-container-highest))",
+          lowest: "hsl(var(--surface-container-lowest))",
         },
+        brand: {
+          teal: "hsl(var(--brand-teal))",
+          "teal-bright": "hsl(var(--brand-teal-bright))",
+          sky: "hsl(var(--brand-sky))",
+          amber: "hsl(var(--brand-amber))",
+          green: "hsl(var(--brand-green))",
+          red: "hsl(var(--brand-red))",
+        },
+        outline: {
+          DEFAULT: "hsl(var(--outline))",
+          variant: "hsl(var(--outline-variant))",
+        },
+      },
+      fontFamily: {
+        headline: ["'Space Grotesk'", "system-ui", "sans-serif"],
+        body: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+        mono: ["'Fira Code'", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+      },
+      letterSpacing: {
+        tightest: "-0.03em",
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        "glow-primary": "0 0 30px rgba(0, 212, 170, 0.12)",
+        "glow-primary-strong": "0 0 60px rgba(0, 212, 170, 0.25)",
+        "glow-sky": "0 0 30px rgba(137, 206, 255, 0.12)",
       },
       keyframes: {
         "accordion-down": {
@@ -76,11 +100,22 @@ export default {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-10px)" },
         },
+        "pulse-ring": {
+          "0%": { boxShadow: "0 0 0 0 rgba(0, 212, 170, 0.4)" },
+          "70%": { boxShadow: "0 0 0 10px rgba(0, 212, 170, 0)" },
+          "100%": { boxShadow: "0 0 0 0 rgba(0, 212, 170, 0)" },
+        },
+        "gradient-pan": {
+          "0%, 100%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         float: "float 6s ease-in-out infinite",
+        "pulse-ring": "pulse-ring 2s infinite",
+        "gradient-pan": "gradient-pan 8s ease infinite",
       },
     },
   },

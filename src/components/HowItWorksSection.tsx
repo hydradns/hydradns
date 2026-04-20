@@ -1,21 +1,42 @@
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { Terminal, Network, BarChart3 } from "lucide-react";
+import { Terminal, Router, BarChart3, ChevronRight } from "lucide-react";
 
 const steps = [
   {
     icon: Terminal,
+    num: "01",
     title: "Deploy",
-    desc: "Run docker-compose up --build on any machine. HydraDNS starts a DNS server and admin API in seconds.",
+    desc: (
+      <>
+        Run{" "}
+        <code className="font-mono text-xs text-brand-sky bg-surface-container-lowest px-1.5 py-0.5 rounded">
+          docker compose up -d
+        </code>{" "}
+        on any machine. HydraDNS starts a DNS server and admin API in seconds.
+      </>
+    ),
   },
   {
-    icon: Network,
+    icon: Router,
+    num: "02",
     title: "Point Your DNS",
-    desc: "Set your router's DNS to your HydraDNS server. Every device on the network is now protected — phones, laptops, IoT, everything.",
+    desc: (
+      <>
+        Set your router's DNS to your HydraDNS server. Every device on the network is now
+        protected — phones, laptops, IoT, everything.
+      </>
+    ),
   },
   {
     icon: BarChart3,
+    num: "03",
     title: "Monitor & Control",
-    desc: "Use the dashboard to see real-time queries, manage blocklists, create policies, and track what's happening on your network.",
+    desc: (
+      <>
+        Use the dashboard to see real-time queries, manage blocklists, create policies,
+        and track exactly what's happening on your network.
+      </>
+    ),
   },
 ];
 
@@ -23,31 +44,45 @@ export function HowItWorksSection() {
   const ref = useScrollAnimation();
 
   return (
-    <section id="how-it-works" className="py-24 lg:py-32" ref={ref}>
+    <section id="how-it-works" className="relative py-28 lg:py-36" ref={ref}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <p className="text-sm font-semibold uppercase tracking-widest text-accent mb-4 fade-in-up">How It Works</p>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground fade-in-up">
-            Three steps. Five minutes.<br />
+          <p className="eyebrow fade-in-up">HOW IT WORKS</p>
+          <h2 className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground fade-in-up leading-[1.1]">
+            Three steps. Five minutes.
+            <br />
             <span className="text-gradient">Full protection.</span>
           </h2>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 relative">
-          {/* Connecting line (desktop) */}
-          <div className="hidden md:block absolute top-16 left-[16.67%] right-[16.67%] h-px border-t-2 border-dashed border-border" />
+        <div className="relative max-w-5xl mx-auto">
+          {/* Dashed connector */}
+          <div className="hidden md:block absolute top-[50px] left-[12%] right-[12%] h-px border-t-2 border-dashed border-outline-variant/40 z-0">
+            <ChevronRight className="absolute -top-[11px] left-[33%] h-5 w-5 text-brand-teal/60" />
+            <ChevronRight className="absolute -top-[11px] left-[66%] h-5 w-5 text-brand-teal/60" />
+          </div>
 
-          {steps.map((step, i) => (
-            <div key={i} className="text-center relative fade-in-up" style={{ transitionDelay: `${i * 150}ms` }}>
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 mb-6 relative z-10">
-                <step.icon className="h-7 w-7 text-primary" />
+          <div className="grid md:grid-cols-3 gap-6 md:gap-8 relative z-10">
+            {steps.map((s, i) => (
+              <div
+                key={i}
+                className="relative rounded-xl bg-surface-container border border-outline-variant/25 p-8 text-center hover:border-brand-teal/30 hover:bg-surface-container-high/70 transition-all fade-in-up"
+                style={{ transitionDelay: `${i * 120}ms` }}
+              >
+                <div className="mx-auto w-[72px] h-[72px] rounded-full bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center mb-6 relative">
+                  <s.icon className="h-7 w-7 text-brand-teal" strokeWidth={1.75} />
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand-teal shadow-[0_0_12px_rgba(0,212,170,0.6)]" />
+                </div>
+                <p className="font-mono text-xs font-semibold tracking-widest text-brand-teal mb-2">
+                  STEP {s.num}
+                </p>
+                <h3 className="font-headline text-xl font-bold text-foreground mb-3">
+                  {s.title}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
               </div>
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-primary/5 blur-xl" />
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Step {i + 1}</p>
-              <h3 className="text-xl font-bold text-foreground mb-3">{step.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{step.desc}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>
