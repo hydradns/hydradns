@@ -1,21 +1,7 @@
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { Terminal, ListFilter, FileText } from "lucide-react";
 import overview from "@/assets/dashboard/overview.png";
 import queryLogs from "@/assets/dashboard/query-logs.png";
 import policies from "@/assets/dashboard/policies.png";
-
-
-type ChapterLink = {
-  label: string;
-  icon: typeof Terminal;
-  href: string;
-};
-
-const chapters: ChapterLink[] = [
-  { label: "Query Logs", icon: Terminal, href: "#" },
-  { label: "Policies", icon: ListFilter, href: "#" },
-  { label: "Blocklists", icon: FileText, href: "#" },
-];
 
 export function ProductHighlightSection() {
   const ref = useScrollAnimation();
@@ -68,24 +54,6 @@ export function ProductHighlightSection() {
           </div>
         </div>
 
-        {/* Chapter links */}
-        <div className="mt-16 flex flex-wrap gap-3 justify-center fade-in-up">
-          {chapters.map((c) => (
-            <a
-              key={c.label}
-              href={c.href}
-              className="group inline-flex items-center gap-2 px-4 py-2 rounded-full border border-outline-variant/40 bg-surface-container/50 hover:border-brand-teal/50 hover:bg-surface-container-high/60 transition-colors"
-            >
-              <c.icon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-brand-teal transition-colors" />
-              <span className="font-mono text-xs text-muted-foreground group-hover:text-foreground transition-colors">
-                {c.label}
-              </span>
-              <span className="text-muted-foreground/60 group-hover:text-brand-teal transition-colors text-xs">
-                ↗
-              </span>
-            </a>
-          ))}
-        </div>
       </div>
     </section>
   );
