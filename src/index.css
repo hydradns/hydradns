@@ -2,46 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * HydraDNS Landing — design tokens mirror the dashboard's "HydraDNS Security Theme".
+ * Palette: teal primary (#00D4AA), sky secondary (#89CEFF), amber tertiary (#F59E0B),
+ * neutral dark surface stack (#101319 → #32353b). Dark-only, dashboard-consistent.
+ */
 @layer base {
   :root {
-    --background: 222 60% 7%;
-    --foreground: 210 40% 96%;
+    /* shadcn semantic tokens (HSL, no color function) */
+    --background: 220 20% 8%;              /* #101319 */
+    --foreground: 222 14% 90%;             /* #e1e2ea */
 
-    --card: 222 50% 10%;
-    --card-foreground: 210 40% 96%;
+    --card: 220 14% 13%;                   /* #1d2026 surface-container */
+    --card-foreground: 222 14% 90%;
 
-    --popover: 222 50% 10%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 220 14% 13%;
+    --popover-foreground: 222 14% 90%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 60% 7%;
+    --primary: 168 100% 42%;               /* #00D4AA teal */
+    --primary-foreground: 167 100% 11%;    /* #00382b on-primary */
 
-    --secondary: 262 83% 58%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 204 100% 77%;             /* #89CEFF sky blue */
+    --secondary-foreground: 204 100% 15%;  /* #00344d */
 
-    --muted: 220 30% 15%;
-    --muted-foreground: 215 20% 60%;
+    --muted: 222 12% 18%;                  /* #272a30 surface-container-high */
+    --muted-foreground: 155 12% 76%;       /* #bacac2 on-surface-variant */
 
-    --accent: 187 92% 43%;
-    --accent-foreground: 222 60% 7%;
+    --accent: 167 100% 61%;                /* #46F1C5 bright teal */
+    --accent-foreground: 167 100% 11%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 6 100% 83%;             /* #ffb4ab */
+    --destructive-foreground: 355 100% 21%;
 
-    --border: 220 20% 18%;
-    --input: 220 20% 18%;
-    --ring: 217 91% 60%;
+    --border: 155 9% 26%;                  /* #3b4a44 outline-variant */
+    --input: 155 9% 26%;
+    --ring: 168 100% 42%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
-    --sidebar-background: 222 60% 7%;
-    --sidebar-foreground: 210 40% 96%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 187 92% 43%;
-    --sidebar-accent-foreground: 222 60% 7%;
-    --sidebar-border: 220 20% 18%;
-    --sidebar-ring: 217 91% 60%;
+    /* HydraDNS surface stack */
+    --surface: 220 20% 8%;                 /* #101319 */
+    --surface-container-lowest: 220 27% 6%;/* #0b0e14 */
+    --surface-container-low: 220 14% 11%;  /* #191c22 */
+    --surface-container: 220 14% 13%;      /* #1d2026 */
+    --surface-container-high: 222 12% 18%; /* #272a30 */
+    --surface-container-highest: 222 8% 22%;/* #32353b */
+
+    /* HydraDNS brand accents */
+    --brand-teal: 168 100% 42%;            /* #00D4AA */
+    --brand-teal-bright: 167 100% 61%;     /* #46F1C5 */
+    --brand-sky: 204 100% 77%;             /* #89CEFF */
+    --brand-amber: 38 93% 50%;             /* #F59E0B */
+    --brand-green: 142 71% 45%;            /* #22C55E */
+    --brand-red: 6 100% 83%;               /* #ffb4ab */
+
+    --outline: 158 6% 55%;                 /* #85948d */
+    --outline-variant: 155 9% 26%;         /* #3b4a44 */
   }
 }
 
@@ -50,45 +66,159 @@
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  }
-
   html {
     scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Space Grotesk", system-ui, sans-serif;
+    letter-spacing: -0.03em;
+  }
+
+  code, kbd, pre, samp {
+    font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.3);
+    color: hsl(var(--foreground));
   }
 }
 
 @layer utilities {
+  /* Surface stack helpers */
+  .bg-surface {
+    background-color: hsl(var(--surface));
+  }
+  .bg-surface-container {
+    background-color: hsl(var(--surface-container));
+  }
+  .bg-surface-container-low {
+    background-color: hsl(var(--surface-container-low));
+  }
+  .bg-surface-container-high {
+    background-color: hsl(var(--surface-container-high));
+  }
+  .bg-surface-container-highest {
+    background-color: hsl(var(--surface-container-highest));
+  }
+  .bg-surface-container-lowest {
+    background-color: hsl(var(--surface-container-lowest));
+  }
+
+  .border-outline-variant {
+    border-color: hsl(var(--outline-variant) / 0.4);
+  }
+
+  /* Glass surface used for nav & hero window */
   .glass {
-    @apply bg-card/60 backdrop-blur-xl border border-border/50;
+    background-color: hsl(var(--surface-container) / 0.6);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid hsl(var(--outline-variant) / 0.3);
   }
 
   .glass-strong {
-    @apply bg-card/80 backdrop-blur-2xl border border-border/60;
+    background-color: hsl(var(--surface-container) / 0.8);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid hsl(var(--outline-variant) / 0.4);
   }
 
+  /* Teal glow for primary surfaces and CTAs */
   .glow-primary {
-    box-shadow: 0 0 40px -10px hsl(var(--primary) / 0.3);
+    box-shadow: 0 0 30px rgba(0, 212, 170, 0.14);
+  }
+  .glow-primary-strong {
+    box-shadow: 0 10px 40px rgba(0, 212, 170, 0.22);
   }
 
-  .glow-accent {
-    box-shadow: 0 0 40px -10px hsl(var(--accent) / 0.3);
-  }
-
+  /* Signature teal → sky-blue gradient text */
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(187,92%,43%)] to-[hsl(262,83%,58%)];
+    background: linear-gradient(
+      135deg,
+      hsl(var(--brand-teal-bright)),
+      hsl(var(--brand-sky))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .text-gradient-long {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--brand-teal)) 0%,
+      hsl(var(--brand-teal-bright)) 50%,
+      hsl(var(--brand-sky)) 100%
+    );
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .btn-primary {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--brand-teal-bright)),
+      hsl(var(--brand-teal))
+    );
+    color: hsl(var(--primary-foreground));
+  }
+
+  .btn-primary:hover {
+    filter: brightness(1.08);
+  }
+
+  /* Subtle animated radial glow behind the hero */
+  .hero-ambient {
+    background:
+      radial-gradient(60% 50% at 80% 20%, hsl(var(--brand-teal) / 0.12) 0%, transparent 60%),
+      radial-gradient(50% 40% at 10% 90%, hsl(var(--brand-sky) / 0.08) 0%, transparent 60%);
   }
 
   .fade-in-up {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(24px);
     transition: opacity 0.7s ease-out, transform 0.7s ease-out;
   }
 
   .fade-in-up.visible {
     opacity: 1;
     transform: translateY(0);
+  }
+
+  /* Mono eyebrow label used on every section */
+  .eyebrow {
+    font-family: "Fira Code", ui-monospace, monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: hsl(var(--brand-teal));
+  }
+
+  /* Thin scrollbar matching dashboard */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--surface));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--outline-variant) / 0.5);
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--outline-variant));
   }
 }

@@ -1,83 +1,138 @@
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { Shield, Wifi, Globe, XCircle } from "lucide-react";
+import { Shield, Wifi, CheckCircle2, XCircle } from "lucide-react";
 
 export function ProblemSection() {
   const ref = useScrollAnimation();
 
   return (
-    <section id="why" className="py-24 lg:py-32" ref={ref}>
+    <section id="why" className="relative py-28 lg:py-36" ref={ref}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
+        <div className="grid lg:grid-cols-2 gap-16 lg:gap-20 items-center">
+          {/* Narrative */}
           <div>
-            <p className="text-sm font-semibold uppercase tracking-widest text-accent mb-4 fade-in-up">
-              Why HydraDNS
-            </p>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground leading-tight fade-in-up">
-              Your DNS is leaking<br />
+            <p className="eyebrow fade-in-up">WHY HYDRADNS</p>
+            <h2 className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground leading-[1.1] fade-in-up">
+              Your DNS is leaking
+              <br />
               <span className="text-gradient">everything.</span>
             </h2>
-            <div className="mt-8 space-y-4 text-muted-foreground leading-relaxed fade-in-up">
+            <div className="mt-8 space-y-5 text-muted-foreground leading-relaxed text-lg fade-in-up">
               <p>
-                Every website you visit, every app you open, every smart device in your home — they all start with a DNS query. And by default, those queries travel unencrypted to your ISP, who can see, log, and sell your browsing history.
+                Every website you visit, every app you open, every smart device in your
+                home — they all start with a DNS query. By default, those queries travel
+                unencrypted to your ISP, which can see, log, and sell your browsing history.
               </p>
               <p>
-                Ads, trackers, and malware domains connect to your devices thousands of times a day — all through DNS. Most people have zero visibility into it.
+                Ads, trackers, and malware domains talk to your devices thousands of times a
+                day through DNS. Most people have zero visibility into any of it.
               </p>
               <p>
-                HydraDNS sits between your network and the internet, intercepting every DNS query. Threats are blocked before a single byte of malicious data reaches your devices.
+                HydraDNS sits between your network and the internet, inspecting every
+                query. Threats are blocked before a single byte of malicious data reaches
+                your devices.
               </p>
             </div>
           </div>
 
-          {/* Diagram */}
-          <div className="flex justify-center fade-in-up">
-            <div className="relative w-full max-w-sm">
-              {/* Device */}
-              <div className="glass rounded-xl p-4 text-center mb-6">
-                <Wifi className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm font-medium text-foreground">Your Devices</p>
-                <p className="text-xs text-muted-foreground">DNS Query</p>
+          {/* Flow diagram */}
+          <div className="fade-in-up">
+            <div className="relative w-full max-w-sm mx-auto">
+              {/* Devices */}
+              <FlowCard
+                icon={<Wifi className="h-7 w-7 text-muted-foreground" strokeWidth={1.75} />}
+                title="Your Devices"
+                caption="Unfiltered queries"
+              />
+
+              <FlowLine />
+
+              {/* HydraDNS */}
+              <div className="relative rounded-xl border border-brand-teal/30 bg-surface-container-high glow-primary p-5 text-center">
+                <span className="absolute top-3 right-3 px-2 py-0.5 rounded-full border border-outline-variant/40 font-mono text-[10px] tracking-wider text-brand-teal">
+                  FILTER
+                </span>
+                <Shield className="h-10 w-10 mx-auto text-brand-teal mb-2" strokeWidth={2} />
+                <p className="font-headline text-base font-bold text-foreground">HydraDNS</p>
+                <p className="mt-1 font-mono text-[11px] text-brand-teal/90">
+                  Inspect · Score · Decide
+                </p>
               </div>
 
-              {/* Arrow down */}
-              <div className="flex justify-center mb-6">
-                <div className="w-px h-8 bg-gradient-to-b from-muted-foreground/50 to-primary" />
+              {/* Branch connectors */}
+              <div className="relative h-10 flex justify-between">
+                <div className="absolute top-0 left-1/2 w-1/2 h-full border-t border-r border-brand-teal/40 rounded-tr-lg -translate-x-1/2" />
+                <div className="absolute top-0 left-0 w-1/2 h-full border-t border-l border-brand-teal/40 rounded-tl-lg translate-x-1/2" />
               </div>
 
-              {/* HydraDNS Shield */}
-              <div className="glass glow-primary rounded-xl p-4 text-center mb-6 border-primary/30">
-                <Shield className="h-10 w-10 mx-auto text-primary mb-2" />
-                <p className="text-sm font-bold text-foreground">HydraDNS</p>
-                <p className="text-xs text-muted-foreground">Inspect & Filter</p>
-              </div>
-
-              {/* Two paths */}
+              {/* Outcomes */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="flex justify-center mb-3">
-                    <div className="w-px h-6 bg-gradient-to-b from-primary to-[hsl(142,71%,45%)]" />
-                  </div>
-                  <div className="glass rounded-xl p-3 text-center border-[hsl(142,71%,45%)]/30">
-                    <Globe className="h-6 w-6 mx-auto text-[hsl(142,71%,45%)] mb-1" />
-                    <p className="text-xs font-medium text-[hsl(142,71%,45%)]">Clean</p>
-                    <p className="text-[10px] text-muted-foreground">Allowed</p>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-center mb-3">
-                    <div className="w-px h-6 bg-gradient-to-b from-primary to-destructive border-dashed" />
-                  </div>
-                  <div className="glass rounded-xl p-3 text-center border-destructive/30">
-                    <XCircle className="h-6 w-6 mx-auto text-destructive mb-1" />
-                    <p className="text-xs font-medium text-destructive">Blocked</p>
-                    <p className="text-[10px] text-muted-foreground">Threat stopped</p>
-                  </div>
-                </div>
+                <OutcomeCard
+                  icon={<CheckCircle2 className="h-5 w-5 text-brand-green" />}
+                  title="Allowed"
+                  caption="Clean traffic"
+                  accent="green"
+                />
+                <OutcomeCard
+                  icon={<XCircle className="h-5 w-5 text-brand-red" />}
+                  title="Blocked"
+                  caption="Threat stopped"
+                  accent="red"
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function FlowCard({
+  icon,
+  title,
+  caption,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  caption: string;
+}) {
+  return (
+    <div className="rounded-xl border border-outline-variant/30 bg-surface-container p-5 text-center">
+      <div className="flex justify-center mb-2">{icon}</div>
+      <p className="font-headline text-base font-bold text-foreground">{title}</p>
+      <p className="mt-1 font-mono text-[11px] text-muted-foreground">{caption}</p>
+    </div>
+  );
+}
+
+function FlowLine() {
+  return (
+    <div className="flex justify-center my-4">
+      <div className="w-px h-8 bg-gradient-to-b from-outline-variant/10 via-brand-teal/40 to-brand-teal/80" />
+    </div>
+  );
+}
+
+function OutcomeCard({
+  icon,
+  title,
+  caption,
+  accent,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  caption: string;
+  accent: "green" | "red";
+}) {
+  const border = accent === "green" ? "border-brand-green/30" : "border-brand-red/30";
+  const text = accent === "green" ? "text-brand-green" : "text-brand-red";
+  return (
+    <div
+      className={`rounded-xl border ${border} bg-surface-container-lowest p-4 text-center`}
+    >
+      <div className="flex justify-center mb-1.5">{icon}</div>
+      <p className={`font-headline text-sm font-bold ${text}`}>{title}</p>
+      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{caption}</p>
+    </div>
   );
 }

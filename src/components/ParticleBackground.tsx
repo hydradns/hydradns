@@ -1,5 +1,9 @@
 import { useEffect, useRef } from "react";
 
+/**
+ * Subtle teal-on-dark dot field. Tuned to match the HydraDNS dashboard aesthetic:
+ * restrained, calm, security-first — not a gimmicky particle demo.
+ */
 export function ParticleBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -10,23 +14,26 @@ export function ParticleBackground() {
     if (!ctx) return;
 
     let animationId: number;
-    let particles: { x: number; y: number; vx: number; vy: number; r: number }[] = [];
+    let particles: { x: number; y: number; vx: number; vy: number; r: number; hue: number }[] = [];
 
     const resize = () => {
-      canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-      canvas.height = canvas.offsetHeight * window.devicePixelRatio;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = canvas.offsetWidth * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
     };
 
     const init = () => {
       resize();
-      const count = Math.min(60, Math.floor((canvas.offsetWidth * canvas.offsetHeight) / 15000));
+      const count = Math.min(48, Math.floor((canvas.offsetWidth * canvas.offsetHeight) / 22000));
       particles = Array.from({ length: count }, () => ({
         x: Math.random() * canvas.offsetWidth,
         y: Math.random() * canvas.offsetHeight,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: (Math.random() - 0.5) * 0.4,
-        r: Math.random() * 1.5 + 0.5,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        r: Math.random() * 1.3 + 0.4,
+        hue: Math.random() > 0.35 ? 168 : 204, // teal or sky
       }));
     };
 
@@ -43,21 +50,21 @@ export function ParticleBackground() {
 
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(59, 130, 246, 0.4)";
+        ctx.fillStyle =
+          p.hue === 168 ? "rgba(0, 212, 170, 0.5)" : "rgba(137, 206, 255, 0.35)";
         ctx.fill();
       }
 
-      // Draw connections
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 150) {
+          if (dist < 140) {
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(59, 130, 246, ${0.15 * (1 - dist / 150)})`;
+            ctx.strokeStyle = `rgba(0, 212, 170, ${0.12 * (1 - dist / 140)})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }
