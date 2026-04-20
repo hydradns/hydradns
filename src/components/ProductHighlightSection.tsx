@@ -31,13 +31,13 @@ export function ProductHighlightSection() {
         <div className="text-center mb-14">
           <p className="eyebrow fade-in-up">SEE IT IN ACTION</p>
           <h2 className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground fade-in-up leading-[1.1]">
-            Not a mock.
+            Your network,
             <br />
-            <span className="text-gradient">A real dashboard.</span>
+            <span className="text-gradient">as it happens.</span>
           </h2>
           <p className="mt-5 text-lg text-muted-foreground max-w-2xl mx-auto fade-in-up">
-            Every chart, table, and toggle on this page ships in the product. This is
-            what you get the moment <code className="font-mono text-brand-sky">docker compose up</code> finishes.
+            Queries, blocks, policies, logs. Everything the gateway is doing, on one
+            screen, the moment <code className="font-mono text-brand-sky">docker compose up</code> finishes.
           </p>
         </div>
 
