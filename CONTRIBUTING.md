@@ -84,4 +84,4 @@ Open an issue on the relevant service repository with:
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions will be licensed under the GPL-3.0 License.
