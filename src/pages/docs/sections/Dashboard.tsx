@@ -174,7 +174,7 @@ export default function Dashboard() {
       </p>
       <p>
         A headline <strong>performance grade</strong> from{" "}
-        <Pill variant="teal">good</Pill> through <Pill variant="amber">bad</Pill>{" "}
+        <Pill variant="teal">excellent</Pill> through <Pill variant="amber">poor</Pill>{" "}
         summarises the whole picture, calibrated to what a typical home
         network should feel like. The most useful moment to check metrics
         is right after adding a new blocklist, the grade will tell you
