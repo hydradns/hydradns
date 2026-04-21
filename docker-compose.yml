@@ -6,6 +6,7 @@ services:
     build:
       context: ./apps/core
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "8080:8080"     # Control plane API
       - "53:1053/udp"   # DNS (UDP)
@@ -34,6 +35,7 @@ services:
       dockerfile: Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=http://localhost:8080
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
