@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Menu, X, Github, Star } from "lucide-react";
 import logo from "@/assets/hydradns-logo.png";
 
@@ -52,6 +53,12 @@ export function Navbar() {
                 {link.label}
               </a>
             ))}
+            <Link
+              to="/docs"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Docs
+            </Link>
           </div>
 
           {/* CTAs */}
@@ -99,6 +106,13 @@ export function Navbar() {
                 {link.label}
               </a>
             ))}
+            <Link
+              to="/docs"
+              className="block text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setMobileOpen(false)}
+            >
+              Docs
+            </Link>
             <div className="pt-3 border-t border-outline-variant/40 flex flex-col gap-2">
               <a
                 href="https://github.com/hydradns/hydradns"
