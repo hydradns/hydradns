@@ -153,6 +153,9 @@ func (h *APIHandler) ToggleDnsEngine(c *gin.Context) {
 		return
 	}
 
+	// Capture prior state for the audit trail before we mutate it.
+	prior, _ := h.Store.SystemState.Get()
+
 	// 1. Persist desired state (source of truth)
 	if err := h.Store.SystemState.SetDNSEnabled(req.Enabled); err != nil {
 		errMsg := "failed to persist DNS engine state"
@@ -172,6 +175,15 @@ func (h *APIHandler) ToggleDnsEngine(c *gin.Context) {
 		})
 		return
 	}
+
+	var priorEnabled *bool
+	if prior != nil {
+		p := prior.DNSEnabled
+		priorEnabled = &p
+	}
+	h.Audit.Record(c, "engine.toggle", "engine:dns",
+		map[string]interface{}{"enabled": priorEnabled},
+		map[string]interface{}{"enabled": req.Enabled})
 
 	// 3. Respond with acknowledged intent
 	c.JSON(http.StatusOK, ResponseGeneric{

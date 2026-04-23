@@ -3,8 +3,19 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/handlers"
+	"github.com/lopster568/phantomDNS/cmd/controlplane/middlewares"
+	"github.com/lopster568/phantomDNS/internal/storage/models"
 )
 
+// writeRoles names the roles permitted to mutate policies, blocklists,
+// and the engine toggle. Admins bypass role checks entirely via the
+// middleware, so "operator" here is effectively "operator or admin".
+var writeRoles = []string{models.RoleOperator}
+
+// RegisterRoutes registers every control plane endpoint. Read routes are
+// open to any authenticated user (read_only included). Mutating routes
+// wrap the handler in middlewares.RequireRole so the role boundary lives
+// next to the route definition, not inside the handler.
 func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 	api := r.Group("/api/v1")
 	r.GET("/health", apiHandler.HealthCheck)
@@ -18,17 +29,19 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 			auth.POST("/login", apiHandler.Login)
 		}
 
-		// Dashboard endpoints
+		// Dashboard endpoints (read-only, open to all authenticated users)
 		dashboard := api.Group("/dashboard")
 		{
 			dashboard.GET("/summary", apiHandler.GetDashboardSummary)
 		}
 
-		// DNS Engine endpoints
+		// DNS Engine endpoints — read open, write requires operator+
 		dns := api.Group("/dns")
 		{
 			dns.GET("/engine", apiHandler.GetDnsEngineStatus)
-			dns.POST("/engine", apiHandler.ToggleDnsEngine)
+			dns.POST("/engine",
+				middlewares.RequireRole(writeRoles...),
+				apiHandler.ToggleDnsEngine)
 			dns.GET("/resolvers", apiHandler.ListResolvers)
 			dns.GET("/metrics", apiHandler.GetDnsMetrics)
 		}
@@ -37,18 +50,26 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 		policies := api.Group("/policies")
 		{
 			policies.GET("", apiHandler.ListPolicies)
-			policies.POST("", apiHandler.CreatePolicy)
+			policies.POST("",
+				middlewares.RequireRole(writeRoles...),
+				apiHandler.CreatePolicy)
 			policies.GET("/:id", apiHandler.GetPolicy)
-			policies.DELETE("/:id", apiHandler.DeletePolicy)
+			policies.DELETE("/:id",
+				middlewares.RequireRole(writeRoles...),
+				apiHandler.DeletePolicy)
 		}
 
 		// Blocklists endpoints
 		blocklists := api.Group("/blocklists")
 		{
 			blocklists.GET("", apiHandler.ListBlocklists)
-			blocklists.POST("", apiHandler.CreateBlocklist)
+			blocklists.POST("",
+				middlewares.RequireRole(writeRoles...),
+				apiHandler.CreateBlocklist)
 			blocklists.GET("/:id", apiHandler.GetBlocklist)
-			blocklists.DELETE("/:id", apiHandler.DeleteBlocklist)
+			blocklists.DELETE("/:id",
+				middlewares.RequireRole(writeRoles...),
+				apiHandler.DeleteBlocklist)
 		}
 
 		// Analytics endpoints

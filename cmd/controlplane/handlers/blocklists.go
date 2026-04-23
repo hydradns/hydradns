@@ -134,6 +134,9 @@ func (h *APIHandler) CreateBlocklist(c *gin.Context) {
 		return
 	}
 
+	out := blocklistFromSource(*src, 0)
+	h.Audit.Record(c, "blocklist.create", "blocklist:"+src.ID, nil, out)
+
 	// Kick off the initial fetch + parse in the background so users see a
 	// populated domain count within seconds. The data plane's periodic
 	// refresh loop will still re-fetch on its own cadence. Duplicate fetches
@@ -152,16 +155,26 @@ func (h *APIHandler) CreateBlocklist(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, ResponseBlocklistSingle{
 		Status: "success",
-		Data:   blocklistFromSource(*src, 0),
+		Data:   out,
 	})
 }
 
 // DeleteBlocklist handles DELETE /blocklists/:id
 func (h *APIHandler) DeleteBlocklist(c *gin.Context) {
-	if err := h.Store.Blocklist.DeleteSource(c.Param("id")); err != nil {
+	id := c.Param("id")
+	var before *Blocklist
+	if src, err := h.Store.Blocklist.GetSource(id); err == nil && src != nil {
+		b := blocklistFromSource(*src, 0)
+		before = &b
+	}
+
+	if err := h.Store.Blocklist.DeleteSource(id); err != nil {
 		errMsg := "blocklist not found"
 		c.JSON(http.StatusNotFound, ResponseGeneric{Status: "error", Error: &errMsg})
 		return
 	}
+
+	h.Audit.Record(c, "blocklist.delete", "blocklist:"+id, before, nil)
+
 	c.JSON(http.StatusOK, ResponseGeneric{Status: "success", Data: map[string]interface{}{}})
 }
