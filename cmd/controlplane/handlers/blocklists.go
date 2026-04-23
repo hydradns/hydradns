@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"log"
 	"net/http"
 	"time"
 
@@ -130,6 +132,22 @@ func (h *APIHandler) CreateBlocklist(c *gin.Context) {
 		errMsg := "failed to create blocklist source"
 		c.JSON(http.StatusInternalServerError, ResponseBlocklistSingle{Status: "error", Error: &errMsg})
 		return
+	}
+
+	// Kick off the initial fetch + parse in the background so users see a
+	// populated domain count within seconds. The data plane's periodic
+	// refresh loop will still re-fetch on its own cadence. Duplicate fetches
+	// are cheap (ETag short-circuits) and the snapshot transaction in the
+	// repository guarantees consistency if both paths land simultaneously.
+	if h.BlocklistEngine != nil {
+		srcCopy := *src
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+			if err := h.BlocklistEngine.UpdateSource(ctx, srcCopy, ""); err != nil {
+				log.Printf("initial blocklist fetch failed for %s: %v", srcCopy.ID, err)
+			}
+		}()
 	}
 
 	c.JSON(http.StatusCreated, ResponseBlocklistSingle{

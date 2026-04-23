@@ -8,6 +8,7 @@ import (
 	"github.com/lopster568/phantomDNS/cmd/controlplane/handlers"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/middlewares"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/routes"
+	"github.com/lopster568/phantomDNS/internal/blocklist"
 	"github.com/lopster568/phantomDNS/internal/config"
 	client "github.com/lopster568/phantomDNS/internal/grpc/controlplane"
 	"github.com/lopster568/phantomDNS/internal/storage/db"
@@ -39,8 +40,12 @@ func main() {
 	}
 	c.SetAcceptQueries(state.DNSEnabled)
 
+	// Blocklist engine powers the immediate fetch on POST /blocklists so
+	// users don't wait up to 6 hours for the next dataplane refresh cycle.
+	blocklistEngine := blocklist.NewEngine(repos.Blocklist)
+
 	// Initialize Gin router
-	apiHandler := handlers.NewAPIHandler(*repos, c)
+	apiHandler := handlers.NewAPIHandler(*repos, c, blocklistEngine)
 	r := gin.Default()
 	r.Use(middlewares.Logger())
 
