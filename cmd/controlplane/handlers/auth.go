@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -92,6 +94,20 @@ func (h *APIHandler) Setup(c *gin.Context) {
 		if err := h.Store.Blocklist.CreateSource(src); err != nil {
 			log.Printf("blocklist source creation failed for %s: %v", bl.ID, err)
 			warnings = append(warnings, "failed to add "+bl.Name)
+			continue
+		}
+
+		// Same async-fetch path as the main CreateBlocklist handler so
+		// the setup wizard ends with populated blocklists, not empty ones.
+		if h.BlocklistEngine != nil {
+			srcCopy := *src
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				defer cancel()
+				if err := h.BlocklistEngine.UpdateSource(ctx, srcCopy, ""); err != nil {
+					log.Printf("initial blocklist fetch failed for %s: %v", srcCopy.ID, err)
+				}
+			}()
 		}
 	}
 

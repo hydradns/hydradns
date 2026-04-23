@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/lopster568/phantomDNS/internal/blocklist"
 	client "github.com/lopster568/phantomDNS/internal/grpc/controlplane"
 	"github.com/lopster568/phantomDNS/internal/storage/repositories"
 )
@@ -9,14 +10,20 @@ import (
 type APIHandler struct {
 	Store           repositories.Store
 	DataPlaneClient *client.Client
+	// BlocklistEngine is used to kick off an immediate fetch when a new
+	// source is created via the API, so users see domain counts within
+	// seconds instead of waiting for the data plane's periodic refresh.
+	BlocklistEngine *blocklist.Engine
 }
 
 func NewAPIHandler(
 	store repositories.Store,
 	dataPlaneClient *client.Client,
+	blocklistEngine *blocklist.Engine,
 ) *APIHandler {
 	return &APIHandler{
 		Store:           store,
 		DataPlaneClient: dataPlaneClient,
+		BlocklistEngine: blocklistEngine,
 	}
 }
