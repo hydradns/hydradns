@@ -1,6 +1,8 @@
 package db
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"log"
 	"time"
 
@@ -51,7 +53,7 @@ func InitDB(path string) *gorm.DB {
 }
 
 func migrate(db *gorm.DB) error {
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&models.Policy{},
 		&models.DNSQuery{},
 		&models.DomainPolicy{},
@@ -63,5 +65,69 @@ func migrate(db *gorm.DB) error {
 		&models.BlocklistSnapshot{},
 		&models.BlocklistEntry{},
 		&models.AdminCredential{},
-	)
+		&models.User{},
+		&models.Token{},
+		&models.AuditEvent{},
+	); err != nil {
+		return err
+	}
+	return migrateAdminSingletonToUser(db)
+}
+
+// migrateAdminSingletonToUser copies an existing AdminCredential singleton
+// into the new User + Token tables on first boot of a binary that knows
+// about RBAC. The migration is idempotent: once the users table is
+// non-empty, this function does nothing.
+//
+// The existing UUID API key is preserved as a hashed Token with no expiry,
+// so existing CLI and dashboard sessions keep working through the upgrade.
+// Operators can rename the placeholder email on first login.
+func migrateAdminSingletonToUser(db *gorm.DB) error {
+	var userCount int64
+	if err := db.Model(&models.User{}).Count(&userCount).Error; err != nil {
+		return err
+	}
+	if userCount > 0 {
+		return nil // already migrated, nothing to do
+	}
+
+	var admin models.AdminCredential
+	if err := db.First(&admin).Error; err != nil {
+		// No singleton to migrate. Fresh install - setup wizard will
+		// create the first user. Not an error.
+		return nil
+	}
+
+	user := models.User{
+		Email:        "admin@hydradns.local",
+		PasswordHash: admin.PasswordHash,
+		Role:         models.RoleAdmin,
+	}
+	if err := db.Create(&user).Error; err != nil {
+		return err
+	}
+
+	sum := sha256.Sum256([]byte(admin.APIKey))
+	token := models.Token{
+		UserID: user.ID,
+		Hash:   hex.EncodeToString(sum[:]),
+		Label:  "migrated-from-singleton",
+		// No ExpiresAt: legacy tokens keep working indefinitely until
+		// the admin chooses to rotate.
+	}
+	if err := db.Create(&token).Error; err != nil {
+		return err
+	}
+
+	now := time.Now()
+	sys := models.AuditEvent{
+		Action:    "system.migrate.admin_singleton",
+		Target:    "user:" + user.Email,
+		ClientIP:  "127.0.0.1",
+		UserAgent: "hydradns/migrate",
+		CreatedAt: now,
+	}
+	_ = db.Create(&sys).Error // audit failure is observational, do not fail the migration
+	log.Printf("migrated legacy admin singleton to user %q", user.Email)
+	return nil
 }
