@@ -79,6 +79,12 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 			analytics.GET("/audits", apiHandler.GetAuditLogs)
 		}
 
+		// Audit log: who did what to the control plane.
+		// Admin + operator can read; read_only cannot (it's sensitive).
+		api.GET("/audit",
+			middlewares.RequireRole(models.RoleOperator),
+			apiHandler.ListAuditEvents)
+
 		// User management endpoints. Read endpoints are open to any
 		// authenticated caller; writes are admin-only except PATCH
 		// which the handler itself gates (admin for any user, self for
