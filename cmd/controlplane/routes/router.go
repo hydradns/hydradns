@@ -78,5 +78,34 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 			analytics.GET("/summary", apiHandler.GetAnalyticsSummary)
 			analytics.GET("/audits", apiHandler.GetAuditLogs)
 		}
+
+		// User management endpoints. Read endpoints are open to any
+		// authenticated caller; writes are admin-only except PATCH
+		// which the handler itself gates (admin for any user, self for
+		// own email / password).
+		users := api.Group("/users")
+		{
+			users.GET("/me", apiHandler.GetMe)
+			users.GET("", apiHandler.ListUsers)
+			users.POST("",
+				middlewares.RequireRole(models.RoleAdmin),
+				apiHandler.CreateUser)
+			users.PATCH("/:id", apiHandler.PatchUser)
+			users.POST("/:id/disable",
+				middlewares.RequireRole(models.RoleAdmin),
+				apiHandler.SetUserDisabled)
+			users.DELETE("/:id",
+				middlewares.RequireRole(models.RoleAdmin),
+				apiHandler.DeleteUser)
+		}
+
+		// Token management endpoints. All authenticated users can
+		// manage their own tokens; admins can list+revoke any.
+		tokens := api.Group("/tokens")
+		{
+			tokens.GET("", apiHandler.ListTokens)
+			tokens.POST("", apiHandler.CreateToken)
+			tokens.DELETE("/:id", apiHandler.RevokeToken)
+		}
 	}
 }
