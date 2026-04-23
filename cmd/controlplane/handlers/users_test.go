@@ -69,6 +69,10 @@ func newHarness(t *testing.T) *testHarness {
 	tokens.POST("", h.CreateToken)
 	tokens.DELETE("/:id", h.RevokeToken)
 
+	r.GET("/api/v1/audit",
+		middlewares.RequireRole(models.RoleOperator),
+		h.ListAuditEvents)
+
 	return &testHarness{db: db, store: store, router: r}
 }
 
