@@ -14,6 +14,7 @@ type Store struct {
 	Auth        AuthRepository
 	Users       UserRepository
 	Tokens      TokenRepository
+	Audit       AuditRepository
 }
 
 func NewStore(db *gorm.DB) *Store {
@@ -27,5 +28,6 @@ func NewStore(db *gorm.DB) *Store {
 		Auth:        NewAuthRepo(db),
 		Users:       NewUserRepo(db),
 		Tokens:      NewTokenRepo(db),
+		Audit:       NewAuditRepo(db),
 	}
 }
