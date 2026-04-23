@@ -53,7 +53,7 @@ func main() {
 	r.Use(middlewares.CORS())
 
 	// Auth middleware — validates Bearer token on protected routes
-	r.Use(middlewares.Auth(repos.Auth))
+	r.Use(middlewares.Auth(repos.Users, repos.Tokens))
 
 	routes.RegisterRoutes(r, apiHandler)
 	r.Run(config.DefaultConfig.ControlPlane.ListenAddr)
