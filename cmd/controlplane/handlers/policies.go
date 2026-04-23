@@ -141,15 +141,28 @@ func (h *APIHandler) CreatePolicy(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, ResponsePolicySingle{Status: "error", Error: &errMsg})
 		return
 	}
+
+	out := policyFromModel(*m)
+	h.Audit.Record(c, "policy.create", "policy:"+m.ID, nil, out)
+
 	c.JSON(http.StatusCreated, ResponsePolicySingle{
 		Status: "success",
-		Data:   policyFromModel(*m),
+		Data:   out,
 	})
 }
 
 // DeletePolicy handles DELETE /policies/:id
 func (h *APIHandler) DeletePolicy(c *gin.Context) {
-	if err := h.Store.Policies.Delete(c.Param("id")); err != nil {
+	// Capture the pre-delete row for the audit trail. A miss here is
+	// fine; we surface a clean 404 below.
+	id := c.Param("id")
+	var before *Policy
+	if m, err := h.Store.Policies.GetByID(id); err == nil && m != nil {
+		p := policyFromModel(*m)
+		before = &p
+	}
+
+	if err := h.Store.Policies.Delete(id); err != nil {
 		status := http.StatusInternalServerError
 		errMsg := "failed to delete policy"
 		if err == gorm.ErrRecordNotFound {
@@ -159,5 +172,8 @@ func (h *APIHandler) DeletePolicy(c *gin.Context) {
 		c.JSON(status, ResponseGeneric{Status: "error", Error: &errMsg})
 		return
 	}
+
+	h.Audit.Record(c, "policy.delete", "policy:"+id, before, nil)
+
 	c.JSON(http.StatusOK, ResponseGeneric{Status: "success", Data: map[string]interface{}{}})
 }
