@@ -1,7 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package models
 
-import "time"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"time"
+)
+
+// HashToken is the canonical plaintext-to-hash transformation. Used by
+// every code path that stores or looks up a token so the migration, the
+// repository, and any future consumer cannot drift.
+func HashToken(plaintext string) string {
+	sum := sha256.Sum256([]byte(plaintext))
+	return hex.EncodeToString(sum[:])
+}
 
 // Token is a per-user API token. The plaintext token value is returned
 // exactly once at creation; only the SHA-256 hash is persisted, so losing

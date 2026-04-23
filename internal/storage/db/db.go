@@ -1,8 +1,6 @@
 package db
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"log"
 	"time"
 
@@ -107,10 +105,9 @@ func migrateAdminSingletonToUser(db *gorm.DB) error {
 		return err
 	}
 
-	sum := sha256.Sum256([]byte(admin.APIKey))
 	token := models.Token{
 		UserID: user.ID,
-		Hash:   hex.EncodeToString(sum[:]),
+		Hash:   models.HashToken(admin.APIKey),
 		Label:  "migrated-from-singleton",
 		// No ExpiresAt: legacy tokens keep working indefinitely until
 		// the admin chooses to rotate.
