@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/lopster568/phantomDNS/cmd/controlplane/audit"
 	"github.com/lopster568/phantomDNS/internal/blocklist"
 	client "github.com/lopster568/phantomDNS/internal/grpc/controlplane"
 	"github.com/lopster568/phantomDNS/internal/storage/repositories"
@@ -14,6 +15,9 @@ type APIHandler struct {
 	// source is created via the API, so users see domain counts within
 	// seconds instead of waiting for the data plane's periodic refresh.
 	BlocklistEngine *blocklist.Engine
+	// Audit records one event per mutating action. Lives on the handler
+	// so every mutation has a single call site (h.Audit.Record(...)).
+	Audit *audit.Recorder
 }
 
 func NewAPIHandler(
@@ -25,5 +29,6 @@ func NewAPIHandler(
 		Store:           store,
 		DataPlaneClient: dataPlaneClient,
 		BlocklistEngine: blocklistEngine,
+		Audit:           audit.New(store.Audit),
 	}
 }
