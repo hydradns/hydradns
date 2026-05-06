@@ -2,6 +2,7 @@
 package dnsengine
 
 import (
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -72,23 +73,57 @@ func (e *Engine) Shutdown() {
 	}
 }
 
+// blockResponseKind controls how respondBlocked answers a blocked query.
+// Configurable via the BLOCK_RESPONSE env var so we can A/B test:
+//
+//	zero      (default) - return A 0.0.0.0 / AAAA ::. Linux clients fail
+//	            connect immediately with ECONNREFUSED. Windows is slower
+//	            because the TCP stack will try connect to 0.0.0.0 and wait
+//	            for the OS connect timeout.
+//	nxdomain            - return RcodeNameError (NXDOMAIN). Definitive
+//	            "this name does not exist" answer per RFC 1034. Browsers
+//	            on every OS give up immediately with DNS_PROBE_FINISHED_
+//	            NXDOMAIN. Windows DNS Client caches this and does NOT fall
+//	            back to secondary (unlike REFUSED).
+//	refused             - return RcodeRefused. Original v0 behaviour.
+//	            Windows + many home routers fall back to a secondary DNS
+//	            on REFUSED, which silently bypasses every block. Do not
+//	            use unless you have verified there is no secondary DNS.
+//
+// Default stays "zero" to preserve existing behaviour. Operators flip
+// via env to test in their own browser before we change the default.
+var blockResponseKind = func() string {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("BLOCK_RESPONSE")))
+	switch v {
+	case "nxdomain", "refused", "zero":
+		return v
+	default:
+		return "zero"
+	}
+}()
+
 func (e *Engine) respondBlocked(w dns.ResponseWriter, r *dns.Msg, domain, reason string) {
 	m := new(dns.Msg)
-	m.SetReply(r)
-	// Return 0.0.0.0 / :: instead of REFUSED — browsers treat REFUSED as "try another DNS"
-	// but 0.0.0.0 causes an immediate connection failure (ERR_CONNECTION_REFUSED)
-	qtype := r.Question[0].Qtype
-	name := r.Question[0].Name
-	switch qtype {
-	case dns.TypeAAAA:
-		rr, err := dns.NewRR(name + " 60 IN AAAA ::")
-		if err == nil {
-			m.Answer = append(m.Answer, rr)
-		}
-	default: // TypeA and everything else
-		rr, err := dns.NewRR(name + " 60 IN A 0.0.0.0")
-		if err == nil {
-			m.Answer = append(m.Answer, rr)
+	switch blockResponseKind {
+	case "nxdomain":
+		m.SetRcode(r, dns.RcodeNameError)
+	case "refused":
+		m.SetRcode(r, dns.RcodeRefused)
+	default: // "zero"
+		m.SetReply(r)
+		qtype := r.Question[0].Qtype
+		name := r.Question[0].Name
+		switch qtype {
+		case dns.TypeAAAA:
+			rr, err := dns.NewRR(name + " 60 IN AAAA ::")
+			if err == nil {
+				m.Answer = append(m.Answer, rr)
+			}
+		default: // TypeA and everything else
+			rr, err := dns.NewRR(name + " 60 IN A 0.0.0.0")
+			if err == nil {
+				m.Answer = append(m.Answer, rr)
+			}
 		}
 	}
 	if err := w.WriteMsg(m); err != nil {
