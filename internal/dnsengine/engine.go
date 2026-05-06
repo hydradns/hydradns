@@ -102,6 +102,18 @@ var blockResponseKind = func() string {
 	}
 }()
 
+// respondNXDomain writes an unconditional NXDOMAIN reply. Used by the
+// DoH bootstrap interception path where we always want the browser to
+// fall back to system DNS, regardless of the operator's BLOCK_RESPONSE
+// preference for user-defined blocks.
+func respondNXDomain(w dns.ResponseWriter, r *dns.Msg) {
+	m := new(dns.Msg)
+	m.SetRcode(r, dns.RcodeNameError)
+	if err := w.WriteMsg(m); err != nil {
+		logger.Log.Error("Failed to write NXDOMAIN response: " + err.Error())
+	}
+}
+
 func (e *Engine) respondBlocked(w dns.ResponseWriter, r *dns.Msg, domain, reason string) {
 	m := new(dns.Msg)
 	switch blockResponseKind {
@@ -238,6 +250,24 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 	var threatResult threat.Result
 	if e.threatDetector != nil {
 		threatResult = e.threatDetector.Analyze(domainName)
+	}
+
+	// --- Step 0: DoH/DoT bootstrap interception ---
+	// If a client is trying to reach a known encrypted-DNS provider, we
+	// answer NXDOMAIN so the browser falls back to system DNS (which is
+	// us). We force NXDOMAIN regardless of the operator's BLOCK_RESPONSE
+	// setting because the alternatives (0.0.0.0 / REFUSED) defeat the
+	// purpose: the browser would either hang on the connect or roll over
+	// to its hardcoded fallback, both of which leak DNS off-net.
+	//
+	// This list is invisible to the dashboard and not user-editable; see
+	// internal/dnsengine/doh_bootstrap.go.
+	if IsDoHBootstrap(domainName) {
+		logger.Log.Infof("Blocked DoH bootstrap: %s", domainName)
+		e.logQuery(domainName, clientIP, "block", threatResult)
+		respondNXDomain(w, r)
+		success = true
+		return
 	}
 
 	// --- Step 1: Check blocklist first ---
