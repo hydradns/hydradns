@@ -264,6 +264,46 @@ func TestRespondBlocked(t *testing.T) {
 	}
 }
 
+// TestRespondBlocked_Modes covers the three BLOCK_RESPONSE values. The
+// package-level blockResponseKind is restored after each sub-test so we
+// do not poison the other tests in this file (which all assume "zero").
+func TestRespondBlocked_Modes(t *testing.T) {
+	original := blockResponseKind
+	t.Cleanup(func() { blockResponseKind = original })
+
+	cases := []struct {
+		mode       string
+		wantRcode  int
+		wantAnswer bool // does the message carry an A/AAAA answer record
+	}{
+		{mode: "zero", wantRcode: dns.RcodeSuccess, wantAnswer: true},
+		{mode: "nxdomain", wantRcode: dns.RcodeNameError, wantAnswer: false},
+		{mode: "refused", wantRcode: dns.RcodeRefused, wantAnswer: false},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.mode, func(t *testing.T) {
+			blockResponseKind = tc.mode
+			e := newTestEngine(nil, nil)
+			w := &mockResponseWriter{}
+			r := newTestQuery("test.com")
+
+			e.respondBlocked(w, r, "test.com", "test")
+
+			if w.msg == nil {
+				t.Fatal("no response written")
+			}
+			if got := w.msg.Rcode; got != tc.wantRcode {
+				t.Errorf("rcode: got %d, want %d", got, tc.wantRcode)
+			}
+			hasAnswer := len(w.msg.Answer) > 0
+			if hasAnswer != tc.wantAnswer {
+				t.Errorf("answer presence: got %v, want %v", hasAnswer, tc.wantAnswer)
+			}
+		})
+	}
+}
+
 func TestRespondRedirect(t *testing.T) {
 	e := newTestEngine(nil, nil)
 	w := &mockResponseWriter{}
