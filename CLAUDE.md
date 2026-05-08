@@ -24,7 +24,6 @@ HydraDNS is a DNS-layer security and privacy gateway built as a monorepo of Git 
 - `make fmt` / `make vet` / `make lint` — code quality (uses golangci-lint)
 - `make proto-generate` — regenerate gRPC/protobuf code (requires buf)
 - `make proto-lint` — lint proto definitions
-- `make build-docker` / `make destroy-docker` — container lifecycle
 
 ### UI (Next.js Dashboard) — `apps/ui/`
 - `npm run dev` — dev server on port 3000
@@ -35,6 +34,11 @@ HydraDNS is a DNS-layer security and privacy gateway built as a monorepo of Git 
 - `npm run build` / `npm run lint`
 - `npm run test` / `npm run test:watch` — Vitest with jsdom
 
+### CLI — `apps/cli/`
+- `go build -o hydra .` — build CLI binary
+- `./hydra --help` — list all commands
+- `./hydra mcp` — start MCP server (JSON-RPC 2.0 over stdio)
+
 ### Scanner (Go) — `apps/scanner/`
 - `make build` — compile scanner binary
 
@@ -43,19 +47,22 @@ HydraDNS is a DNS-layer security and privacy gateway built as a monorepo of Git 
 ```
 Root (orchestrator)
 ├── apps/core       — Go 1.24, Gin, gRPC, GORM/SQLite
-│   ├── cmd/controlplane/   — Admin API (port 8080)
-│   ├── cmd/dataplane/      — DNS server (gRPC on 50051)
-│   ├── internal/           — blocklist, dnsengine, policy, storage, grpc, metrics
+│   ├── cmd/controlplane/   — Admin API (port 8080), auth middleware, handlers
+│   ├── cmd/dataplane/      — DNS server (UDP/TCP on 1053), gRPC on 50051
+│   ├── internal/           — blocklist, dnsengine, policy, storage, grpc, config
 │   └── proto/              — Protobuf definitions (buf for codegen → internal/gen/proto/)
 ├── apps/ui         — Next.js 16, React 19, TypeScript, Tailwind v4, shadcn/ui (port 3000)
 ├── apps/landing    — Vite, React 18, TypeScript, Tailwind v3, shadcn/ui (port 3001)
-├── apps/scanner    — Go 1.25, network scanning worker (no exposed port)
-├── apps/cli        — placeholder, not yet populated
+├── apps/scanner    — Go, network scanning worker (no exposed port)
+├── apps/cli        — Go + Cobra CLI (11 commands) + MCP server (8 tools)
+│   ├── cmd/        — Cobra commands (status, engine, block, policies, blocklists, logs, mcp)
+│   ├── api/        — Shared HTTP client for control plane API
+│   └── mcp/        — MCP JSON-RPC 2.0 server
 └── docker-compose.yml
-    ├── postgres (15-alpine, port 5432) — not used by core yet
-    ├── redis (7-alpine, port 6379) — not used by core yet
     └── hydra-net bridge network
 ```
+
+**Docker port mapping:** Core runs on 1053 internally, Docker maps 53→1053 on the host. API on 8080.
 
 ## Core Domain Concepts
 
@@ -73,48 +80,81 @@ Domain normalization: lowercase + strip trailing dot (e.g., `EXAMPLE.COM.` → `
 
 ### Blocklist Engine
 
-Sources are fetched with ETag support (304 skip), SHA256 checksum tracking, and atomic persistence (transaction wraps snapshot + entries + metadata). Multiple format parsers: hosts, domain-list, ads-list — selected by `format` field on `BlocklistSource`.
+Sources are fetched with ETag support (304 skip), SHA256 checksum tracking, and atomic persistence (transaction wraps snapshot + entries + metadata). Multiple format parsers: hosts, domain-list, ads-list — selected by `format` field on `BlocklistSource`. Blocklists auto-refresh on a configurable interval (default 6h, env: `BLOCKLIST_UPDATE_INTERVAL`).
 
 ### Policy Format
 
-JSON file at `configs/policies.json`. Array of policies with `id`, `action` (BLOCK/ALLOW/REDIRECT), `domains`, optional `regexes`, `priority` (higher wins). Regexes are compiled/validated on load but **not yet evaluated at query time** (TODO in code). Wildcards also parsed but not evaluated.
+JSON file at `configs/policies.json`. Array of policies with `id`, `action` (BLOCK/ALLOW/REDIRECT), `domains`, optional `regexes`, `priority` (higher wins). Regexes are compiled/validated on load but **not yet evaluated at query time**. Wildcards also parsed but not evaluated.
+
+### Authentication
+
+Single admin user model (`AdminCredential` singleton in DB). Bearer token auth on all API endpoints except `/health`, `/api/v1/auth/status`, `/api/v1/auth/login`, `/api/v1/auth/setup`. Token is a UUID API key generated during setup. Password hashed with bcrypt.
+
+**Auth flow:** First boot → setup wizard creates admin + returns token. Subsequent access → login with password → get token. Dashboard stores token in localStorage + cookie.
+
+**Auth endpoints (unprotected):**
+- `GET /api/v1/auth/status` — returns `{setup_complete: bool}`
+- `POST /api/v1/auth/setup` — creates admin, optionally configures blocklists
+- `POST /api/v1/auth/login` — validates password, returns token
 
 ## Configuration
 
 - **Config file**: `configs/config.yaml` — top-level `dataplane` and `controlplane` keys
-- **DataPlane config**: `listen_addr` (UDP/TCP), `upstream_resolvers` (list with failover), `grpc_server` (port/addr)
+- **DataPlane config**: `listen_addr` (UDP/TCP), `upstream_resolvers` (list with failover), `grpc_server` (port/addr), `blocklist_update_interval`
 - **Policy file**: `configs/policies.json` loaded from disk on dataplane startup
-- **Config loaded as package singleton**: `config.DefaultConfig`
+- **Config loaded as package singleton**: `config.DefaultConfig` with env var overrides (`DNS_LISTEN_ADDR`, `BLOCKLIST_UPDATE_INTERVAL`)
 - **Environment**: `.env` file (gitignored) with fallback defaults. See `.env.example`.
+
+| Env Variable | Default | Description |
+|:-------------|:--------|:------------|
+| `PHANTOM_CONFIG` | `/app/configs/config.yaml` | Path to config file |
+| `PHANTOM_DB` | `/app/data/phantomdns.db` | SQLite database path |
+| `PHANTOM_POLICIES` | `configs/policies.json` | Policy file path |
+| `CORS_ORIGINS` | `http://localhost:3000` | Allowed CORS origins |
+| `DNS_LISTEN_ADDR` | (from config) | Override DNS listen address |
+| `BLOCKLIST_UPDATE_INTERVAL` | `6h` | Blocklist refresh interval |
+| `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
+| `HYDRA_TOKEN` | (none) | CLI auth token |
+| `BLOCK_RESPONSE` | `zero` | Engine response for blocked domains: `zero` (A 0.0.0.0), `nxdomain` (RcodeNameError), `refused` (RcodeRefused). `zero` is the safe default; `nxdomain` is faster on Windows browsers but should be A/B tested first |
 
 ## SQLite Setup
 
-Pure-Go SQLite driver (`glebarez/sqlite`), WAL mode for concurrency, single-writer (`MaxOpenConns=1`). GORM auto-migrates all models on startup: Policy, DNSQuery, DomainPolicy, Action, Category, Statistics, SystemState, BlocklistSource, BlocklistSnapshot, BlocklistEntry.
-
-## Known Incomplete Features
-
-Many control plane API handlers use **in-memory mock data**, not the real storage/engines:
-- `handlers/blocklists.go` — mock slice, doesn't use the real blocklist engine or DB
-- `handlers/policies.go` — mock slice, doesn't use the real policy engine
-- `handlers/dns.go` — `/dns/resolvers` uses mock data
-
-**What IS wired up**: `/dns/engine` GET/POST (real gRPC to dataplane), `/dns/metrics` (real gRPC), and the full blocklist DB storage layer (just not called from the API).
-
-The UI has no API client layer yet — `NEXT_PUBLIC_API_URL` is set but unused in code.
-
-The scanner currently only detects the system resolver via `/etc/resolv.conf` and runs a basic UDP resolution check.
+Pure-Go SQLite driver (`glebarez/sqlite`), WAL mode for concurrency, single-writer (`MaxOpenConns=1`). GORM auto-migrates all models on startup: Policy, DNSQuery, DomainPolicy, Action, Category, Statistics, SystemState, BlocklistSource, BlocklistSnapshot, BlocklistEntry, AdminCredential.
 
 ## API Response Envelope
 
 All control plane responses use a standard envelope:
 ```json
-{"status": "success|error", "data": {...}, "error": "message if error"}
+{"status": "success", "data": {...}, "error": "message if error"}
 ```
 
 ## Submodule Workflow
 
 Each app is a separate Git repo. Clone with `git clone --recursive`. Work inside each `apps/<service>` directory and push to that service's repo. Run `make update` from root to sync.
 
-## CI (Core)
+## CI
 
-GitHub Actions on push/PR to main: golangci-lint, gosec security scan, tests on Go 1.21/1.22 with Codecov, Docker build verification, govulncheck.
+Two GitHub Actions workflows:
+- `ci.yml` — on push/PR to main: vet + test core, vet + build CLI, lint + build dashboard, lint + build landing, Docker build verification
+- `release.yml` — on tag push: multi-arch Docker images (amd64/arm64) to GHCR + cross-compiled CLI binaries
+
+## Known Incomplete Features
+
+- Regex/wildcard policy evaluation — parsed but not evaluated at query time
+- Query log retention — DNSQuery table grows unbounded
+- TLS on gRPC — uses `grpc.WithInsecure()`
+- TLS on dashboard — HTTPS not terminated anywhere
+- Port 53 binding on bare metal — needs `CAP_NET_BIND_SERVICE` (Docker handles this via port mapping)
+- `/dns/resolvers` endpoint returns mock data (resolvers are config-only)
+- Scanner only detects system resolver via `/etc/resolv.conf`
+- Policy / blocklist edit UI — only create + delete today, no inline edit
+- Query log pagination — hard-capped at ~100 entries, no paging UI
+- Settings page — UI stub exists, no backend wiring
+- CORS origins — defaults to `http://localhost:3000`; production needs `CORS_ORIGINS` env override
+- Update mechanism — no `hydra update` or container self-update flow
+- Remote monitoring — no heartbeat or alert pipeline for distributed Pis
+
+## Known Live Bugs (caught in real stack)
+
+- **`UNIQUE constraint failed: statistics.id`** in core logs during query counting. Causes intermittent stats increment failures. Reproducible on a fresh volume. _Fix landed on `apps/core feat/bypass-mitigations` branch._
+- **Blocklist ingestion leaves `domains_count` at 0** after `POST /api/v1/blocklists`. Source row persists, fetch/parse pipeline never populates the snapshot. Seen with StevenBlack, OISD Big, URLhaus, AdGuard Tracking. _Fix landed on `apps/core feat/bypass-mitigations` branch (kicks off async UpdateSource on creation)._

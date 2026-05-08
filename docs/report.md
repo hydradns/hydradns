@@ -369,9 +369,16 @@ These are known issues that were intentionally deferred. Track them here so they
 
 | Item | Severity | Deferred Since | Notes |
 |---|---|---|---|
+| Statistics UNIQUE constraint failure | **High** (fixed) | 2026-04-21 | `statistics.id` PK collision logged `UNIQUE constraint failed` on every query, causing intermittent stats-increment failures. Fixed on `apps/core feat/bypass-mitigations` via atomic increment + idempotent seed. |
+| Blocklist ingestion leaves `domains_count` at 0 | **High** (fixed) | 2026-04-21 | `POST /api/v1/blocklists` persisted the source row but the fetch/parse/snapshot pipeline never ran until the next periodic refresh (up to 6h). Fixed on `apps/core feat/bypass-mitigations` by kicking off an async `UpdateSource` from the handler. |
 | Regex/wildcard policy evaluation | Medium | Phase 1 | Parsed but not evaluated at query time |
 | Query log retention / cleanup | Medium | Phase 1 | DNSQuery table grows unbounded |
 | TLS on gRPC | Medium | Phase 1 | Uses `grpc.WithInsecure()` |
+| TLS on dashboard | Medium | Phase 3 | HTTPS not terminated anywhere; plain-text admin auth over LAN |
+| Update mechanism | Medium | Tier 3 | No `hydra update` or container self-update flow |
+| Remote monitoring | Medium | Tier 3 | No heartbeat / alert pipeline for distributed Pi deploys |
+| `/api/v1/dns/resolvers` returns mock data | Medium | Phase 1 | Resolvers are config-only; no UI edit path |
+| Scanner client-discovery | Medium | Phase 3 | Only reads `/etc/resolv.conf`; LAN client enumeration not implemented |
 | CORS hardcoded to localhost:3000 | Low | Phase 1 | Needs env config for production |
 | BlocklistEntry composite index | Low | Phase 1 | (SourceID, Domain) for faster queries |
 | SQLite single-connection bottleneck | Low | Phase 1 | Fine for v1, revisit under load |
@@ -381,6 +388,7 @@ These are known issues that were intentionally deferred. Track them here so they
 | Settings page | Low | Phase 2 | No backend support yet |
 | WebSocket for live log streaming | Low | Phase 2 | Using polling (setInterval) instead |
 | Systemd service file for Pi | Low | Phase 3 | Docker-only deployment for now |
+| Pi default-gateway fragility | Low | 2026-04-23 | Production Pi booted without a default route (empty DHCP lease, no NM profile for wlan0). Patched with `/etc/systemd/system/hydradns-default-route.service` oneshot; Wi-Fi setup should migrate to NetworkManager or dhcpcd for a proper fix. |
 
 ---
 
