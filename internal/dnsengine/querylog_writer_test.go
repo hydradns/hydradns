@@ -25,6 +25,9 @@ func (f *fakeQueryLog) SaveBatch(qs []*models.DNSQuery) error {
 	return nil
 }
 func (f *fakeQueryLog) ListRecent(limit int) ([]models.DNSQuery, error) { return nil, nil }
+func (f *fakeQueryLog) DeleteOlderThan(time.Time) (int64, error)        { return 0, nil }
+func (f *fakeQueryLog) EnforceRowCap(int64) (int64, error)              { return 0, nil }
+func (f *fakeQueryLog) Count() (int64, error)                           { return int64(f.count()), nil }
 func (f *fakeQueryLog) count() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -131,3 +134,6 @@ func (b *blockingQueryLog) SaveBatch([]*models.DNSQuery) error {
 	return nil
 }
 func (b *blockingQueryLog) ListRecent(int) ([]models.DNSQuery, error) { return nil, nil }
+func (b *blockingQueryLog) DeleteOlderThan(time.Time) (int64, error)  { return 0, nil }
+func (b *blockingQueryLog) EnforceRowCap(int64) (int64, error)        { return 0, nil }
+func (b *blockingQueryLog) Count() (int64, error)                     { return 0, nil }
