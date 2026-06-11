@@ -98,5 +98,10 @@ func (s *Server) Run() {
 	udpSrv.Shutdown()
 	tcpSrv.Shutdown()
 
+	// Servers have stopped accepting, so no new queries can enqueue logs.
+	// Drain the batched log writer (and close upstream sockets) before exit
+	// so the final in-flight batch and its stats deltas are persisted.
+	s.engine.Shutdown()
+
 	logger.Log.Info("exited")
 }

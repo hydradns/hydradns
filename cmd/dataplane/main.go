@@ -31,14 +31,17 @@ func main() {
 	// 2. Initialize Repositories
 	repos := repositories.NewStore(db.DB)
 
-	// 3. Blocklist Engine — load from DB sources, refresh periodically
+	// 3. Blocklist Engine — load from DB sources, refresh periodically.
+	// The DNS hot path checks an in-memory set (memBlocklist), never the
+	// DB; refreshBlocklists rebuilds that set after each source update.
 	blEngine := blocklist.NewEngine(repos.Blocklist)
+	memBlocklist := blocklist.NewMemoryChecker()
 
 	// Initial load in background so DNS starts immediately
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
-		refreshBlocklists(ctx, blEngine, repos.Blocklist)
+		refreshBlocklists(ctx, blEngine, memBlocklist)
 	}()
 
 	// Periodic refresh
@@ -51,7 +54,7 @@ func main() {
 		defer ticker.Stop()
 		for range ticker.C {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			refreshBlocklists(ctx, blEngine, repos.Blocklist)
+			refreshBlocklists(ctx, blEngine, memBlocklist)
 			cancel()
 		}
 	}()
@@ -99,7 +102,7 @@ func main() {
 	}()
 
 	// 7. Attach blocklist checker and start DNS server
-	engine.AttachBlocklistChecker(repos.Blocklist)
+	engine.AttachBlocklistChecker(memBlocklist)
 	srv, err := dnsengine.NewServer(config.DefaultConfig.DataPlane, engine)
 	if err != nil {
 		logger.Log.Fatal("Failed to create server: " + err.Error())
@@ -109,8 +112,8 @@ func main() {
 	srv.Run()
 }
 
-func refreshBlocklists(ctx context.Context, engine *blocklist.Engine, repo repositories.BlocklistRepository) {
-	sources, err := repo.ListSources()
+func refreshBlocklists(ctx context.Context, engine *blocklist.Engine, mem *blocklist.MemoryChecker) {
+	sources, err := engine.ListSources()
 	if err != nil {
 		logger.Log.Errorf("Failed to list blocklist sources: %v", err)
 		return
@@ -127,8 +130,14 @@ func refreshBlocklists(ctx context.Context, engine *blocklist.Engine, repo repos
 			logger.Log.Errorf("Blocklist update failed for %s: %v", src.Name, err)
 		}
 	}
-	count, _ := engine.List()
-	logger.Log.Infof("Blocklist refresh complete: %d total domains blocked", len(count))
+	// Rebuild the in-memory set the DNS hot path reads from.
+	domains, err := engine.List()
+	if err != nil {
+		logger.Log.Errorf("Failed to load blocklist domains into memory: %v", err)
+		return
+	}
+	mem.Reload(domains)
+	logger.Log.Infof("Blocklist refresh complete: %d total domains blocked", mem.Count())
 }
 
 func reloadPolicies(engine *policy.Engine, filePolicies []policy.Policy, repo repositories.PolicyRepository) {

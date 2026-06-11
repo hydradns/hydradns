@@ -33,8 +33,7 @@ type Engine struct {
 	blocklist       BlocklistChecker
 	state           *RuntimeState
 	metrics         *metrics.QueryMetrics
-	queryLog        repositories.QueryLogRepository
-	statistics      repositories.StatisticsRepository
+	logWriter       *QueryLogWriter
 	threatDetector  *threat.Detector
 	cache           *ResponseCache
 }
@@ -64,8 +63,7 @@ func NewDNSEngine(cfg config.DataPlaneConfig, repos *repositories.Store, pE *pol
 		policyEngine:    pE,
 		state:           state,
 		metrics:         qm,
-		queryLog:        repos.QueryLogs,
-		statistics:      repos.Statistics,
+		logWriter:       NewQueryLogWriter(repos.QueryLogs, repos.Statistics),
 		threatDetector:  threat.NewDetector(),
 		cache:           NewResponseCache(defaultCacheMaxEntries),
 	}, nil
@@ -77,6 +75,9 @@ func (e *Engine) SetAcceptQueries(enabled bool) {
 
 // Cleanup the resources used by the Engine
 func (e *Engine) Shutdown() {
+	if e.logWriter != nil {
+		e.logWriter.Shutdown()
+	}
 	if e.upstreamManager != nil {
 		e.upstreamManager.Close()
 	}
@@ -337,10 +338,14 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 func (e *Engine) logQuery(domain, clientIP, action string, tr threat.Result) {
-	if e.queryLog == nil {
+	if e.logWriter == nil {
 		return
 	}
-	q := &models.DNSQuery{
+	// Non-blocking handoff to the batched writer; never spawns per-query
+	// goroutines or touches the DB on the hot path. The writer folds
+	// "flagged" into allowed counts and persists the row with its real
+	// action.
+	e.logWriter.Enqueue(&models.DNSQuery{
 		Domain:          domain,
 		ClientIP:        clientIP,
 		Action:          action,
@@ -348,23 +353,7 @@ func (e *Engine) logQuery(domain, clientIP, action string, tr threat.Result) {
 		ThreatScore:     tr.ThreatScore,
 		DetectionMethod: tr.DetectionMethod,
 		ThreatReason:    tr.Reason,
-	}
-	// Map "flagged" to "allow" for statistics (flagged domains are still forwarded)
-	statsAction := action
-	if statsAction == "flagged" {
-		statsAction = "allow"
-	}
-
-	go func() {
-		if err := e.queryLog.Save(q); err != nil {
-			logger.Log.Errorf("Failed to log query: %v", err)
-		}
-		if e.statistics != nil {
-			if err := e.statistics.IncrementCounter(statsAction); err != nil {
-				logger.Log.Errorf("Failed to increment stats: %v", err)
-			}
-		}
-	}()
+	})
 }
 
 func (e *Engine) Metrics() *metrics.QueryMetrics {
