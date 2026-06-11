@@ -32,13 +32,24 @@ func (m *UpstreamManager) Close() {
 	}
 }
 
-// Exchange forwards query to resolvers with retry+failover
+// Exchange forwards query to resolvers with retry+failover.
+//
+// Each attempt goes out with a fresh random ID rather than the client's:
+// the client-chosen ID is attacker-predictable, and reusing one ID across
+// attempts lets a late answer to a timed-out attempt satisfy the next one.
+// The original ID is restored on the query and stamped on the response so
+// the client sees its own ID.
 func (m *UpstreamManager) Exchange(q *dns.Msg, timeout time.Duration, maxRetries int) (*dns.Msg, error) {
+	origID := q.Id
+	defer func() { q.Id = origID }()
+
 	var lastErr error
 	for _, pool := range m.pools {
 		for attempt := 0; attempt < maxRetries; attempt++ {
+			q.Id = dns.Id()
 			resp, err := pool.Exchange(q, timeout)
 			if err == nil {
+				resp.Id = origID
 				return resp, nil
 			}
 			lastErr = err
