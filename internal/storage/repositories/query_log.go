@@ -12,6 +12,7 @@ import (
 // Interface (clean, mockable)
 type QueryLogRepository interface {
 	Save(query *models.DNSQuery) error
+	SaveBatch(queries []*models.DNSQuery) error
 	ListRecent(limit int) ([]models.DNSQuery, error)
 }
 
@@ -29,6 +30,22 @@ func (r *GormQueryLogRepo) Save(query *models.DNSQuery) error {
 	logger.Log.Debug("Saving DNS query log")
 	logger.Log.Debug("query", query)
 	return r.db.Create(query).Error
+}
+
+// SaveBatch inserts many query logs in a single multi-row transaction.
+// Used by the async log writer so a high query rate collapses into few
+// DB round-trips instead of one INSERT (and one fsync) per query.
+func (r *GormQueryLogRepo) SaveBatch(queries []*models.DNSQuery) error {
+	if len(queries) == 0 {
+		return nil
+	}
+	now := time.Now()
+	for _, q := range queries {
+		if q.Timestamp.IsZero() {
+			q.Timestamp = now
+		}
+	}
+	return r.db.CreateInBatches(queries, 200).Error
 }
 
 func (r *GormQueryLogRepo) ListRecent(limit int) ([]models.DNSQuery, error) {
