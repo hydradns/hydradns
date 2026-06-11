@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/lopster568/phantomDNS/internal/blocklist"
@@ -30,6 +31,10 @@ func main() {
 
 	// 2. Initialize Repositories
 	repos := repositories.NewStore(db.DB)
+
+	// 2b. Query-log retention — keep the table (and the Pi's SD card)
+	// bounded. Without this the dns_queries table grows without limit.
+	startQueryLogRetention(repos.QueryLogs)
 
 	// 3. Blocklist Engine — load from DB sources, refresh periodically.
 	// The DNS hot path checks an in-memory set (memBlocklist), never the
@@ -138,6 +143,68 @@ func refreshBlocklists(ctx context.Context, engine *blocklist.Engine, mem *block
 	}
 	mem.Reload(domains)
 	logger.Log.Infof("Blocklist refresh complete: %d total domains blocked", mem.Count())
+}
+
+// startQueryLogRetention runs a background loop that bounds the query log
+// table by age and by row count. Both limits are configurable via env:
+//
+//	QUERY_LOG_RETENTION_DAYS   (default 7)   delete rows older than N days; 0 disables
+//	QUERY_LOG_MAX_ROWS         (default 1e6) keep at most N newest rows; 0 disables
+//	QUERY_LOG_CLEANUP_INTERVAL (default 1h)  how often to run cleanup
+//
+// Runs once immediately so a fat table from before this build is pruned on
+// the first boot that includes retention.
+func startQueryLogRetention(repo repositories.QueryLogRepository) {
+	retentionDays := envInt("QUERY_LOG_RETENTION_DAYS", 7)
+	maxRows := int64(envInt("QUERY_LOG_MAX_ROWS", 1_000_000))
+	interval := envDuration("QUERY_LOG_CLEANUP_INTERVAL", time.Hour)
+
+	cleanup := func() {
+		if retentionDays > 0 {
+			cutoff := time.Now().AddDate(0, 0, -retentionDays)
+			if n, err := repo.DeleteOlderThan(cutoff); err != nil {
+				logger.Log.Errorf("query log retention (age) failed: %v", err)
+			} else if n > 0 {
+				logger.Log.Infof("query log retention: deleted %d rows older than %d days", n, retentionDays)
+			}
+		}
+		if maxRows > 0 {
+			if n, err := repo.EnforceRowCap(maxRows); err != nil {
+				logger.Log.Errorf("query log retention (cap) failed: %v", err)
+			} else if n > 0 {
+				logger.Log.Infof("query log retention: trimmed %d rows over cap of %d", n, maxRows)
+			}
+		}
+	}
+
+	go func() {
+		cleanup()
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for range ticker.C {
+			cleanup()
+		}
+	}()
+}
+
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+		logger.Log.Warnf("invalid %s=%q, using default %d", key, v, def)
+	}
+	return def
+}
+
+func envDuration(key string, def time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
+		}
+		logger.Log.Warnf("invalid %s=%q, using default %s", key, v, def)
+	}
+	return def
 }
 
 func reloadPolicies(engine *policy.Engine, filePolicies []policy.Policy, repo repositories.PolicyRepository) {
