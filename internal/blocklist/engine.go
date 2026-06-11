@@ -93,6 +93,11 @@ func (e *Engine) List() ([]string, error) {
 	return hosts, nil
 }
 
+// ListSources returns the configured blocklist sources from the repo.
+func (e *Engine) ListSources() ([]models.BlocklistSource, error) {
+	return e.repo.ListSources()
+}
+
 // For a quick debug utility:
 func (e *Engine) PrintAll() error {
 	hosts, err := e.List()
