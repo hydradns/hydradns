@@ -36,7 +36,15 @@ type Engine struct {
 	queryLog        repositories.QueryLogRepository
 	statistics      repositories.StatisticsRepository
 	threatDetector  *threat.Detector
+	cache           *ResponseCache
 }
+
+// Upstream exchange budget: short per-attempt timeout with retries beats
+// one long wait — a lost UDP packet costs 1.5s, not 5s, before failover.
+const (
+	upstreamTimeout    = 1500 * time.Millisecond
+	upstreamMaxRetries = 2
+)
 
 func (e *Engine) AttachBlocklistChecker(b BlocklistChecker) {
 	e.blocklist = b
@@ -59,6 +67,7 @@ func NewDNSEngine(cfg config.DataPlaneConfig, repos *repositories.Store, pE *pol
 		queryLog:        repos.QueryLogs,
 		statistics:      repos.Statistics,
 		threatDetector:  threat.NewDetector(),
+		cache:           NewResponseCache(defaultCacheMaxEntries),
 	}, nil
 }
 
@@ -160,7 +169,14 @@ func (e *Engine) respondRedirect(w dns.ResponseWriter, r *dns.Msg, domain, ip st
 }
 
 func (e *Engine) forwardUpstream(w dns.ResponseWriter, r *dns.Msg, domain string) {
-	resp, err := e.upstreamManager.Exchange(r, 5, 2)
+	if cached := e.cache.Get(r); cached != nil {
+		if err := w.WriteMsg(cached); err != nil {
+			logger.Log.Error("Failed to write cached DNS response: " + err.Error())
+		}
+		return
+	}
+
+	resp, err := e.upstreamManager.Exchange(r, upstreamTimeout, upstreamMaxRetries)
 	if err != nil {
 		logger.Log.Error("Upstream query failed: " + err.Error())
 		m := new(dns.Msg)
@@ -175,6 +191,7 @@ func (e *Engine) forwardUpstream(w dns.ResponseWriter, r *dns.Msg, domain string
 		_ = w.WriteMsg(m)
 		return
 	}
+	e.cache.Set(r, resp)
 	if err := w.WriteMsg(resp); err != nil {
 		logger.Log.Error("Failed to write DNS response: " + err.Error())
 	}

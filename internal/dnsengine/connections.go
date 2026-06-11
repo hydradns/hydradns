@@ -4,6 +4,7 @@ package dnsengine
 import (
 	"errors"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +17,10 @@ const (
 	defaultQueryTimeout = 5 * time.Second
 	defaultKeepAlive    = 30 * time.Second
 	maxRetries          = 3
+	// maxStaleReads caps how many mismatched datagrams one exchange will
+	// discard before giving up, so the shared-socket mutex can't be pinned
+	// by a flood.
+	maxStaleReads = 16
 )
 
 // UDPClient is a small wrapper around a reusable UDP socket for a single upstream.
@@ -50,11 +55,33 @@ func (u *UDPClient) Exchange(q *dns.Msg, timeout time.Duration) (*dns.Msg, error
 	if err := u.conn.WriteMsg(q); err != nil {
 		return nil, err
 	}
-	resp, err := u.conn.ReadMsg()
-	if err != nil {
-		return nil, err
+	// The socket is shared across queries, so a late answer to an earlier
+	// timed-out query may still be sitting in the buffer. A response is
+	// only accepted if both the ID and the echoed Question match — ID
+	// alone is 16 bits and collides under load (and is spoofable). The
+	// deadline bounds the loop in time, maxStaleReads bounds it in
+	// iterations so a datagram flood can't pin the socket mutex.
+	for stale := 0; stale < maxStaleReads; stale++ {
+		resp, err := u.conn.ReadMsg()
+		if err != nil {
+			return nil, err
+		}
+		if resp.Id == q.Id && questionMatches(q, resp) {
+			return resp, nil
+		}
 	}
-	return resp, nil
+	return nil, errors.New("too many mismatched datagrams from upstream")
+}
+
+// questionMatches reports whether resp echoes q's question section
+// (case-insensitive name, same type and class). Anything else is a stale
+// or forged datagram and must not be accepted, let alone cached.
+func questionMatches(q, resp *dns.Msg) bool {
+	if len(q.Question) != 1 || len(resp.Question) != 1 {
+		return false
+	}
+	a, b := q.Question[0], resp.Question[0]
+	return a.Qtype == b.Qtype && a.Qclass == b.Qclass && strings.EqualFold(a.Name, b.Name)
 }
 
 // Close closes the underlying UDP socket.
@@ -188,7 +215,8 @@ func (p *UpstreamPool) getTCPConn() (*net.TCPConn, int, error) {
 }
 
 // releaseTCPConn releases the connection at index idx back to the pool.
-// If hadErr is true, the connection is closed and the slot becomes nil.
+// If hadErr is true, the connection is closed and the slot becomes nil so
+// the next user dials fresh; either way the slot is freed for reuse.
 func (p *UpstreamPool) releaseTCPConn(idx int, hadErr bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -198,13 +226,11 @@ func (p *UpstreamPool) releaseTCPConn(idx int, hadErr bool) {
 		return
 	}
 
-	if hadErr {
-		if p.conns[idx] != nil {
-			_ = p.conns[idx].Close()
-			p.conns[idx] = nil
-		}
-		p.inUse[idx] = false
+	if hadErr && p.conns[idx] != nil {
+		_ = p.conns[idx].Close()
+		p.conns[idx] = nil
 	}
+	p.inUse[idx] = false
 }
 
 // Exchange implements the UDP-fastpath -> TCP-fallback behavior.
@@ -215,7 +241,7 @@ func (p *UpstreamPool) releaseTCPConn(idx int, hadErr bool) {
 func (p *UpstreamPool) Exchange(q *dns.Msg, timeout time.Duration) (*dns.Msg, error) {
 	// First, try UDP (fast path)
 	if p.udp != nil {
-		resp, err := p.udp.Exchange(q, defaultQueryTimeout)
+		resp, err := p.udp.Exchange(q, timeout)
 		if err == nil && resp != nil && !resp.Truncated {
 			return resp, nil
 		}
@@ -229,11 +255,13 @@ func (p *UpstreamPool) Exchange(q *dns.Msg, timeout time.Duration) (*dns.Msg, er
 	}
 
 	var hadErr bool
-	defer p.releaseTCPConn(idx, hadErr)
+	// Wrapped in a closure so hadErr is read at return time, not captured
+	// by value when the defer is declared.
+	defer func() { p.releaseTCPConn(idx, hadErr) }()
 
 	// wrap with dns.Conn for framing (length-prefix) and convenience
 	dnsConn := &dns.Conn{Conn: tcpConn}
-	if err := tcpConn.SetDeadline(time.Now().Add(defaultQueryTimeout)); err != nil {
+	if err := tcpConn.SetDeadline(time.Now().Add(timeout)); err != nil {
 		return nil, err
 	}
 
@@ -248,6 +276,13 @@ func (p *UpstreamPool) Exchange(q *dns.Msg, timeout time.Duration) (*dns.Msg, er
 		hadErr = true
 		logger.Log.Errorf("Failed to read DNS response from TCP connection: %v", err)
 		return nil, err
+	}
+	// A reused TCP conn can hold a stale response from a prior exchange
+	// that timed out between write and read. Don't trust it; close the
+	// conn so the next user starts clean.
+	if resp.Id != q.Id || !questionMatches(q, resp) {
+		hadErr = true
+		return nil, errors.New("mismatched response on pooled TCP connection")
 	}
 	return resp, nil
 }
