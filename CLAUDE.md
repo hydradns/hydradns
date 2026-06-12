@@ -42,27 +42,34 @@ HydraDNS is a DNS-layer security and privacy gateway built as a monorepo of Git 
 ### Scanner (Go) — `apps/scanner/`
 - `make build` — compile scanner binary
 
+### CLI (Go / Cobra) — `apps/cli/`
+- `go build -o hydra` — produces the `hydra` binary at the package root
+- `./hydra <command>` — `status`, `engine`, `block`, `blocklists`, `policies`, `metrics`, `logs`, `login`, `setup-router`, `mcp`
+- `./hydra mcp` — runs the MCP stdio server (used by Gemini/Claude clients; ~9 tools incl. `create_policy` for batch ops)
+- `go test ./...` — Cobra command tests live next to the commands (e.g. `cmd/setup_router_test.go`)
+- API client lives in `apps/cli/api/client.go` and talks to the controlplane on `:8080`
+
 ## Architecture
 
 ```
 Root (orchestrator)
 ├── apps/core       — Go 1.24, Gin, gRPC, GORM/SQLite
-│   ├── cmd/controlplane/   — Admin API (port 8080), auth middleware, handlers
-│   ├── cmd/dataplane/      — DNS server (UDP/TCP on 1053), gRPC on 50051
-│   ├── internal/           — blocklist, dnsengine, policy, storage, grpc, config
+│   ├── cmd/controlplane/   — Admin API (host :8080)
+│   ├── cmd/dataplane/      — DNS server; gRPC on :50051 (internal only, not published)
+│   ├── internal/           — blocklist, dnsengine, policy, storage, grpc, metrics
 │   └── proto/              — Protobuf definitions (buf for codegen → internal/gen/proto/)
+│   NOTE: in production compose, controlplane + dataplane run as one combined `core` container
 ├── apps/ui         — Next.js 16, React 19, TypeScript, Tailwind v4, shadcn/ui (port 3000)
 ├── apps/landing    — Vite, React 18, TypeScript, Tailwind v3, shadcn/ui (port 3001)
-├── apps/scanner    — Go, network scanning worker (no exposed port)
-├── apps/cli        — Go + Cobra CLI (11 commands) + MCP server (8 tools)
-│   ├── cmd/        — Cobra commands (status, engine, block, policies, blocklists, logs, mcp)
-│   ├── api/        — Shared HTTP client for control plane API
-│   └── mcp/        — MCP JSON-RPC 2.0 server
-└── docker-compose.yml
-    └── hydra-net bridge network
+├── apps/scanner    — Go 1.25, network scanning worker (no exposed port; commented out in compose)
+├── apps/cli        — Cobra CLI + MCP stdio server (talks to controlplane API)
+├── docker-compose.yml          — base: only `core` and `ui` are active; scanner/landing commented out
+├── docker-compose.override.yml — local-dev overlay (auto-merged): WSL2-safe DNS port, `BLOCK_RESPONSE` env
+├── docs/                       — phase plans, critiques, demo playbook, report.md
+└── scripts/                    — setup.sh, install.sh, stress-test.sh
 ```
 
-**Docker port mapping:** Core runs on 1053 internally, Docker maps 53→1053 on the host. API on 8080.
+There is **no postgres or redis service** in compose. `core` writes to a Docker volume (`core-data`) backed by SQLite.
 
 ## Core Domain Concepts
 
@@ -70,11 +77,14 @@ Root (orchestrator)
 
 The control plane maintains **desired state** in SQLite (source of truth). The data plane holds **actual runtime state**. When a change is made (e.g., toggle DNS engine), the control plane persists intent to DB, then applies it to the data plane via gRPC (`SetAcceptQueries`). Status endpoints return both desired and actual state combined. gRPC services defined in `proto/phantomdns/v1/status.proto`.
 
-### DNS Query Pipeline (3-step, early exit)
+### DNS Query Pipeline (4-step, early exit)
 
-1. **Blocklist check** — if domain is blocklisted → respond REFUSED immediately (hardest block)
+1. **Blocklist check** — in-memory membership test (`internal/blocklist/memory.go`, `MemoryChecker`: atomic `map[string]struct{}` of all blocked domains + parent-domain walk). Reloaded on the 6h refresh; the DNS hot path never hits the DB. If blocked → respond per `BLOCK_RESPONSE`. (Historical note: this check used to run a per-query SQL `COUNT`, which capped throughput at ~500 QPS — see `docs/stress-test-plan.md` T1.)
 2. **Policy evaluation** — Bloom filter for fast O(1) negative lookup, then exact domain match against `PolicySnapshot` (atomic rebuild on change). Multiple matches resolved by priority, then lexicographic ID
-3. **Upstream forward** — pool-per-resolver with failover across all configured upstreams (5s timeout, 2 retries each)
+3. **Response cache** — TTL-respecting LRU (20k entries, `internal/dnsengine/cache.go`); only allowed queries are cached, never blocked/redirect responses
+4. **Upstream forward** — pool-per-resolver with failover across all configured upstreams (1.5s per-attempt timeout, 2 retries each)
+
+Query logging and statistics are written off the hot path by a bounded batched writer (`internal/dnsengine/querylog_writer.go`): non-blocking enqueue, single drain goroutine, batched inserts. Drops (counted) when its 4096-deep queue is full so logging can never stall resolution or grow memory without bound.
 
 Domain normalization: lowercase + strip trailing dot (e.g., `EXAMPLE.COM.` → `example.com`).
 
@@ -116,10 +126,46 @@ Single admin user model (`AdminCredential` singleton in DB). Bearer token auth o
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
 | `HYDRA_TOKEN` | (none) | CLI auth token |
 | `BLOCK_RESPONSE` | `zero` | Engine response for blocked domains: `zero` (A 0.0.0.0), `nxdomain` (RcodeNameError), `refused` (RcodeRefused). `zero` is the safe default; `nxdomain` is faster on Windows browsers but should be A/B tested first |
+| `QUERY_LOG_RETENTION_DAYS` | `7` | Delete query logs older than N days; 0 disables |
+| `QUERY_LOG_MAX_ROWS` | `1000000` | Keep at most N newest query-log rows (SD-card insurance); 0 disables |
+| `QUERY_LOG_CLEANUP_INTERVAL` | `1h` | How often the retention loop runs |
+
+### Compose port mapping (important for demos)
+
+The dataplane listens on container port **1053**. The base compose maps it to host **:53**, but `docker-compose.override.yml` (gitignored, present locally) replaces that list to also expose **:5353** for WSL2/Windows hosts where :53 collides with `systemd-resolved` or the Windows DNS Client. Smoke-test paths:
+
+```
+curl http://localhost:8080/health                               # controlplane
+dig @127.0.0.1 -p 5353 example.com                              # host-side, WSL-safe
+docker exec hydradns-core-1 dig @127.0.0.1 -p 1053 example.com  # ground truth (always works)
+```
+
+`BLOCK_RESPONSE` env var (set in override) controls how the dataplane answers a blocked query: `zero` (default; A/AAAA → 0.0.0.0/::), `nxdomain`, or `refused`. See `respondBlocked` in `apps/core/cmd/dataplane`/`engine.go`.
 
 ## SQLite Setup
 
 Pure-Go SQLite driver (`glebarez/sqlite`), WAL mode for concurrency, single-writer (`MaxOpenConns=1`). GORM auto-migrates all models on startup: Policy, DNSQuery, DomainPolicy, Action, Category, Statistics, SystemState, BlocklistSource, BlocklistSnapshot, BlocklistEntry, AdminCredential.
+
+### Query-log retention
+
+The `dns_queries` table is bounded by a background loop in the dataplane (`startQueryLogRetention`), runs once at startup then on `QUERY_LOG_CLEANUP_INTERVAL` (default 1h). Two limits, both via env:
+- `QUERY_LOG_RETENTION_DAYS` (default 7) — delete rows older than N days; 0 disables.
+- `QUERY_LOG_MAX_ROWS` (default 1,000,000) — keep at most N newest rows (SD-card insurance); 0 disables.
+
+Note: SQLite `DELETE` reuses freed pages rather than shrinking the file, so the `.db` size settles at its high-water mark (bounded by retention) and does not auto-`VACUUM` — `VACUUM` is avoided deliberately because it locks the DB and would stall DNS. Compliance note: CERT-In wants 180-day retention; that conflicts with SD-card capacity at scale, so long-retention customers need a bigger disk or external log shipping (see `docs/certifications-roadmap.md`).
+
+## Known Incomplete Features
+
+Many control plane API handlers use **in-memory mock data**, not the real storage/engines:
+- `handlers/blocklists.go` — mock slice, doesn't use the real blocklist engine or DB
+- `handlers/policies.go` — mock slice, doesn't use the real policy engine
+- `handlers/dns.go` — `/dns/resolvers` uses mock data
+
+**What IS wired up**: `/dns/engine` GET/POST (real gRPC to dataplane), `/dns/metrics` (real gRPC), and the full blocklist DB storage layer (just not called from the API).
+
+The UI has no API client layer yet — `NEXT_PUBLIC_API_URL` is set but unused in code.
+
+The scanner currently only detects the system resolver via `/etc/resolv.conf` and runs a basic UDP resolution check.
 
 ## API Response Envelope
 
@@ -130,7 +176,11 @@ All control plane responses use a standard envelope:
 
 ## Submodule Workflow
 
-Each app is a separate Git repo. Clone with `git clone --recursive`. Work inside each `apps/<service>` directory and push to that service's repo. Run `make update` from root to sync.
+Each app is a separate Git repo (see `.gitmodules`). Clone with `git clone --recursive`. Work inside each `apps/<service>` directory and push to that service's repo. Run `make update` from root to sync. Submodule URLs all live under `github.com/hydradns/`.
+
+## Docs & session retrospectives
+
+`docs/` holds phase plans, critiques (`critique-NNN.md`), and `report.md` (rolling session log). New phases get a `phaseN-*-plan.md` before implementation and a `phaseN-*.md` retrospective after. `report.md` is updated at the end of each working session.
 
 ## CI
 

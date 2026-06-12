@@ -363,6 +363,83 @@ See [critique-003.md](critique-003.md) for full review findings.
 
 ---
 
+## Performance & Hardening Session (2026-06-11)
+
+**Goal:** Find and kill the latency "jerks" with data before shipping; produce a stress test plan.
+
+### What was done
+
+**1. Measured the jerks (250-query benchmark, WSL2)**
+- Through HydraDNS: p50 8ms, p99 1,980ms, 2.8% dropped
+- Direct to 8.8.8.8 (control): p99 223ms, 7.6% raw UDP loss
+- Diagnosis: lossy upstream path + 5s timeout + no response cache = 1-in-100 queries stalling ~2s
+
+**2. Root causes found in `internal/dnsengine`**
+- No DNS response cache — every query (even repeats) re-rolled the packet-loss dice upstream
+- `engine.go` passed `5` (= 5 *nanoseconds*) as the Exchange timeout; masked by `connections.go` ignoring the parameter and substituting a 5s default
+- Shared UDP upstream socket returned any datagram regardless of DNS ID — late answers to timed-out queries got served to the wrong query
+
+**3. Fixes shipped (core commit `69b3a51` on feat/bypass-mitigations)**
+- TTL-respecting LRU response cache (20k entries), negative caching per RFC 2308, DNS 0x20 question echo, EDNS OPT stripping. Cached only on the allow path — blocked/policy/redirect untouched
+- Honest 1.5s per-attempt timeout passed through the full chain, 2 retries
+- Upstream exchanges use fresh random IDs (client ID never forwarded); responses accepted only when ID **and** echoed Question match
+- Critique agent found the critical: ID-only matching + client-controlled IDs = cache-poisoning vector. Fixed before commit
+- Two latent TCP pool bugs: `defer` captured `hadErr` at declaration (error conns never closed) and successful exchanges never released their slot (pool leaked to exhaustion)
+
+### Key metrics
+- **p99: 1,980ms → 20ms; p50: 8ms → 0ms (sub-ms, cache-served); drops: 2.8% → 0%**
+- Tests: +14 (cache + question matching), all packages green
+- Verified live post-deploy: blocklist (0.0.0.0), DoH bootstrap (NXDOMAIN), forwarding all intact
+
+### Stress test plan
+New `docs/stress-test-plan.md`: 8 tests (throughput redline, 24h soak, packet-loss injection, upstream failover, burst, 1M blocklist, restart-under-fire, Pi hardware pass). Predicted failure points documented: goroutine-per-query log writer into single-conn SQLite, unbounded DNSQuery table. Each passing test maps to a sales claim.
+
+### Lessons learned
+1. A retry that takes 5s is indistinguishable from an outage to the user — short timeouts + retries beat long timeouts
+2. On a shared DNS socket, matching response ID alone is a cache-poisoning vector — always verify the echoed Question too
+3. `defer f(x)` evaluates `x` immediately — wrap in a closure when the value is set later
+4. Benchmark against a direct-to-upstream control group, or you'll blame your code for your network
+
+---
+
+## Stress Test T1 — Two Ceilings Found & Lifted (2026-06-11)
+
+**Goal:** Run the stress plan's T1 (throughput redline) on the dev laptop (no Pi yet; laptop is current prod hardware). Load generated with dnspyre *inside* the core container to remove docker-proxy from the path.
+
+### Finding 1: ~500 QPS throughput ceiling — per-query SQL blocklist read
+- Both blocked and cached paths capped at the SAME ~500 QPS with low CPU (under 30% of 22 cores) — signature of a serialized non-CPU stage.
+- Root cause: `BlocklistRepo.IsBlocked` ran a SQL `COUNT` against the 92k-row table on **every** query (the check precedes the cache, so allowed queries paid it too), serialized through the single SQLite connection (`MaxOpenConns=1`) that also absorbed the async write flood. Engine self-latency: p50=50ms, p99=5000ms, grade=bad.
+- The "Bloom filter" the docs/feature-sheet advertised for the blocklist never existed — that's the policy engine. The blocklist hot path was DB-backed all along.
+- **Fix:** `internal/blocklist/memory.go` — `MemoryChecker`, an atomic in-memory domain set reloaded on the existing 6h refresh. Parent-domain walk matches the old DB candidate set exactly. Attached in `cmd/dataplane/main.go` instead of the repo.
+- **Result:** throughput ceiling ~500 → ~9,500 QPS (≈19x). p99 0-2ms at low rates.
+
+### Finding 2: 2GB memory bomb under load — goroutine-per-query logging
+- Unmasked once throughput was free: RSS climbed 98MiB → 2,063MiB as offered load went 500 → 10,000 QPS. Drained back to ~256MiB when load stopped (transient backlog, not a leak) — but a 2GB transient spike OOM-crashes a 2-4GB Pi mid-burst.
+- Root cause: every query spawned a goroutine doing INSERT + UPDATE on the single connection; at high QPS they accumulated faster than SQLite drained.
+- **Fix:** `internal/dnsengine/querylog_writer.go` — bounded (4096) single-goroutine batched writer. Non-blocking enqueue drops (counted) when full; batches 256/500ms; bulk INSERT + one aggregated stats UPDATE per batch. New repo methods `SaveBatch` (CreateInBatches) and `AddCounters`.
+- **Result:** RSS flat at ~85MiB from 500 to 10,000 QPS. Engine self-latency grade bad → excellent (p50=5ms, p99=20ms). CPU at 10k QPS dropped 56% → 14%.
+
+### Verified
+- 7/8 test domains block (0.0.0.0); blocking, forwarding, DoH interception all intact.
+- Batched writes land: analytics/audits returns fresh rows with correct fields; stats counters advance correctly via AddCounters.
+- All packages pass `go test -race`. New tests: MemoryChecker (parent match, fail-open, concurrent reload), QueryLogWriter (batch/count parity, drop-when-full).
+
+### Query-log retention + T2-lite soak (same day)
+- **Retention shipped** (`startQueryLogRetention` in dataplane): time-based (`QUERY_LOG_RETENTION_DAYS`, default 7) + row-cap (`QUERY_LOG_MAX_ROWS`, default 1M) cleanup loop, runs at startup then hourly. New repo methods `DeleteOlderThan`, `EnforceRowCap`, `Count` with tests. Verified live: first boot pruned 7,235 stale rows.
+- **T2-lite soak passed**: 248,166 queries at 1,379 QPS over 180s. RSS a bounded sawtooth (119→139→114 MiB, GC returns to baseline) vs the old 98→2,063 MiB monotonic climb — no leak. Engine errors 0/248k, grade excellent. `localhost` regression fix held under load.
+- **Process catch:** the first soak attempt silently generated NO load — the dnspyre binary had been wiped when the retention deploy recreated the container, and `docker exec` failures were swallowed by `2>/dev/null`. Nearly reported a pass on an idle box. Re-copied the binary, confirmed `sent` count, re-ran. (Verify-live rule, again.)
+
+### Still open
+- **T8 / true 24h soak** — re-run the redline AND a multi-hour soak on real Pi hardware when it arrives. That throughput number, not the laptop's, is the sales claim; the 24h soak is what proves the sawtooth peak is flat over hours (3 min can't).
+
+### Lessons learned
+1. When two very different code paths hit the *same* throughput ceiling, the bottleneck is common to both or upstream of both — don't micro-optimize one path.
+2. "Async logging" is only safe if bounded — an unbounded goroutine-per-event path just moves the OOM from sync to a memory spike.
+3. Fixing the read ceiling unmasked the write ceiling. Lift one bottleneck, measure again, find the next. The box's real limit is wherever you stop looking.
+4. Verify advertised internals against the code — the blocklist "Bloom filter" was in three docs and zero source files.
+
+---
+
 ## Deferred Items (Tech Debt)
 
 These are known issues that were intentionally deferred. Track them here so they don't get lost.
@@ -372,7 +449,7 @@ These are known issues that were intentionally deferred. Track them here so they
 | Statistics UNIQUE constraint failure | **High** (fixed) | 2026-04-21 | `statistics.id` PK collision logged `UNIQUE constraint failed` on every query, causing intermittent stats-increment failures. Fixed on `apps/core feat/bypass-mitigations` via atomic increment + idempotent seed. |
 | Blocklist ingestion leaves `domains_count` at 0 | **High** (fixed) | 2026-04-21 | `POST /api/v1/blocklists` persisted the source row but the fetch/parse/snapshot pipeline never ran until the next periodic refresh (up to 6h). Fixed on `apps/core feat/bypass-mitigations` by kicking off an async `UpdateSource` from the handler. |
 | Regex/wildcard policy evaluation | Medium | Phase 1 | Parsed but not evaluated at query time |
-| Query log retention / cleanup | Medium | Phase 1 | DNSQuery table grows unbounded |
+| ~~Query log retention / cleanup~~ | ~~Medium~~ | DONE 2026-06-11 | Time + row-cap retention loop (`QUERY_LOG_RETENTION_DAYS`/`QUERY_LOG_MAX_ROWS`) |
 | TLS on gRPC | Medium | Phase 1 | Uses `grpc.WithInsecure()` |
 | TLS on dashboard | Medium | Phase 3 | HTTPS not terminated anywhere; plain-text admin auth over LAN |
 | Update mechanism | Medium | Tier 3 | No `hydra update` or container self-update flow |
@@ -380,8 +457,8 @@ These are known issues that were intentionally deferred. Track them here so they
 | `/api/v1/dns/resolvers` returns mock data | Medium | Phase 1 | Resolvers are config-only; no UI edit path |
 | Scanner client-discovery | Medium | Phase 3 | Only reads `/etc/resolv.conf`; LAN client enumeration not implemented |
 | CORS hardcoded to localhost:3000 | Low | Phase 1 | Needs env config for production |
-| BlocklistEntry composite index | Low | Phase 1 | (SourceID, Domain) for faster queries |
-| SQLite single-connection bottleneck | Low | Phase 1 | Fine for v1, revisit under load |
+| ~~BlocklistEntry composite index~~ | ~~Low~~ | Moot 2026-06-11 | Blocklist now in-memory; per-query SQL gone |
+| ~~SQLite single-connection bottleneck~~ | ~~Low~~ | Mitigated 2026-06-11 | Hot path no longer reads DB; writes are batched off-path |
 | Hardcoded magic numbers in engine | Low | Phase 1 | Timeout, retries, pool size, TTL |
 | Edit/update for policies & blocklists | Low | Phase 2 | Only create/delete, no edit UI |
 | Pagination for query logs | Low | Phase 2 | Shows all 100 entries at once |
