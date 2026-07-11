@@ -65,7 +65,7 @@ Root (orchestrator)
 ├── apps/cli        — Cobra CLI + MCP stdio server (talks to controlplane API)
 ├── docker-compose.yml          — base: only `core` and `ui` are active; scanner/landing commented out
 ├── docker-compose.override.yml — local-dev overlay (auto-merged): WSL2-safe DNS port, `BLOCK_RESPONSE` env
-├── docs/                       — phase plans, critiques, demo playbook, report.md
+├── docs/                       — user-facing docs; docs/internal/ (gitignored) — phase plans, critiques, report.md
 └── scripts/                    — setup.sh, install.sh, stress-test.sh
 ```
 
@@ -79,7 +79,7 @@ The control plane maintains **desired state** in SQLite (source of truth). The d
 
 ### DNS Query Pipeline (4-step, early exit)
 
-1. **Blocklist check** — in-memory membership test (`internal/blocklist/memory.go`, `MemoryChecker`: atomic `map[string]struct{}` of all blocked domains + parent-domain walk). Reloaded on the 6h refresh; the DNS hot path never hits the DB. If blocked → respond per `BLOCK_RESPONSE`. (Historical note: this check used to run a per-query SQL `COUNT`, which capped throughput at ~500 QPS — see `docs/stress-test-plan.md` T1.)
+1. **Blocklist check** — in-memory membership test (`internal/blocklist/memory.go`, `MemoryChecker`: atomic `map[string]struct{}` of all blocked domains + parent-domain walk). Reloaded on the 6h refresh; the DNS hot path never hits the DB. If blocked → respond per `BLOCK_RESPONSE`. (Historical note: this check used to run a per-query SQL `COUNT`, which capped throughput at ~500 QPS — see `docs/internal/stress-test-plan.md` T1.)
 2. **Policy evaluation** — Bloom filter for fast O(1) negative lookup, then exact domain match against `PolicySnapshot` (atomic rebuild on change). Multiple matches resolved by priority, then lexicographic ID
 3. **Response cache** — TTL-respecting LRU (20k entries, `internal/dnsengine/cache.go`); only allowed queries are cached, never blocked/redirect responses
 4. **Upstream forward** — pool-per-resolver with failover across all configured upstreams (1.5s per-attempt timeout, 2 retries each)
@@ -152,7 +152,7 @@ The `dns_queries` table is bounded by a background loop in the dataplane (`start
 - `QUERY_LOG_RETENTION_DAYS` (default 7) — delete rows older than N days; 0 disables.
 - `QUERY_LOG_MAX_ROWS` (default 1,000,000) — keep at most N newest rows (SD-card insurance); 0 disables.
 
-Note: SQLite `DELETE` reuses freed pages rather than shrinking the file, so the `.db` size settles at its high-water mark (bounded by retention) and does not auto-`VACUUM` — `VACUUM` is avoided deliberately because it locks the DB and would stall DNS. Compliance note: CERT-In wants 180-day retention; that conflicts with SD-card capacity at scale, so long-retention customers need a bigger disk or external log shipping (see `docs/certifications-roadmap.md`).
+Note: SQLite `DELETE` reuses freed pages rather than shrinking the file, so the `.db` size settles at its high-water mark (bounded by retention) and does not auto-`VACUUM` — `VACUUM` is avoided deliberately because it locks the DB and would stall DNS. Compliance note: CERT-In wants 180-day retention; that conflicts with SD-card capacity at scale, so long-retention customers need a bigger disk or external log shipping (see `docs/internal/certifications-roadmap.md`).
 
 ## Known Incomplete Features
 
@@ -180,7 +180,7 @@ Each app is a separate Git repo (see `.gitmodules`). Clone with `git clone --rec
 
 ## Docs & session retrospectives
 
-`docs/` holds phase plans, critiques (`critique-NNN.md`), and `report.md` (rolling session log). New phases get a `phaseN-*-plan.md` before implementation and a `phaseN-*.md` retrospective after. `report.md` is updated at the end of each working session.
+`docs/internal/` (gitignored, local only) holds phase plans, critiques (`critique-NNN.md`), and `report.md` (rolling session log). New phases get a `phaseN-*-plan.md` before implementation and a `phaseN-*.md` retrospective after. `report.md` is updated at the end of each working session.
 
 ## CI
 
