@@ -132,7 +132,7 @@ A fresh Pi running HydraDNS for a month doesn't log a single `UNIQUE constraint`
 
 # Commercial Product Roadmap
 
-Phases 6–9 move HydraDNS from "demoable portfolio piece + free homelab tool" to "something a small business will pay for, and eventually an enterprise will evaluate." Sequencing is based on `docs/enterprise-gap-analysis.md` — read that first for the competitive landscape.
+Phases 6–9 move HydraDNS from "demoable portfolio piece + free homelab tool" to "something a small business will pay for, and eventually an enterprise will evaluate." Sequencing is based on `docs/internal/enterprise-gap-analysis.md` — read that first for the competitive landscape.
 
 **Solo-dev reality check:** each phase below is an eyeball estimate assuming evenings + weekends. Real calendar time depends on whether HydraDNS stays a side project or gets dedicated time.
 
