@@ -106,6 +106,15 @@ cd hydradns`}</CodeBlock>
         box&apos;s LAN IP (something like <code>192.168.1.50</code>), save,
         and reboot the router or renew DHCP leases.
       </p>
+      <p>
+        Before you do this, make sure the machine running HydraDNS keeps
+        that IP forever: a DHCP lease change would break DNS for the whole
+        network. See{" "}
+        <a href="/docs/installation#static-ip">
+          Give the device a static IP
+        </a>{" "}
+        for DHCP reservations and per-OS setup on Linux, macOS, and Windows.
+      </p>
       <Callout variant="danger" title="Do not set a secondary DNS">
         Many routers have a second DNS field and helpfully suggest filling
         it with <code>1.1.1.1</code> or <code>8.8.8.8</code>. Don&apos;t.

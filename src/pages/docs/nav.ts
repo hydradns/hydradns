@@ -32,7 +32,7 @@ export const docsSections: DocsSection[] = [
     title: "Installation",
     eyebrow: "02 · Deploy",
     description:
-      "Docker Compose for your workstation, Raspberry Pi for always-on home use, and how to keep it up to date.",
+      "Docker Compose for your workstation, Raspberry Pi for always-on home use, static IP setup, and how to keep it up to date.",
     icon: Package,
   },
   {
