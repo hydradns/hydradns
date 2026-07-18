@@ -15,6 +15,7 @@ export default function Installation() {
       toc={[
         { id: "docker-compose", label: "Docker Compose" },
         { id: "raspberry-pi", label: "Raspberry Pi" },
+        { id: "static-ip", label: "Static IP" },
         { id: "updating", label: "Updating" },
       ]}
     >
@@ -82,6 +83,83 @@ docker compose down           # stop`}</CodeBlock>
         and interned string table, so you&apos;ve got plenty of headroom for
         the rest of the stack.
       </Callout>
+
+      <h2 id="static-ip">Give the device a static IP</h2>
+      <p>
+        Your router forwards every DNS query on the network to the IP of the
+        machine running HydraDNS. If that machine gets its address from DHCP,
+        the router can hand it a different IP after a reboot or lease
+        renewal, and DNS for the entire network silently breaks. Pin the IP{" "}
+        <strong>before</strong> pointing the router at it.
+      </p>
+      <p>
+        The cleanest fix is a <strong>DHCP reservation</strong> on the
+        router: bind the machine&apos;s MAC address to a fixed IP under the
+        router&apos;s DHCP / LAN settings (called{" "}
+        <em>Address Reservation</em>, <em>Static Lease</em>, or{" "}
+        <em>DHCP Binding</em> depending on the brand). It works the same
+        regardless of OS and survives reinstalls. Find the MAC address with{" "}
+        <code>ip link</code> (Linux), <code>ipconfig /all</code> (Windows),
+        or System Settings &gt; Network (macOS).
+      </p>
+      <p>
+        If your router doesn&apos;t support reservations, set the address on
+        the device itself. Pick an IP outside the router&apos;s DHCP pool so
+        it never gets assigned to another device.
+      </p>
+      <h3>Linux / Raspberry Pi OS</h3>
+      <p>
+        Raspberry Pi OS Bookworm and most modern distros use NetworkManager
+        (list connection names with <code>nmcli con show</code>):
+      </p>
+      <CodeBlock language="bash">{`sudo nmcli con mod "Wired connection 1" \\
+  ipv4.method manual \\
+  ipv4.addresses 192.168.1.53/24 \\
+  ipv4.gateway 192.168.1.1 \\
+  ipv4.dns 1.1.1.1
+sudo nmcli con up "Wired connection 1"`}</CodeBlock>
+      <p>
+        Older Raspberry Pi OS (Bullseye and earlier) uses{" "}
+        <code>dhcpcd</code> instead: append the block below to{" "}
+        <code>/etc/dhcpcd.conf</code> and reboot.
+      </p>
+      <CodeBlock language="bash">{`interface eth0
+static ip_address=192.168.1.53/24
+static routers=192.168.1.1
+static domain_name_servers=1.1.1.1`}</CodeBlock>
+      <h3>macOS</h3>
+      <p>
+        <strong>System Settings</strong> &gt; <strong>Network</strong> &gt;
+        your connection &gt; <strong>Details</strong> &gt;{" "}
+        <strong>TCP/IP</strong>, set <strong>Configure IPv4</strong> to{" "}
+        <strong>Manually</strong>, then enter the IP, subnet mask{" "}
+        <code>255.255.255.0</code>, and your router&apos;s IP as the gateway.
+        Or from Terminal (service names via{" "}
+        <code>networksetup -listallnetworkservices</code>):
+      </p>
+      <CodeBlock language="bash">{`sudo networksetup -setmanual "Ethernet" 192.168.1.53 255.255.255.0 192.168.1.1
+sudo networksetup -setdnsservers "Ethernet" 1.1.1.1`}</CodeBlock>
+      <h3>Windows</h3>
+      <p>
+        <strong>Settings</strong> &gt; <strong>Network &amp; Internet</strong>{" "}
+        &gt; <strong>Ethernet</strong> (or your Wi-Fi network) &gt;{" "}
+        <strong>IP assignment</strong> &gt; <strong>Edit</strong> &gt;{" "}
+        <strong>Manual</strong>, turn on IPv4, and fill in the IP, prefix
+        length <code>24</code>, gateway, and DNS. Or in an elevated
+        PowerShell (adapter names via <code>Get-NetAdapter</code>):
+      </p>
+      <CodeBlock language="powershell">{`New-NetIPAddress -InterfaceAlias "Ethernet" -IPAddress 192.168.1.53 -PrefixLength 24 -DefaultGateway 192.168.1.1
+Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses 1.1.1.1`}</CodeBlock>
+      <Callout variant="tip" title="Point the device's own DNS elsewhere">
+        Set the HydraDNS machine&apos;s own DNS server to a public resolver
+        like <code>1.1.1.1</code>, not to itself. HydraDNS needs working DNS
+        to download blocklists even while its container is restarting.
+      </Callout>
+      <p>
+        Verify from another device on the network before touching the
+        router: <code>ping</code> the new address and confirm the dashboard
+        loads at <code>http://&lt;static-ip&gt;:3000</code>.
+      </p>
 
       <h2 id="updating">Updating</h2>
       <p>
