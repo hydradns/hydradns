@@ -45,7 +45,7 @@ dig @localhost example.com
 open http://localhost:3000
 ```
 
-That's it. DNS filtering is active. Point your router's DNS to this machine's IP and your whole network is protected.
+That's it. DNS filtering is active. Give this machine a static IP and point your router's DNS to it — see [docs/pi-deployment.md](docs/pi-deployment.md) for static IP setup on Linux, macOS, and Windows plus per-router DNS instructions.
 
 ---
 
@@ -277,7 +277,14 @@ Core runs as a combined container (controlplane + dataplane) with:
 curl -fsSL https://raw.githubusercontent.com/hydradns/hydradns/main/scripts/install.sh | bash
 ```
 
-Then point your router's DNS server to `<pi-ip>`.
+Then give the device a static IP and point your router's DNS server to it. Full walkthrough (static IP on Linux/macOS/Windows, router config): [docs/pi-deployment.md](docs/pi-deployment.md).
+
+---
+
+## Documentation
+
+- [Deployment Guide](docs/pi-deployment.md) — install on a Raspberry Pi or any always-on machine; static IP setup (Linux, macOS, Windows), per-router DNS configuration, troubleshooting
+- [Hardware Guide](docs/hardware-guide.md) — choosing a device to run HydraDNS on
 
 ---
 
