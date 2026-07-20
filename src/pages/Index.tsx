@@ -5,6 +5,7 @@ import { FeaturesSection } from "@/components/FeaturesSection";
 import { HowItWorksSection } from "@/components/HowItWorksSection";
 import { ProductHighlightSection } from "@/components/ProductHighlightSection";
 import { ComparisonSection } from "@/components/ComparisonSection";
+import { RoiCalculatorSection } from "@/components/RoiCalculatorSection";
 import { QuickStartSection } from "@/components/QuickStartSection";
 import { StatsSection } from "@/components/StatsSection";
 import { OpenSourceSection } from "@/components/OpenSourceSection";
@@ -21,6 +22,7 @@ const Index = () => {
         <HowItWorksSection />
         <ProductHighlightSection />
         <ComparisonSection />
+        <RoiCalculatorSection />
         <QuickStartSection />
         <StatsSection />
         <OpenSourceSection />
