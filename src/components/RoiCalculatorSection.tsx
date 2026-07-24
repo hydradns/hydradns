@@ -115,7 +115,8 @@ export function RoiCalculatorSection() {
 
             <p className="mt-5 font-mono text-[10px] leading-relaxed text-muted-foreground">
               Competitor pricing is approximate published list price, converted at
-              US$1 = ₹{USD_TO_INR}. HydraDNS flat fee shown is the top of the
+              US$1 = ₹{USD_TO_INR} (FX rate as of Jul 2026 — checked periodically,
+              may drift). HydraDNS flat fee shown is the top of the
               ₹15,000–18,000/yr range.
             </p>
           </div>
@@ -156,7 +157,9 @@ export function RoiCalculatorSection() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
                     <p className="font-mono text-[10px] text-muted-foreground">
-                      ${c.perUserPerMonthUSD}/user/mo · {c.tier}
+                      {c.billing?.type === "block"
+                        ? `$${c.billing.annualUSDPerBlock}/yr per ${c.billing.seatsPerBlock} seats · ${c.tier}`
+                        : `$${c.perUserPerMonthUSD}/user/mo · ${c.tier}`}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
@@ -173,6 +176,14 @@ export function RoiCalculatorSection() {
                 </div>
               ))}
             </div>
+
+            {result.competitors.some((c) => c.billing?.type === "block") && (
+              <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted-foreground">
+                NextDNS Business is billed in blocks of 50 seats, not per seat — cost
+                steps up at each 50-seat threshold rather than scaling smoothly like
+                the other rows above.
+              </p>
+            )}
           </div>
         </div>
       </div>
