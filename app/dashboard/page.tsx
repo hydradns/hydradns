@@ -13,8 +13,24 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { SectionCards } from "@/components/section-cards"
-import { getDashboardSummary, getDnsEngineStatus, getQueryLogs } from "@/lib/api"
-import type { DashboardSummary, DnsEngineStatus, QueryLogEntry } from "@/lib/types"
+import { HealthWidget } from "@/components/health-widget"
+import { BypassPanel } from "@/components/bypass-panel"
+import {
+  getDashboardSummary,
+  getDnsEngineStatus,
+  getRecentQueryLogs,
+  getDnsMetrics,
+  getBlocklists,
+  getBypassAttempts,
+} from "@/lib/api"
+import type {
+  DashboardSummary,
+  DnsEngineStatus,
+  QueryLogEntry,
+  DnsMetrics,
+  BlocklistListData,
+  BypassAttemptsData,
+} from "@/lib/types"
 import {
   AreaChart,
   Area,
@@ -124,6 +140,9 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [engine, setEngine] = useState<DnsEngineStatus | null>(null)
   const [logs, setLogs] = useState<QueryLogEntry[]>([])
+  const [metrics, setMetrics] = useState<DnsMetrics | null>(null)
+  const [blocklists, setBlocklists] = useState<BlocklistListData | null>(null)
+  const [bypass, setBypass] = useState<BypassAttemptsData | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const fetchData = async () => {
@@ -131,7 +150,7 @@ export default function DashboardPage() {
       const [s, e, l] = await Promise.all([
         getDashboardSummary(),
         getDnsEngineStatus(),
-        getQueryLogs(),
+        getRecentQueryLogs(),
       ])
       setSummary(s)
       setEngine(e)
@@ -140,6 +159,11 @@ export default function DashboardPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to connect to API")
     }
+    // Secondary signals for the health widget + bypass panel. These degrade
+    // gracefully so a missing endpoint never blanks the whole dashboard.
+    getDnsMetrics().then(setMetrics).catch(() => {})
+    getBlocklists().then(setBlocklists).catch(() => {})
+    getBypassAttempts().then(setBypass).catch(() => {})
   }
 
   useEffect(() => {
@@ -220,6 +244,14 @@ export default function DashboardPage() {
 
         {/* Stat cards */}
         <SectionCards data={summary} threats={threatCount} />
+
+        {/* Plain-language system health (I-098) */}
+        <HealthWidget
+          engine={engine}
+          metrics={metrics}
+          blocklists={blocklists}
+          summary={summary}
+        />
 
         {/* Charts row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -325,6 +357,9 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Encrypted-DNS bypass attempts (I-108) */}
+        <BypassPanel data={bypass} />
 
         {/* Recent Activity table */}
         <div className="bg-card rounded-xl border border-border/20 overflow-hidden">

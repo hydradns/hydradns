@@ -9,13 +9,13 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
   Drawer, DrawerClose, DrawerContent, DrawerDescription,
-  DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger,
+  DrawerFooter, DrawerHeader, DrawerTitle,
 } from "@/components/ui/drawer"
-import { getPolicies, createPolicy, deletePolicy } from "@/lib/api"
+import { getPolicies, createPolicy, updatePolicy, deletePolicy } from "@/lib/api"
 import type { Policy, PolicyListData } from "@/lib/types"
 import {
   Plus, Trash2, Shield, ShieldCheck, ArrowRightLeft,
-  Globe, ChevronDown,
+  Globe, ChevronDown, Pencil, Clock, Users,
 } from "lucide-react"
 
 const actionConfig: Record<string, { label: string; badge: string; icon: string; bg: string }> = {
@@ -52,6 +52,7 @@ function ActionIcon({ action }: { action: string }) {
 export default function PoliciesPage() {
   const [data, setData] = useState<PolicyListData | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -62,6 +63,8 @@ export default function PoliciesPage() {
   const [formAction, setFormAction] = useState("BLOCK")
   const [formDomains, setFormDomains] = useState("")
   const [formPriority, setFormPriority] = useState("100")
+  const [formSchedule, setFormSchedule] = useState("")
+  const [formClientScope, setFormClientScope] = useState("")
 
   const [error, setError] = useState<string | null>(null)
 
@@ -76,31 +79,57 @@ export default function PoliciesPage() {
     setFormAction("BLOCK")
     setFormDomains("")
     setFormPriority("100")
+    setFormSchedule("")
+    setFormClientScope("")
     setFormError(null)
+    setEditingId(null)
   }
 
-  const handleCreate = async () => {
+  const openCreate = () => {
+    resetForm()
+    setShowForm(true)
+  }
+
+  const openEdit = (p: Policy) => {
+    setEditingId(p.id)
+    setFormName(p.name)
+    setFormAction(p.action)
+    setFormDomains((p.domains || []).join("\n"))
+    setFormPriority(String(p.priority ?? 100))
+    setFormSchedule(p.schedule ?? "")
+    setFormClientScope(p.client_scope ?? "")
+    setFormError(null)
+    setShowForm(true)
+  }
+
+  const handleSubmit = async () => {
     const domains = formDomains.split(/[,\n]/).map((d) => d.trim()).filter(Boolean)
     if (!formName || domains.length === 0) {
       setFormError("Name and at least one domain are required")
       return
     }
-    const id = formName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
     setSubmitting(true)
     setFormError(null)
+    const payload = {
+      name: formName,
+      action: formAction,
+      domains,
+      priority: parseInt(formPriority) || 100,
+      schedule: formSchedule || undefined,
+      client_scope: formClientScope || undefined,
+    }
     try {
-      await createPolicy({
-        id,
-        name: formName,
-        action: formAction,
-        domains,
-        priority: parseInt(formPriority) || 100,
-      })
+      if (editingId) {
+        await updatePolicy(editingId, payload)
+      } else {
+        const id = formName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        await createPolicy({ id, ...payload })
+      }
       resetForm()
       setShowForm(false)
       fetchData()
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : "Failed to create policy")
+      setFormError(e instanceof Error ? e.message : "Failed to save policy")
     } finally {
       setSubmitting(false)
     }
@@ -140,19 +169,24 @@ export default function PoliciesPage() {
           </div>
         </div>
 
+        <button
+          type="button"
+          onClick={openCreate}
+          className="flex items-center gap-2 bg-[#00D4AA] text-background font-bold px-4 py-2 rounded-lg text-sm hover:bg-[#00f5c4] transition-colors shadow-lg shadow-[#00D4AA]/20"
+        >
+          <Plus className="w-4 h-4" />
+          Add Policy
+        </button>
+
         <Drawer direction="right" open={showForm} onOpenChange={(open) => { setShowForm(open); if (!open) resetForm() }}>
-          <DrawerTrigger asChild>
-            <button
-              className="flex items-center gap-2 bg-[#00D4AA] text-background font-bold px-4 py-2 rounded-lg text-sm hover:bg-[#00f5c4] transition-colors shadow-lg shadow-[#00D4AA]/20"
-            >
-              <Plus className="w-4 h-4" />
-              Add Policy
-            </button>
-          </DrawerTrigger>
           <DrawerContent className="data-[vaul-drawer-direction=right]:sm:max-w-md">
             <DrawerHeader className="border-b border-border">
-              <DrawerTitle className="font-headline text-xl font-bold">Add Policy</DrawerTitle>
-              <DrawerDescription>Create a new DNS policy rule</DrawerDescription>
+              <DrawerTitle className="font-headline text-xl font-bold">
+                {editingId ? "Edit Policy" : "Add Policy"}
+              </DrawerTitle>
+              <DrawerDescription>
+                {editingId ? "Update this DNS policy rule" : "Create a new DNS policy rule"}
+              </DrawerDescription>
             </DrawerHeader>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -210,6 +244,38 @@ export default function PoliciesPage() {
                 />
                 <p className="text-[10px] text-muted-foreground mt-2 italic">Higher numbers override lower priorities.</p>
               </div>
+
+              <div>
+                <label className={labelClass}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock className="w-3 h-3" /> Schedule
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  placeholder="e.g. Mon-Fri 09:00-17:00 (optional)"
+                  value={formSchedule}
+                  onChange={(e) => setFormSchedule(e.target.value)}
+                />
+                <p className="text-[10px] text-muted-foreground mt-2 italic">Leave blank to apply the policy at all times.</p>
+              </div>
+
+              <div>
+                <label className={labelClass}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Users className="w-3 h-3" /> Client Scope
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  placeholder="e.g. 192.168.1.0/24 or all (optional)"
+                  value={formClientScope}
+                  onChange={(e) => setFormClientScope(e.target.value)}
+                />
+                <p className="text-[10px] text-muted-foreground mt-2 italic">Restrict this policy to specific clients or subnets.</p>
+              </div>
             </div>
 
             <DrawerFooter className="border-t border-border flex-row justify-end gap-3">
@@ -223,11 +289,11 @@ export default function PoliciesPage() {
               </DrawerClose>
               <button
                 type="button"
-                onClick={handleCreate}
+                onClick={handleSubmit}
                 disabled={submitting}
                 className="px-8 py-3 bg-[#00D4AA] text-background font-bold rounded-lg hover:bg-[#00f5c4] transition-colors text-sm disabled:opacity-50 shadow-lg shadow-[#00D4AA]/20"
               >
-                {submitting ? "Saving..." : "Save Policy"}
+                {submitting ? "Saving..." : editingId ? "Update Policy" : "Save Policy"}
               </button>
             </DrawerFooter>
           </DrawerContent>
@@ -299,18 +365,28 @@ export default function PoliciesPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-8">
+                    <div className="flex items-center gap-6">
                       <div className="text-right hidden sm:block">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Priority</p>
                         <p className="font-mono text-foreground">{p.priority}</p>
                       </div>
-                      <button
-                        onClick={() => handleDelete(p.id)}
-                        disabled={deleting === p.id}
-                        className="w-9 h-9 flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEdit(p)}
+                          title="Edit policy"
+                          className="w-9 h-9 flex items-center justify-center text-muted-foreground hover:text-[#00D4AA] hover:bg-[#00D4AA]/10 rounded-lg transition-all"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(p.id)}
+                          disabled={deleting === p.id}
+                          title="Delete policy"
+                          className="w-9 h-9 flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
