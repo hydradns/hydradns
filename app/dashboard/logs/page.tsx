@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList,
   BreadcrumbPage, BreadcrumbSeparator,
@@ -12,134 +12,160 @@ import { Input } from "@/components/ui/input"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { getQueryLogs } from "@/lib/api"
-import type { QueryLogEntry } from "@/lib/types"
+import { allowDomain, blockDomain, getQueryLogs } from "@/lib/api"
+import type { QueryLogEntry, QueryLogPage } from "@/lib/types"
 import {
-  Search, Download, ChevronLeft, ChevronRight, ShieldCheck, ShieldOff,
-  Gauge, AlertTriangle, RefreshCw,
+  Search, ChevronLeft, ChevronRight, RefreshCw, ShieldCheck, Ban,
+  Check, Loader2,
 } from "lucide-react"
 
-type ActionFilter = "all" | "block" | "allow" | "flagged"
+const PAGE_SIZE = 50
+const DEBOUNCE_MS = 300
 
-const ITEMS_PER_PAGE = 50
+type RowAction = "allow" | "block"
 
-function classifyAction(log: QueryLogEntry): "block" | "allow" | "flagged" {
-  if (log.action === "block") return "block"
+type RowResult = { type: "ok" | "err"; text: string }
+
+function kindOf(log: QueryLogEntry): "block" | "flagged" | "allow" {
+  if (log.action?.toLowerCase() === "block") return "block"
   if (log.is_suspicious) return "flagged"
   return "allow"
 }
 
-function domainColorClass(kind: "block" | "allow" | "flagged") {
-  switch (kind) {
-    case "block": return "text-hydra-red"
-    case "flagged": return "text-hydra-amber"
-    default: return "text-hydra-blue"
-  }
-}
-
-function actionBadge(kind: "block" | "allow" | "flagged") {
-  switch (kind) {
+function rowClasses(log: QueryLogEntry) {
+  const base = "border-b border-background hover:bg-white/5 transition-colors"
+  switch (kindOf(log)) {
     case "block":
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-hydra-red/10 text-hydra-red border border-hydra-red/20">
-          BLOCKED
-        </span>
-      )
+      return `${base} border-l-4 border-l-hydra-red bg-hydra-red/5`
     case "flagged":
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-hydra-amber/10 text-hydra-amber border border-hydra-amber/20">
-          FLAGGED
-        </span>
-      )
+      // suspicious rows highlighted
+      return `${base} border-l-4 border-l-hydra-amber bg-hydra-amber/5`
     default:
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-hydra-green/10 text-hydra-green border border-hydra-green/20">
-          ALLOWED
-        </span>
-      )
+      return base
   }
 }
 
-function threatScoreBar(score: number) {
-  const pct = Math.max(1, Math.round(score * 100))
-  let barColor = "bg-hydra-green"
-  if (score >= 0.7) barColor = "bg-gradient-to-r from-hydra-amber to-hydra-red"
-  else if (score >= 0.3) barColor = "bg-hydra-amber"
-
+function actionBadge(log: QueryLogEntry) {
+  const kind = kindOf(log)
+  const map = {
+    block: { label: "BLOCKED", cls: "bg-hydra-red/10 text-hydra-red border-hydra-red/20" },
+    flagged: { label: "FLAGGED", cls: "bg-hydra-amber/10 text-hydra-amber border-hydra-amber/20" },
+    allow: { label: "ALLOWED", cls: "bg-hydra-green/10 text-hydra-green border-hydra-green/20" },
+  } as const
+  const { label, cls } = map[kind]
   return (
-    <div className="w-24 h-1.5 bg-background rounded-full overflow-hidden">
-      <div className={`h-full ${barColor}`} style={{ width: `${pct}%` }} />
-    </div>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${cls}`}>
+      {label}
+    </span>
   )
-}
-
-function rowClasses(kind: "block" | "allow" | "flagged") {
-  switch (kind) {
-    case "block":
-      return "border-b border-background hover:bg-white/5 transition-colors border-l-4 border-l-hydra-red bg-hydra-red/5"
-    case "flagged":
-      return "border-b border-background hover:bg-white/5 transition-colors border-l-4 border-l-hydra-amber bg-hydra-amber/5"
-    default:
-      return "border-b border-background hover:bg-white/5 transition-colors"
-  }
 }
 
 export default function LogsPage() {
-  const [logs, setLogs] = useState<QueryLogEntry[]>([])
+  const [data, setData] = useState<QueryLogPage | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [domainSearch, setDomainSearch] = useState("")
-  const [actionFilter, setActionFilter] = useState<ActionFilter>("all")
+
+  // Filters
+  const [domain, setDomain] = useState("")
+  const [client, setClient] = useState("")
+  const [action, setAction] = useState("all")
+  const [suspiciousOnly, setSuspiciousOnly] = useState(false)
+  const [start, setStart] = useState("")
+  const [end, setEnd] = useState("")
   const [page, setPage] = useState(1)
 
-  const fetchData = () => {
-    getQueryLogs()
-      .then((d) => { setLogs(d); setError(null) })
-      .catch((e) => setError(e.message))
-  }
+  // Refresh nonce so the manual refresh button re-triggers the fetch effect.
+  const [nonce, setNonce] = useState(0)
+
+  // Per-row one-click action feedback.
+  const [pendingKey, setPendingKey] = useState<string | null>(null)
+  const [rowResults, setRowResults] = useState<Record<number, RowResult>>({})
+
+  // Reset to the first page whenever a filter (not the page itself) changes.
+  const onFilterChange =
+    <T,>(setter: (v: T) => void) =>
+    (v: T) => {
+      setter(v)
+      setPage(1)
+    }
 
   useEffect(() => {
-    fetchData()
-    const interval = setInterval(fetchData, 10000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const filtered = useMemo(() => {
-    let result = logs
-    if (domainSearch) {
-      const q = domainSearch.toLowerCase()
-      result = result.filter((l) => l.domain.toLowerCase().includes(q))
+    let cancelled = false
+    setLoading(true)
+    const handle = setTimeout(() => {
+      getQueryLogs({
+        domain: domain || undefined,
+        client: client || undefined,
+        action,
+        suspicious: suspiciousOnly || undefined,
+        start: start ? new Date(start).toISOString() : undefined,
+        end: end ? new Date(end).toISOString() : undefined,
+        page,
+        page_size: PAGE_SIZE,
+      })
+        .then((d) => {
+          if (cancelled) return
+          setData(d)
+          setError(null)
+        })
+        .catch((e) => {
+          if (cancelled) return
+          setError(e instanceof Error ? e.message : "Failed to load query logs")
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }, DEBOUNCE_MS)
+    return () => {
+      cancelled = true
+      clearTimeout(handle)
     }
-    if (actionFilter !== "all") {
-      result = result.filter((l) => classifyAction(l) === actionFilter)
-    }
-    return result
-  }, [logs, domainSearch, actionFilter])
+  }, [domain, client, action, suspiciousOnly, start, end, page, nonce])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
-  const safePage = Math.min(page, totalPages)
-  const paginated = filtered.slice(
-    (safePage - 1) * ITEMS_PER_PAGE,
-    safePage * ITEMS_PER_PAGE,
+  const items = data?.items ?? []
+  const total = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const startIdx = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const endIdx = Math.min(page * PAGE_SIZE, total)
+
+  const hasFilters = useMemo(
+    () => Boolean(domain || client || suspiciousOnly || start || end || action !== "all"),
+    [domain, client, suspiciousOnly, start, end, action],
   )
-  const startIdx = (safePage - 1) * ITEMS_PER_PAGE + 1
-  const endIdx = Math.min(safePage * ITEMS_PER_PAGE, filtered.length)
 
-  // Summary stats
-  const blockedCount = logs.filter((l) => l.action === "block").length
-  const flaggedCount = logs.filter((l) => l.is_suspicious).length
-  const avgThreat = logs.length > 0
-    ? logs.reduce((s, l) => s + l.threat_score, 0) / logs.length
-    : 0
-  const healthPct = logs.length > 0
-    ? (((logs.length - blockedCount) / logs.length) * 100).toFixed(1)
-    : "100.0"
+  const handleRowAction = async (log: QueryLogEntry, act: RowAction) => {
+    const key = `${log.id}:${act}`
+    setPendingKey(key)
+    setRowResults((prev) => {
+      const next = { ...prev }
+      delete next[log.id]
+      return next
+    })
+    try {
+      if (act === "allow") await allowDomain(log.domain)
+      else await blockDomain(log.domain)
+      setRowResults((prev) => ({
+        ...prev,
+        [log.id]: { type: "ok", text: act === "allow" ? "Allowed" : "Blocked" },
+      }))
+    } catch (e) {
+      setRowResults((prev) => ({
+        ...prev,
+        [log.id]: { type: "err", text: e instanceof Error ? e.message : "Action failed" },
+      }))
+    } finally {
+      setPendingKey(null)
+    }
+  }
 
-  const filterPills: { label: string; value: ActionFilter }[] = [
-    { label: "All Queries", value: "all" },
+  const actionPills: { label: string; value: string }[] = [
+    { label: "All", value: "all" },
     { label: "Blocked", value: "block" },
     { label: "Allowed", value: "allow" },
-    { label: "Flagged", value: "flagged" },
   ]
+
+  const filterInput =
+    "bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
 
   return (
     <>
@@ -166,15 +192,22 @@ export default function LogsPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              aria-label="Filter by domain"
               placeholder="Filter domains..."
               className="pl-10 w-72 bg-card border-border focus-visible:ring-primary"
-              value={domainSearch}
-              onChange={(e) => { setDomainSearch(e.target.value); setPage(1) }}
+              value={domain}
+              onChange={(e) => onFilterChange(setDomain)(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Download className="h-4 w-4" />
-            Export
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => setNonce((n) => n + 1)}
+            aria-label="Refresh"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
           </Button>
         </div>
       </header>
@@ -187,14 +220,15 @@ export default function LogsPage() {
         )}
 
         {/* Filter Bar */}
-        <div className="bg-card/30 border border-border rounded-xl p-3 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            {filterPills.map((pill) => (
+        <div className="bg-card/30 border border-border rounded-xl p-3 flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2" role="group" aria-label="Action filter">
+            {actionPills.map((pill) => (
               <button
                 key={pill.value}
-                onClick={() => { setActionFilter(pill.value); setPage(1) }}
+                onClick={() => onFilterChange(setAction)(pill.value)}
+                aria-pressed={action === pill.value}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                  actionFilter === pill.value
+                  action === pill.value
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -203,13 +237,45 @@ export default function LogsPage() {
               </button>
             ))}
           </div>
-          <button
-            onClick={fetchData}
-            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-            title="Refresh"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
+
+          <Input
+            aria-label="Filter by client IP"
+            placeholder="Client IP..."
+            className={`${filterInput} w-40`}
+            value={client}
+            onChange={(e) => onFilterChange(setClient)(e.target.value)}
+          />
+
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="uppercase tracking-wider font-bold">From</span>
+            <input
+              type="datetime-local"
+              aria-label="Start time"
+              className={filterInput}
+              value={start}
+              onChange={(e) => onFilterChange(setStart)(e.target.value)}
+            />
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="uppercase tracking-wider font-bold">To</span>
+            <input
+              type="datetime-local"
+              aria-label="End time"
+              className={filterInput}
+              value={end}
+              onChange={(e) => onFilterChange(setEnd)(e.target.value)}
+            />
+          </label>
+
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none ml-auto">
+            <input
+              type="checkbox"
+              className="accent-hydra-amber h-4 w-4"
+              checked={suspiciousOnly}
+              onChange={(e) => onFilterChange(setSuspiciousOnly)(e.target.checked)}
+            />
+            Suspicious only
+          </label>
         </div>
 
         {/* Data Table */}
@@ -218,49 +284,95 @@ export default function LogsPage() {
             <Table>
               <TableHeader>
                 <TableRow className="border-b border-background bg-background/50 hover:bg-background/50">
-                  <TableHead className="px-4 py-4 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Timestamp</TableHead>
-                  <TableHead className="px-4 py-4 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Domain</TableHead>
-                  <TableHead className="px-4 py-4 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Type</TableHead>
-                  <TableHead className="px-4 py-4 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Client IP</TableHead>
-                  <TableHead className="px-4 py-4 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-center">Action</TableHead>
-                  <TableHead className="px-4 py-4 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Threat Score</TableHead>
-                  <TableHead className="px-4 py-4 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Detection Method</TableHead>
+                  {["Timestamp", "Domain", "Client IP", "Action", "Reason"].map((h) => (
+                    <TableHead
+                      key={h}
+                      className="px-4 py-4 text-[11px] font-bold uppercase tracking-wider text-muted-foreground"
+                    >
+                      {h}
+                    </TableHead>
+                  ))}
+                  <TableHead className="px-4 py-4 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-right">
+                    Quick Action
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody className="text-sm">
-                {paginated.length > 0 ? (
-                  paginated.map((log) => {
-                    const kind = classifyAction(log)
+                {items.length > 0 ? (
+                  items.map((log) => {
+                    const result = rowResults[log.id]
+                    const allowPending = pendingKey === `${log.id}:allow`
+                    const blockPending = pendingKey === `${log.id}:block`
+                    const busy = allowPending || blockPending
                     return (
-                      <TableRow key={log.id} className={rowClasses(kind)}>
+                      <TableRow key={log.id} className={rowClasses(log)}>
                         <TableCell className="px-4 py-3 text-muted-foreground text-xs">
                           {new Date(log.timestamp).toLocaleString()}
                         </TableCell>
-                        <TableCell className={`px-4 py-3 font-mono ${domainColorClass(kind)}`}>
+                        <TableCell className="px-4 py-3 font-mono text-foreground">
                           {log.domain}
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-muted-foreground text-xs font-bold">
-                          A
                         </TableCell>
                         <TableCell className="px-4 py-3 font-mono text-muted-foreground text-xs">
                           {log.client_ip}
                         </TableCell>
-                        <TableCell className="px-4 py-3 text-center">
-                          {actionBadge(kind)}
+                        <TableCell className="px-4 py-3">{actionBadge(log)}</TableCell>
+                        <TableCell className="px-4 py-3 text-xs text-muted-foreground">
+                          {log.threat_reason || log.detection_method || "—"}
                         </TableCell>
                         <TableCell className="px-4 py-3">
-                          {threatScoreBar(log.threat_score)}
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-xs text-muted-foreground italic">
-                          {log.detection_method || "\u2014"}
+                          <div className="flex items-center justify-end gap-2">
+                            {result && (
+                              <span
+                                className={`text-[11px] font-bold ${
+                                  result.type === "ok" ? "text-hydra-green" : "text-hydra-red"
+                                }`}
+                              >
+                                {result.text}
+                              </span>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => handleRowAction(log, "allow")}
+                              aria-label={`Allow ${log.domain}`}
+                              className="h-7 gap-1 text-xs text-hydra-green hover:text-hydra-green"
+                            >
+                              {allowPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Check className="h-3 w-3" />
+                              )}
+                              Allow
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => handleRowAction(log, "block")}
+                              aria-label={`Block ${log.domain}`}
+                              className="h-7 gap-1 text-xs text-hydra-red hover:text-hydra-red"
+                            >
+                              {blockPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Ban className="h-3 w-3" />
+                              )}
+                              Block
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      {domainSearch || actionFilter !== "all" ? "No matching entries" : "No query logs yet"}
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      {loading
+                        ? "Loading query logs..."
+                        : hasFilters
+                          ? "No matching entries"
+                          : "No query logs yet"}
                     </TableCell>
                   </TableRow>
                 )}
@@ -271,14 +383,20 @@ export default function LogsPage() {
           {/* Pagination Footer */}
           <div className="px-6 py-4 flex items-center justify-between border-t border-background bg-background/30">
             <p className="text-xs text-muted-foreground">
-              Showing <span className="text-foreground font-bold">{filtered.length > 0 ? startIdx : 0}-{endIdx}</span> of{" "}
-              <span className="text-foreground font-bold">{filtered.length.toLocaleString()}</span> queries
+              Showing{" "}
+              <span className="text-foreground font-bold">
+                {startIdx}-{endIdx}
+              </span>{" "}
+              of <span className="text-foreground font-bold">{total.toLocaleString()}</span> queries
             </p>
             <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                Page {page} / {totalPages}
+              </span>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={safePage <= 1}
+                disabled={page <= 1 || loading}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 className="text-xs font-bold gap-1"
               >
@@ -288,7 +406,7 @@ export default function LogsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={safePage >= totalPages}
+                disabled={page >= totalPages || loading}
                 onClick={() => setPage((p) => p + 1)}
                 className="text-xs font-bold gap-1 border-primary/20 text-primary hover:bg-primary/10"
               >
@@ -299,49 +417,10 @@ export default function LogsPage() {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-card p-4 rounded-xl border border-border">
-            <div className="flex items-center gap-3 mb-2">
-              <ShieldCheck className="h-5 w-5 text-primary" />
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Health Index</h3>
-            </div>
-            <div className="text-2xl font-headline font-bold text-foreground">{healthPct}%</div>
-            <div className="mt-2 h-1 w-full bg-background rounded-full overflow-hidden">
-              <div className="h-full bg-primary" style={{ width: `${healthPct}%` }} />
-            </div>
-          </div>
-          <div className="bg-card p-4 rounded-xl border border-border">
-            <div className="flex items-center gap-3 mb-2">
-              <ShieldOff className="h-5 w-5 text-hydra-red" />
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Blocks (24h)</h3>
-            </div>
-            <div className="text-2xl font-headline font-bold text-foreground">{blockedCount.toLocaleString()}</div>
-            <div className="text-[10px] text-hydra-red font-bold mt-1">
-              {logs.length > 0
-                ? `${((blockedCount / logs.length) * 100).toFixed(1)}% of total`
-                : "No data"}
-            </div>
-          </div>
-          <div className="bg-card p-4 rounded-xl border border-border">
-            <div className="flex items-center gap-3 mb-2">
-              <Gauge className="h-5 w-5 text-hydra-blue" />
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Avg Threat</h3>
-            </div>
-            <div className="text-2xl font-headline font-bold text-foreground">{(avgThreat * 100).toFixed(1)}%</div>
-            <div className="text-[10px] text-muted-foreground mt-1">Mean threat score</div>
-          </div>
-          <div className="bg-card p-4 rounded-xl border border-border">
-            <div className="flex items-center gap-3 mb-2">
-              <AlertTriangle className="h-5 w-5 text-hydra-amber" />
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Active Threats</h3>
-            </div>
-            <div className="text-2xl font-headline font-bold text-foreground">{flaggedCount}</div>
-            <div className="text-[10px] text-muted-foreground mt-1">
-              {flaggedCount > 0 ? "Requires review" : "All clear"}
-            </div>
-          </div>
-        </div>
+        <p className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+          One-click actions create a high-priority policy scoped to the single domain.
+        </p>
       </div>
     </>
   )
