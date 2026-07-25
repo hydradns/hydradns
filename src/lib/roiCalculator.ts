@@ -1,9 +1,11 @@
 /*
- * ROI / cost-comparison math for the landing page calculator.
+ * Cost-comparison math for the landing page calculator.
  *
- * HydraDNS is billed as a flat annual fee (₹15,000–18,000/yr) that does NOT
- * scale with device/seat count. Per-seat DNS-security competitors are priced
- * in USD per user per month, so their annual cost grows linearly with seats.
+ * HydraDNS is billed as a flat annual fee that does NOT scale with
+ * device/seat count — but that price isn't published yet, so this module
+ * only computes what per-seat DNS-security competitors cost. Their pricing
+ * is USD per user per month, so annual cost grows with seats (linearly for
+ * most vendors, in step-blocks for a few — see `Competitor.billing`).
  * This module is pure (no React) so it can be unit-tested in isolation.
  */
 
@@ -17,12 +19,6 @@
  * review periodically and bump it so it doesn't silently go stale.
  */
 export const USD_TO_INR = 97;
-
-/**
- * HydraDNS flat annual price in INR. Top of the ₹15,000–18,000/yr range is used
- * so the savings shown are the conservative (smallest) case.
- */
-export const HYDRADNS_ANNUAL_INR = 18000;
 
 export interface Competitor {
   id: string;
@@ -76,23 +72,17 @@ export const COMPETITORS: Competitor[] = [
 export interface CompetitorResult extends Competitor {
   /** Total annual cost in INR for the given seat count. */
   annualINR: number;
-  /** competitor annual − HydraDNS flat, in INR (>= 0 when competitor is dearer). */
-  savingsINR: number;
-  /** How many times more the competitor costs vs the HydraDNS flat fee. */
-  multiplier: number;
 }
 
 export interface RoiResult {
   /** Sanitised seat count actually used for the math. */
   seats: number;
   usdToInr: number;
-  hydradnsAnnualINR: number;
   competitors: CompetitorResult[];
 }
 
 export interface RoiOptions {
   usdToInr?: number;
-  hydradnsAnnualINR?: number;
   competitors?: Competitor[];
 }
 
@@ -133,26 +123,23 @@ export function sanitizeSeats(seats: number): number {
 }
 
 /**
- * Given a seat/device count, return HydraDNS's flat annual cost plus each
- * competitor's per-seat annual cost, savings, and cost multiplier.
+ * Given a seat/device count, return each competitor's per-seat annual cost.
+ * HydraDNS's own price is deliberately not part of this result — it isn't
+ * published yet, so the calculator only quantifies the competitor side.
  */
 export function calculateRoi(seats: number, options: RoiOptions = {}): RoiResult {
   const usdToInr = options.usdToInr ?? USD_TO_INR;
-  const hydradnsAnnualINR = options.hydradnsAnnualINR ?? HYDRADNS_ANNUAL_INR;
   const competitors = options.competitors ?? COMPETITORS;
   const s = sanitizeSeats(seats);
 
   return {
     seats: s,
     usdToInr,
-    hydradnsAnnualINR,
     competitors: competitors.map((c) => {
       const annualINR = competitorAnnualINRForCompetitor(s, c, usdToInr);
       return {
         ...c,
         annualINR,
-        savingsINR: annualINR - hydradnsAnnualINR,
-        multiplier: hydradnsAnnualINR > 0 ? annualINR / hydradnsAnnualINR : 0,
       };
     }),
   };
