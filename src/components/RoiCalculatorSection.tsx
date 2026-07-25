@@ -2,34 +2,23 @@ import { useMemo, useState } from "react";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import {
-  calculateRoi,
-  formatINR,
-  sanitizeSeats,
-  HYDRADNS_ANNUAL_INR,
-  USD_TO_INR,
-} from "@/lib/roiCalculator";
-import { TrendingDown } from "lucide-react";
+import { calculateRoi, formatINR, sanitizeSeats, USD_TO_INR } from "@/lib/roiCalculator";
+import { Github, Users } from "lucide-react";
 
 const DEFAULT_SEATS = 50;
 const MIN_SEATS = 1;
 const MAX_SEATS = 1000;
+
+// Same destination as the site's other primary CTAs (Navbar "Get Started",
+// Hero "Get the code") — the project has no separate contact/sales page yet,
+// GitHub is where inquiries actually land.
+const CTA_HREF = "https://github.com/hydradns/hydradns";
 
 export function RoiCalculatorSection() {
   const ref = useScrollAnimation();
   const [seats, setSeats] = useState<number>(DEFAULT_SEATS);
 
   const result = useMemo(() => calculateRoi(seats), [seats]);
-
-  // Biggest per-seat competitor bill, used for the headline savings figure.
-  const dearest = useMemo(
-    () =>
-      result.competitors.reduce(
-        (max, c) => (c.annualINR > max.annualINR ? c : max),
-        result.competitors[0],
-      ),
-    [result],
-  );
 
   const handleInput = (raw: string) => {
     if (raw === "") {
@@ -46,13 +35,14 @@ export function RoiCalculatorSection() {
     <section id="roi-calculator" className="relative py-20 sm:py-28 lg:py-36" ref={ref}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
-          <p className="eyebrow fade-in-up">ROI CALCULATOR</p>
+          <p className="eyebrow fade-in-up">COST CALCULATOR</p>
           <h2 className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground fade-in-up leading-[1.1]">
-            The flat-fee <span className="text-gradient">math.</span>
+            See what per-seat <span className="text-gradient">costs you.</span>
           </h2>
           <p className="mt-5 max-w-2xl mx-auto text-base sm:text-lg text-muted-foreground fade-in-up">
-            Per-seat DNS security scales with your headcount. HydraDNS is one flat annual fee.
-            Drag the count and watch the gap.
+            Per-seat DNS security scales with your headcount — every device you add raises the
+            bill. HydraDNS is billed as one flat annual fee instead. Drag the count and watch
+            the gap grow.
           </p>
         </div>
 
@@ -97,49 +87,58 @@ export function RoiCalculatorSection() {
               <span>{MAX_SEATS}+</span>
             </div>
 
-            {/* HydraDNS flat result */}
+            {/* HydraDNS flat-fee positioning (no price published yet) */}
             <div className="mt-8 rounded-lg bg-brand-teal/[0.06] border border-brand-teal/30 glow-primary p-5">
               <p className="font-mono text-[10px] uppercase tracking-widest text-brand-teal">
                 HydraDNS · flat
               </p>
-              <p
-                className="mt-1 font-headline text-3xl sm:text-4xl font-bold tracking-tightest text-gradient"
-                data-testid="roi-hydradns-annual"
-              >
-                {formatINR(result.hydradnsAnnualINR)}
+              <p className="mt-1 font-headline text-2xl sm:text-3xl font-bold tracking-tightest text-gradient">
+                One annual fee
               </p>
               <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                per year · any number of devices
+                same price at 10 devices or 1,000 — not per seat
               </p>
+              <a
+                href={CTA_HREF}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold shadow-[0_0_20px_rgba(0,212,170,0.25)] hover:shadow-[0_0_28px_rgba(0,212,170,0.4)] transition-shadow"
+              >
+                <Github className="h-4 w-4" />
+                Talk to us for pricing
+              </a>
             </div>
 
             <p className="mt-5 font-mono text-[10px] leading-relaxed text-muted-foreground">
               Competitor pricing is approximate published list price, converted at
               US$1 = ₹{USD_TO_INR} (FX rate as of Jul 2026 — checked periodically,
-              may drift). HydraDNS flat fee shown is the top of the
-              ₹15,000–18,000/yr range.
+              may drift). HydraDNS pricing isn't published yet — the rows below show what
+              you'd pay elsewhere.
             </p>
           </div>
 
           {/* Comparison panel */}
           <div className="lg:col-span-3 fade-in-up">
-            {/* Headline savings */}
+            {/* Flat-fee vs per-seat positioning */}
             <div className="rounded-xl bg-surface-container border border-outline-variant/30 p-6 sm:p-7 flex items-center gap-4">
               <div className="shrink-0 h-11 w-11 rounded-lg bg-brand-green/10 border border-brand-green/30 flex items-center justify-center">
-                <TrendingDown className="h-5 w-5 text-brand-green" strokeWidth={2.25} />
+                <Users className="h-5 w-5 text-brand-green" strokeWidth={2.25} />
               </div>
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Save up to
+                  Every row below grows with headcount
                 </p>
-                <p
-                  className="font-headline text-2xl sm:text-3xl font-bold tracking-tightest text-brand-green"
-                  data-testid="roi-max-savings"
-                >
-                  {formatINR(Math.max(dearest.savingsINR, 0))}
-                  <span className="ml-2 text-sm font-normal text-muted-foreground">
-                    / year vs {dearest.name}
-                  </span>
+                <p className="mt-1 text-base sm:text-lg font-medium text-foreground leading-snug">
+                  HydraDNS doesn't. It's one flat fee — add devices for free.{" "}
+                  <a
+                    href={CTA_HREF}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand-teal underline underline-offset-2 hover:text-brand-teal/80 transition-colors"
+                  >
+                    Get a quote
+                  </a>
+                  .
                 </p>
               </div>
             </div>
@@ -169,9 +168,7 @@ export function RoiCalculatorSection() {
                     >
                       {formatINR(c.annualINR)}
                     </p>
-                    <p className="font-mono text-[10px] text-brand-amber">
-                      {cleanSeats > 0 ? `${c.multiplier.toFixed(1)}× HydraDNS` : "—"}
-                    </p>
+                    <p className="font-mono text-[10px] text-muted-foreground">/ year</p>
                   </div>
                 </div>
               ))}

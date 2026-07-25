@@ -5,7 +5,6 @@ import {
   competitorAnnualINRForCompetitor,
   sanitizeSeats,
   formatINR,
-  HYDRADNS_ANNUAL_INR,
   USD_TO_INR,
   COMPETITORS,
 } from "./roiCalculator";
@@ -73,18 +72,11 @@ describe("competitorAnnualINRForCompetitor (block billing)", () => {
 });
 
 describe("calculateRoi", () => {
-  const opts = { usdToInr: 88, hydradnsAnnualINR: 18000 };
+  const opts = { usdToInr: 88 };
 
-  it("returns the flat HydraDNS fee regardless of seat count", () => {
-    expect(calculateRoi(10, opts).hydradnsAnnualINR).toBe(18000);
-    expect(calculateRoi(1000, opts).hydradnsAnnualINR).toBe(18000);
-  });
-
-  it("computes correct per-competitor annual cost, savings and multiplier", () => {
+  it("computes correct per-competitor annual cost", () => {
     const cisco = calculateRoi(100, opts).competitors.find((c) => c.id === "cisco-umbrella")!;
     expect(cisco.annualINR).toBe(316800); // 100 * 3.00 * 12 * 88
-    expect(cisco.savingsINR).toBe(316800 - 18000); // 298800
-    expect(cisco.multiplier).toBeCloseTo(316800 / 18000, 5); // ~17.6×
   });
 
   it("computes DNSFilter and Cloudflare correctly for 100 seats", () => {
@@ -109,14 +101,12 @@ describe("calculateRoi", () => {
     expect(result.seats).toBe(0);
     result.competitors.forEach((c) => {
       expect(c.annualINR).toBe(0);
-      expect(c.savingsINR).toBe(-18000); // still pay the (unfavourable) flat fee vs nothing
     });
   });
 
   it("falls back to module defaults when options are omitted", () => {
     const result = calculateRoi(100);
     expect(result.usdToInr).toBe(USD_TO_INR);
-    expect(result.hydradnsAnnualINR).toBe(HYDRADNS_ANNUAL_INR);
   });
 });
 
