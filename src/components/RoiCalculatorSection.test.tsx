@@ -30,12 +30,12 @@ beforeAll(() => {
 });
 
 describe("RoiCalculatorSection", () => {
-  it("renders the section heading and the flat HydraDNS fee", () => {
+  it("renders the section heading and a pricing CTA instead of a HydraDNS price", () => {
     render(<RoiCalculatorSection />);
-    expect(screen.getByRole("heading", { name: /flat-fee/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /see what per-seat/i })).toBeInTheDocument();
 
-    const expected = formatINR(calculateRoi(50).hydradnsAnnualINR);
-    expect(screen.getByTestId("roi-hydradns-annual")).toHaveTextContent(expected);
+    expect(screen.getAllByRole("link", { name: /talk to us for pricing|get a quote/i })).not.toHaveLength(0);
+    expect(screen.queryByTestId("roi-hydradns-annual")).not.toBeInTheDocument();
   });
 
   it("shows the default (50 seat) Cisco Umbrella annual cost", () => {
@@ -55,10 +55,6 @@ describe("RoiCalculatorSection", () => {
     const cisco = calculateRoi(200).competitors.find((c) => c.id === "cisco-umbrella")!;
     expect(screen.getByTestId("roi-annual-cisco-umbrella")).toHaveTextContent(
       formatINR(cisco.annualINR),
-    );
-    // HydraDNS flat fee must stay put as seats grow.
-    expect(screen.getByTestId("roi-hydradns-annual")).toHaveTextContent(
-      formatINR(calculateRoi(200).hydradnsAnnualINR),
     );
   });
 });
