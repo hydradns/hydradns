@@ -88,11 +88,12 @@ That's it. DNS filtering is active. Give this machine a static IP and point your
 
 ### DNS Query Pipeline
 
-Every DNS query goes through a 3-step pipeline with early exit:
+Every DNS query goes through a 4-step pipeline with early exit:
 
-1. **Blocklist check** — if domain is on any blocklist, respond `REFUSED` immediately
+1. **Blocklist check** — in-memory membership test; if the domain is blocked, respond per `BLOCK_RESPONSE` (default: A/AAAA → `0.0.0.0`/`::`; `nxdomain` and `refused` also available)
 2. **Policy evaluation** — Bloom filter for O(1) negative lookup, then exact match. Highest priority wins
-3. **Upstream forward** — pool-per-resolver with failover (5s timeout, 2 retries)
+3. **Response cache** — TTL-respecting LRU for allowed queries; blocked/redirect responses are never cached
+4. **Upstream forward** — pool-per-resolver with failover (1.5s per-attempt timeout, 2 retries)
 
 ---
 
@@ -297,6 +298,10 @@ Then give the device a static IP and point your router's DNS server to it. Full 
 | `PHANTOM_POLICIES` | `configs/policies.json` | Policy file path |
 | `CORS_ORIGINS` | `http://localhost:3000` | Allowed CORS origins |
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
+| `BLOCK_RESPONSE` | `zero` | Answer for blocked domains: `zero` (A `0.0.0.0`), `nxdomain`, or `refused` |
+| `BLOCKLIST_UPDATE_INTERVAL` | `6h` | Blocklist refresh interval |
+| `QUERY_LOG_RETENTION_DAYS` | `7` | Delete query logs older than N days; `0` disables |
+| `QUERY_LOG_MAX_ROWS` | `1000000` | Keep at most N newest query-log rows; `0` disables |
 
 ---
 
