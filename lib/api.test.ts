@@ -328,7 +328,7 @@ describe("allowDomain / blockDomain", () => {
   it("allowDomain POSTs an ALLOW policy scoped to the domain", async () => {
     const fetchMock = stubFetchData({ id: "quick-allow-evil-com" })
     await allowDomain("evil.com")
-    const [url, opts] = fetchMock.mock.calls.at(-1) as [string, RequestInit]
+    const [url, opts] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit]
     expect(String(url)).toContain("/api/v1/policies")
     expect(opts.method).toBe("POST")
     const body = JSON.parse(String(opts.body))
@@ -340,7 +340,7 @@ describe("allowDomain / blockDomain", () => {
   it("blockDomain POSTs a BLOCK policy scoped to the domain", async () => {
     const fetchMock = stubFetchData({ id: "quick-block-evil-com" })
     await blockDomain("evil.com")
-    const [, opts] = fetchMock.mock.calls.at(-1) as [string, RequestInit]
+    const [, opts] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit]
     const body = JSON.parse(String(opts.body))
     expect(body.action).toBe("BLOCK")
     expect(body.domains).toEqual(["evil.com"])
