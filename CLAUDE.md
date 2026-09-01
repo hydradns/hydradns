@@ -156,16 +156,22 @@ Note: SQLite `DELETE` reuses freed pages rather than shrinking the file, so the 
 
 ## Known Incomplete Features
 
-Many control plane API handlers use **in-memory mock data**, not the real storage/engines:
-- `handlers/blocklists.go` — mock slice, doesn't use the real blocklist engine or DB
-- `handlers/policies.go` — mock slice, doesn't use the real policy engine
-- `handlers/dns.go` — `/dns/resolvers` uses mock data
+(Accurate for the shipped stack — i.e. the pinned submodule checkouts — as of 2026-09-01.)
 
-**What IS wired up**: `/dns/engine` GET/POST (real gRPC to dataplane), `/dns/metrics` (real gRPC), and the full blocklist DB storage layer (just not called from the API).
+- Regex/wildcard policy evaluation — parsed but not evaluated at query time (fix exists on `apps/core origin/feat/enforce-regex-wildcard-policies`, unmerged)
+- TLS on gRPC — uses `grpc.WithInsecure()`
+- TLS on dashboard — HTTPS not terminated anywhere
+- Port 53 binding on bare metal — needs `CAP_NET_BIND_SERVICE` (Docker handles this via port mapping)
+- `/dns/resolvers` — read-only view of config-file resolvers, no CRUD
+- Scanner only detects the system resolver via `/etc/resolv.conf` and runs a basic UDP resolution check
+- Policy / blocklist edit — API supports create + delete only on the pinned core (upstream core main has inline-edit PUT/PATCH routes, unmerged here)
+- Query log pagination — hard-capped at ~100 entries, no paging UI
+- Settings page — UI page exists (UI rollout #7); backend wiring absent on the pinned core
+- CORS origins — defaults to `http://localhost:3000`; production needs `CORS_ORIGINS` env override
+- Container self-update — none (the CLI does have `hydra update` self-update since hydra-cli #6)
+- Remote monitoring — no heartbeat/alert pipeline in the shipped stack (upstream core main has fleet heartbeat, unmerged here)
 
-The UI has no API client layer yet — `NEXT_PUBLIC_API_URL` is set but unused in code.
-
-The scanner currently only detects the system resolver via `/etc/resolv.conf` and runs a basic UDP resolution check.
+Historical note: the control-plane handlers (`blocklists.go`, `policies.go`) used in-memory mock data until the `feat/bypass-mitigations` work; the pinned core now calls the real storage layer. The UI has a full API client (`lib/api.ts`, `lib/auth.ts`) — all dashboard pages poll the real API.
 
 ## API Response Envelope
 
@@ -188,23 +194,12 @@ Two GitHub Actions workflows:
 - `ci.yml` — on push/PR to main: vet + test core, vet + build CLI, lint + build dashboard, lint + build landing, Docker build verification
 - `release.yml` — on tag push: multi-arch Docker images (amd64/arm64) to GHCR + cross-compiled CLI binaries
 
-## Known Incomplete Features
-
-- Regex/wildcard policy evaluation — parsed but not evaluated at query time
-- Query log retention — DNSQuery table grows unbounded
-- TLS on gRPC — uses `grpc.WithInsecure()`
-- TLS on dashboard — HTTPS not terminated anywhere
-- Port 53 binding on bare metal — needs `CAP_NET_BIND_SERVICE` (Docker handles this via port mapping)
-- `/dns/resolvers` endpoint returns mock data (resolvers are config-only)
-- Scanner only detects system resolver via `/etc/resolv.conf`
-- Policy / blocklist edit UI — only create + delete today, no inline edit
-- Query log pagination — hard-capped at ~100 entries, no paging UI
-- Settings page — UI stub exists, no backend wiring
-- CORS origins — defaults to `http://localhost:3000`; production needs `CORS_ORIGINS` env override
-- Update mechanism — no `hydra update` or container self-update flow
-- Remote monitoring — no heartbeat or alert pipeline for distributed Pis
-
 ## Known Live Bugs (caught in real stack)
 
-- **`UNIQUE constraint failed: statistics.id`** in core logs during query counting. Causes intermittent stats increment failures. Reproducible on a fresh volume. _Fix landed on `apps/core feat/bypass-mitigations` branch._
-- **Blocklist ingestion leaves `domains_count` at 0** after `POST /api/v1/blocklists`. Source row persists, fetch/parse pipeline never populates the snapshot. Seen with StevenBlack, OISD Big, URLhaus, AdGuard Tracking. _Fix landed on `apps/core feat/bypass-mitigations` branch (kicks off async UpdateSource on creation)._
+- **apps/ui main ships 28 failing vitest tests** (of 47) — pre-existing from the "UI rollout" PR #7; root CI only lints + builds the dashboard and never runs its tests, so this was never caught.
+- **apps/core `origin/main` default config blocks google.com** — `configs/policies.json` still contains a leftover `block-google-for-testing` policy (the pinned `feat/bypass-mitigations` checkout removed it; a port back to main is in flight).
+- (Fixed in the pinned core, kept for history: `UNIQUE constraint failed: statistics.id` during query counting, and blocklist ingestion leaving `domains_count` at 0 — both fixed on `feat/bypass-mitigations`, still present on `apps/core origin/main`.)
+
+## Upstream Divergence Warning (2026-09-01)
+
+`apps/core origin/main` has absorbed ~40 PRs (geoip filtering, fast-flux and NOD detection, DNS rate limiting, safe-search, 0x20 encoding, serve-stale cache, its own bounded query-log writer, fleet/MSP heartbeat, device inventory, repaired CI) and has **diverged hard** from the pinned `feat/bypass-mitigations` checkout this compose stack builds. A straight merge is not viable (16 conflicted files incl. the dnsengine hot path); branch deltas are being ported onto main as small commits instead — see `docs/internal/audit-2026-09-01.md`. Do not assume this file's core descriptions match `origin/main`; they describe the pinned checkout.
