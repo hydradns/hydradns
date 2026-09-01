@@ -47,6 +47,7 @@ func (r Response) MarshalJSON() ([]byte, error) {
 type Error struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
+	Data    any    `json:"data,omitempty"`
 }
 
 // MCP protocol types
@@ -57,15 +58,25 @@ type ServerInfo struct {
 }
 
 type InitializeResult struct {
-	ProtocolVersion string            `json:"protocolVersion"`
-	Capabilities    map[string]any    `json:"capabilities"`
-	ServerInfo      ServerInfo        `json:"serverInfo"`
+	ProtocolVersion string         `json:"protocolVersion"`
+	Capabilities    map[string]any `json:"capabilities"`
+	ServerInfo      ServerInfo     `json:"serverInfo"`
 }
 
 type Tool struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	InputSchema InputSchema `json:"inputSchema"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	InputSchema InputSchema      `json:"inputSchema"`
+	Annotations *ToolAnnotations `json:"annotations,omitempty"`
+}
+
+// ToolAnnotations are optional behavioural hints attached to a tool so MCP
+// clients can distinguish read-only tools from destructive ones and warn (or
+// require confirmation) before running a mutating operation.
+type ToolAnnotations struct {
+	ReadOnlyHint         bool `json:"readOnlyHint,omitempty"`
+	DestructiveHint      bool `json:"destructiveHint,omitempty"`
+	ConfirmationRequired bool `json:"confirmationRequired,omitempty"`
 }
 
 type InputSchema struct {
@@ -111,15 +122,25 @@ type CallToolParams struct {
 // Server
 
 type Server struct {
-	client *api.Client
+	client apiClient
+	role   Role
 }
 
+// NewServer constructs an MCP server, resolving its permission role from the
+// MCP_ROLE environment variable. When MCP_ROLE is unset the server runs as
+// admin (no restriction), preserving prior behaviour.
 func NewServer(client *api.Client) *Server {
-	return &Server{client: client}
+	return &Server{client: client, role: resolveRole(os.Getenv("MCP_ROLE"))}
+}
+
+// NewServerWithRole constructs a server with an explicit role, bypassing the
+// MCP_ROLE environment lookup. Primarily useful for tests.
+func NewServerWithRole(client *api.Client, role Role) *Server {
+	return &Server{client: client, role: role}
 }
 
 func (s *Server) tools() []Tool {
-	return []Tool{
+	list := []Tool{
 		{
 			Name:        "get_status",
 			Description: "Get DNS engine status and query statistics",
@@ -192,12 +213,83 @@ func (s *Server) tools() []Tool {
 			Description: "Get DNS query performance metrics including latency percentiles",
 			InputSchema: InputSchema{Type: "object"},
 		},
+		{
+			Name:        "get_weekly_summary",
+			Description: "Get a natural-language rollup of DNS security activity (traffic, block rate, performance, and protection coverage) built from live stats, metrics, and query logs. Best for an at-a-glance report.",
+			InputSchema: InputSchema{Type: "object"},
+		},
+		{
+			Name:        "explain_anomaly",
+			Description: "Inspect current DNS activity and describe anything unusual (elevated error rate, degraded latency, block-rate spikes, or a single client dominating traffic). Optionally pass a baseline to compare against.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"baseline_block_rate":     Property{Type: "number", Description: "Prior block rate percent to compare current block rate against (optional)"},
+					"max_error_rate_percent":  Property{Type: "number", Description: "Error-rate threshold that counts as an anomaly. Default 5.0"},
+					"block_rate_jump_percent": Property{Type: "number", Description: "Increase in block rate (percentage points) vs baseline that counts as a spike. Default 15.0"},
+				},
+			},
+		},
+		{
+			Name:        "compare_to_last_month",
+			Description: "Compare current DNS traffic and block rate against a baseline window (e.g. last month) and describe the changes in plain language. Supply the baseline figures from a prior summary.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"baseline_total_queries":   Property{Type: "integer", Description: "Total queries during the baseline period (optional)"},
+					"baseline_blocked_queries": Property{Type: "integer", Description: "Blocked queries during the baseline period (optional)"},
+					"baseline_block_rate":      Property{Type: "number", Description: "Block rate percent during the baseline period (optional)"},
+					"label":                    Property{Type: "string", Description: "Name of the baseline period for the report. Default 'last month'"},
+				},
+			},
+		},
+		{
+			Name:        "bulk_unblock",
+			Description: "Remove multiple policies at once by their IDs. Reports which were removed and which failed.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"policy_ids": ArrayProperty{Type: "array", Description: "List of policy IDs to remove", Items: ItemType{Type: "string"}},
+				},
+				Required: []string{"policy_ids"},
+			},
+		},
+		{
+			Name:        "delete_policy",
+			Description: "Delete a single DNS policy by its ID. Works for BLOCK, ALLOW, and REDIRECT policies.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"policy_id": Property{Type: "string", Description: "The policy ID to delete"},
+				},
+				Required: []string{"policy_id"},
+			},
+		},
 	}
+
+	// Attach behavioural annotations derived from the tool classification so
+	// clients can flag read-only vs destructive (confirmation-required) tools.
+	for i := range list {
+		if isReadOnly(list[i].Name) {
+			list[i].Annotations = &ToolAnnotations{ReadOnlyHint: true}
+		} else {
+			list[i].Annotations = &ToolAnnotations{DestructiveHint: true, ConfirmationRequired: true}
+		}
+	}
+	return list
 }
 
+// Run serves the MCP protocol over stdin/stdout (the default transport).
 func (s *Server) Run() error {
-	reader := bufio.NewReader(os.Stdin)
-	writer := os.Stdout
+	return s.serve(os.Stdin, os.Stdout)
+}
+
+// serve runs the JSON-RPC read/dispatch loop over the given streams. It backs
+// the stdio transport (Run) and is transport-agnostic so the request handling
+// stays identical across transports.
+func (s *Server) serve(in io.Reader, out io.Writer) error {
+	reader := bufio.NewReader(in)
+	writer := out
 
 	for {
 		line, err := reader.ReadString('\n')
@@ -272,6 +364,15 @@ func (s *Server) handleRequest(req Request) Response {
 				Error:   &Error{Code: -32602, Message: "Invalid params"},
 			}
 		}
+		// Role gate: reject tools the active role may not call, returning a
+		// structured JSON-RPC error instead of executing the tool.
+		if !s.role.Allows(params.Name) {
+			return Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   permissionError(s.role, params.Name),
+			}
+		}
 		result := s.callTool(params)
 		return Response{
 			JSONRPC: "2.0",
@@ -311,6 +412,16 @@ func (s *Server) callTool(params CallToolParams) CallToolResult {
 		return s.toolGetQueryLogs()
 	case "get_metrics":
 		return s.toolGetMetrics()
+	case "get_weekly_summary":
+		return s.toolGetWeeklySummary()
+	case "explain_anomaly":
+		return s.toolExplainAnomaly(params.Arguments)
+	case "compare_to_last_month":
+		return s.toolCompareToLastMonth(params.Arguments)
+	case "bulk_unblock":
+		return s.toolBulkUnblock(params.Arguments)
+	case "delete_policy":
+		return s.toolDeletePolicy(params.Arguments)
 	default:
 		return CallToolResult{
 			Content: []ContentItem{{Type: "text", Text: "Unknown tool: " + params.Name}},
