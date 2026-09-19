@@ -1,0 +1,14 @@
+# Binaries
+/bin/
+controlplane
+dataplane
+
+# Data
+/data/
+data/phantomdns.db
+data/phantomdns.db-shm
+data/phantomdns.db-wal
+tmp/
+
+# Build artifacts
+.commit_message.txt

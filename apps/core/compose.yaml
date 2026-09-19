@@ -1,0 +1,52 @@
+services:
+  dataplane:
+    build:
+      context: .
+      dockerfile: docker/dataplane.Dockerfile
+    container_name: phantom-dataplane
+    restart: unless-stopped
+    ports:
+      - "1053:1053/udp"
+      - "1053:1053/tcp"
+    cap_add:
+      - NET_BIND_SERVICE # allow binding to low ports
+    networks:
+      - phantom-net
+    environment:
+      - CONTROLPLANE_ADDR=phantom-controlplane:50051
+    volumes:
+      - ./data:/app/data
+      - ./configs/config.yaml:/app/configs/config.yaml
+      - ./configs/policies.json:/app/configs/policies.json
+
+  controlplane:
+    depends_on:
+      - dataplane
+    build:
+      context: .
+      dockerfile: docker/controlplane.Dockerfile
+    container_name: phantom-controlplane
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+      - "50051:50051"
+    networks:
+      - phantom-net
+    volumes:
+      - ./data:/app/data
+      - ./configs/config.yaml:/app/configs/config.yaml
+
+  debugger:
+    build:
+      context: .
+      dockerfile: docker/debugger.Dockerfile
+    container_name: phantom-debugger
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./data:/app/data
+      - ./configs/config.yaml:/app/configs/config.yaml
+
+networks:
+  phantom-net:
+    driver: bridge

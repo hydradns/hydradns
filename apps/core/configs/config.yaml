@@ -1,0 +1,14 @@
+dataplane:
+  listen_addr: "0.0.0.0:1053"
+  upstream_resolvers:
+    - "8.8.8.8:53"
+    - "1.1.1.1:53"
+  anonymization:
+    secret: "${PHANTOM_ANON_SECRET:-change-me-in-production}"
+  blocklist_update_interval: "6h"
+  grpc_server:
+    port: 50051
+    listen_addr: "localhost:50051"
+
+controlplane:
+  listen_addr: "0.0.0.0:8080"
