@@ -11,7 +11,7 @@
 
 **[Live demo and screenshots at hydradns.app](https://hydradns.app)**
 
-![HydraDNS dashboard](apps/landing/src/assets/dashboard/overview.png)
+![HydraDNS dashboard](docs/screenshots/overview.png)
 
 ---
 
@@ -91,7 +91,6 @@ That's it. DNS filtering is active. Give this machine a static IP and point your
 |:--------|:----------|:-----|:-----|
 | Core (Control + Data Plane) | `apps/core` | Go 1.24, Gin, gRPC, GORM/SQLite | 8080, 53 |
 | Dashboard | `apps/ui` | Next.js 16, React 19, TypeScript, Tailwind | 3000 |
-| Landing Page | `apps/landing` | Vite, React 18, TypeScript | 3001 |
 | Scanner | `apps/scanner` | Go, network detection | — |
 | CLI + MCP | `apps/cli` | Go, Cobra, JSON-RPC 2.0 | — |
 
@@ -116,9 +115,9 @@ The web dashboard at `localhost:3000` lets you:
 - Create and delete DNS policies (block, allow, redirect)
 - Search and filter query logs
 
-![Query logs](apps/landing/src/assets/dashboard/query-logs.png)
+![Query logs](docs/screenshots/query-logs.png)
 
-![Policies](apps/landing/src/assets/dashboard/policies.png)
+![Policies](docs/screenshots/policies.png)
 
 ---
 
