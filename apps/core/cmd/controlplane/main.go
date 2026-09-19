@@ -19,10 +19,7 @@ import (
 
 func main() {
 	// Initialize database
-	dbPath := "/app/data/phantomdns.db"
-	if p := os.Getenv("HYDRA_DB"); p != "" {
-		dbPath = p
-	}
+	dbPath := db.ResolveDBPath(os.Getenv("HYDRA_DB"))
 	db.InitDB(dbPath)
 	repos := repositories.NewStore(db.DB)
 
