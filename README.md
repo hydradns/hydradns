@@ -32,7 +32,7 @@ Honest limits: like every DNS-layer filter, HydraDNS cannot stop a client that h
 
 ```bash
 # Clone with submodules
-git clone --recursive https://github.com/hydradns/hydradns.git
+git clone https://github.com/hydradns/hydradns.git
 cd hydradns
 
 # Start everything
