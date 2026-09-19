@@ -1,5 +1,5 @@
 name: 🐛 Bug Report
-description: Report a bug or issue with HydraCore
+description: Report a bug or issue with HydraDNS
 title: "[Bug]: "
 labels: ["bug", "triage"]
 assignees: []
@@ -15,8 +15,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: HydraCore Version
-      description: What version of HydraCore are you running?
+      label: HydraDNS Version
+      description: What version of HydraDNS are you running?
       placeholder: "e.g., v1.0.0 or commit hash"
     validations:
       required: true
@@ -25,7 +25,7 @@ body:
     id: deployment
     attributes:
       label: Deployment Method
-      description: How are you running HydraCore?
+      description: How are you running HydraDNS?
       options:
         - Docker Compose
         - Docker (manual)
@@ -65,7 +65,7 @@ body:
       label: Steps to Reproduce
       description: Steps to reproduce the behavior
       placeholder: |
-        1. Start HydraCore with config...
+        1. Start HydraDNS with config...
         2. Send DNS query for...
         3. Observe that...
     validations:
