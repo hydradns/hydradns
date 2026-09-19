@@ -1,26 +1,12 @@
 #!/bin/bash
+# One-time local setup for the HydraDNS monorepo.
+# The five services live under apps/ in this repo (no submodules), so a plain
+# clone already has everything. This script just prepares a local .env.
 set -e
 
-echo "Creating apps directory..."
-mkdir -p apps
+if [ ! -f .env ] && [ -f .env.example ]; then
+  cp .env.example .env
+  echo "Created .env from .env.example (edit it if you need non-default paths)."
+fi
 
-echo "Initializing submodules..."
-git submodule init
-git submodule update
-
-echo "Adding hydra-core submodule..."
-git submodule add https://github.com/hydradns/hydra-core apps/core
-
-echo "Adding hydra-ui submodule..."
-git submodule add https://github.com/hydradns/hydra-ui apps/ui
-
-echo "Adding scanner submodule..."
-git submodule add https://github.com/hydradns/scanner apps/scanner
-
-echo "Adding landing page submodule..."
-git submodule add https://github.com/hydradns/hydradns-landing apps/landing
-
-echo "Adding CLI submodule..."
-git submodule add https://github.com/hydradns/hydra-cli apps/cli
-
-echo "Setup complete!"
+echo "Setup complete. Start the stack with: docker compose up -d"

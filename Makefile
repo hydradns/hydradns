@@ -1,6 +1,6 @@
 .PHONY: setup start stop update logs core-logs ui-logs \
-       build-core build-ui build-landing build-scanner \
-       restart-core restart-ui restart-landing restart-scanner
+       build-core build-ui build-scanner \
+       restart-core restart-ui restart-scanner
 
 # --- Full Stack ---
 
@@ -17,8 +17,8 @@ stop:
 	docker compose down
 
 update:
-	@echo "Updating all submodules..."
-	git submodule update --remote --merge
+	@echo "Pulling latest..."
+	git pull --ff-only
 
 # --- Logs ---
 
@@ -34,8 +34,6 @@ ui-logs:
 scanner-logs:
 	docker compose logs -f scanner
 
-landing-logs:
-	docker compose logs -f landing
 
 # --- Per-service build & restart ---
 
@@ -45,8 +43,6 @@ build-core:
 build-ui:
 	docker compose build ui
 
-build-landing:
-	docker compose build landing
 
 build-scanner:
 	docker compose build scanner
@@ -57,8 +53,6 @@ restart-core:
 restart-ui:
 	docker compose up -d --build ui
 
-restart-landing:
-	docker compose up -d --build landing
 
 restart-scanner:
 	docker compose up -d --build scanner
