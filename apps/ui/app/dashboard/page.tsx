@@ -23,6 +23,7 @@ import {
   getBlocklists,
   getBypassAttempts,
 } from "@/lib/api"
+import { getApiBaseUrl } from "@/lib/api-base"
 import type {
   DashboardSummary,
   DnsEngineStatus,
@@ -238,7 +239,7 @@ export default function DashboardPage() {
         {error && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
             {error} — Is the API running on{" "}
-            {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}?
+            {getApiBaseUrl()}?
           </div>
         )}
 

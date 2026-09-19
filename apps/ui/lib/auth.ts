@@ -1,5 +1,8 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
-const API = `${BASE_URL}/api/v1`
+import { getApiBaseUrl } from "./api-base"
+
+function apiUrl(path: string): string {
+  return `${getApiBaseUrl()}/api/v1${path}`
+}
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null
@@ -19,7 +22,7 @@ export function clearToken() {
 // Returns: "complete" | "needs_setup" | "unreachable"
 export async function checkSetupStatus(): Promise<"complete" | "needs_setup" | "unreachable"> {
   try {
-    const res = await fetch(`${API}/auth/status`)
+    const res = await fetch(apiUrl("/auth/status"))
     const json = await res.json()
     return json.data?.setup_complete ? "complete" : "needs_setup"
   } catch {
@@ -28,7 +31,7 @@ export async function checkSetupStatus(): Promise<"complete" | "needs_setup" | "
 }
 
 export async function login(password: string): Promise<string> {
-  const res = await fetch(`${API}/auth/login`, {
+  const res = await fetch(apiUrl("/auth/login"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password }),
@@ -44,7 +47,7 @@ export async function setup(data: {
   password: string
   blocklists?: { id: string; name: string; url: string; format: string }[]
 }): Promise<string> {
-  const res = await fetch(`${API}/auth/setup`, {
+  const res = await fetch(apiUrl("/auth/setup"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
