@@ -1,5 +1,5 @@
 name: 🐛 Bug Report
-description: Report a bug or issue with PhantomCore
+description: Report a bug or issue with HydraCore
 title: "[Bug]: "
 labels: ["bug", "triage"]
 assignees: []
@@ -15,8 +15,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: PhantomCore Version
-      description: What version of PhantomCore are you running?
+      label: HydraCore Version
+      description: What version of HydraCore are you running?
       placeholder: "e.g., v1.0.0 or commit hash"
     validations:
       required: true
@@ -25,7 +25,7 @@ body:
     id: deployment
     attributes:
       label: Deployment Method
-      description: How are you running PhantomCore?
+      description: How are you running HydraCore?
       options:
         - Docker Compose
         - Docker (manual)
@@ -65,7 +65,7 @@ body:
       label: Steps to Reproduce
       description: Steps to reproduce the behavior
       placeholder: |
-        1. Start PhantomCore with config...
+        1. Start HydraCore with config...
         2. Send DNS query for...
         3. Observe that...
     validations:

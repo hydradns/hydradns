@@ -14,7 +14,7 @@ setup:
 
 # Build binaries
 build:
-	@echo "🏗️ Building PhantomCore..."
+	@echo "🏗️ Building HydraCore..."
 	buf lint
 	buf generate
 	@echo "🔨 Compiling binaries..."
@@ -113,7 +113,7 @@ proto-lint:
 # ============================================================================
 
 help:
-	@echo "PhantomDNS Development Commands:"
+	@echo "HydraDNS Development Commands:"
 	@echo ""
 	@echo "Build & Development:"
 	@echo "  setup        - Setup development environment"

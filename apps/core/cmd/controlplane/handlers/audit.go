@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lopster568/phantomDNS/internal/storage/models"
-	"github.com/lopster568/phantomDNS/internal/storage/repositories"
+	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydra-core/internal/storage/repositories"
 )
 
 // auditDTO is the wire shape for an audit event. BeforeJSON / AfterJSON

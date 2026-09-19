@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/PhantomDNS/scanner/internal/scanner"
+	"github.com/hydradns/scanner/internal/scanner"
 	"github.com/gin-gonic/gin"
 )
 

@@ -5,14 +5,14 @@ import (
 	"log"
 	"os"
 
-	"github.com/lopster568/phantomDNS/cmd/controlplane/handlers"
-	"github.com/lopster568/phantomDNS/cmd/controlplane/middlewares"
-	"github.com/lopster568/phantomDNS/cmd/controlplane/routes"
-	"github.com/lopster568/phantomDNS/internal/blocklist"
-	"github.com/lopster568/phantomDNS/internal/config"
-	client "github.com/lopster568/phantomDNS/internal/grpc/controlplane"
-	"github.com/lopster568/phantomDNS/internal/storage/db"
-	"github.com/lopster568/phantomDNS/internal/storage/repositories"
+	"github.com/hydradns/hydra-core/cmd/controlplane/handlers"
+	"github.com/hydradns/hydra-core/cmd/controlplane/middlewares"
+	"github.com/hydradns/hydra-core/cmd/controlplane/routes"
+	"github.com/hydradns/hydra-core/internal/blocklist"
+	"github.com/hydradns/hydra-core/internal/config"
+	client "github.com/hydradns/hydra-core/internal/grpc/controlplane"
+	"github.com/hydradns/hydra-core/internal/storage/db"
+	"github.com/hydradns/hydra-core/internal/storage/repositories"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,7 +20,7 @@ import (
 func main() {
 	// Initialize database
 	dbPath := "/app/data/phantomdns.db"
-	if p := os.Getenv("PHANTOM_DB"); p != "" {
+	if p := os.Getenv("HYDRA_DB"); p != "" {
 		dbPath = p
 	}
 	db.InitDB(dbPath)

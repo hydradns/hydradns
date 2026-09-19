@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lopster568/phantomDNS/internal/storage/models"
+	"github.com/hydradns/hydra-core/internal/storage/models"
 )
 
 func TestListAuditEvents_AdminSeesEverything(t *testing.T) {

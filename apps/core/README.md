@@ -95,7 +95,7 @@ The control plane and data plane services will be running in the background.
 Want to contribute? Great! We use a standard Go project layout:
 
 ```
-phantomcore/
+hydra-core/
 ├── cmd/                    # Main applications
 │   ├── controlplane/      # Admin API service
 │   └── dataplane/         # DNS server

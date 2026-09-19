@@ -1,4 +1,4 @@
-module github.com/PhantomDNS/scanner
+module github.com/hydradns/scanner
 
 go 1.25.4
 

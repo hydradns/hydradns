@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lopster568/phantomDNS/internal/blocklist/fetcher"
-	"github.com/lopster568/phantomDNS/internal/blocklist/parser"
-	"github.com/lopster568/phantomDNS/internal/logger"
-	"github.com/lopster568/phantomDNS/internal/storage/models"
-	"github.com/lopster568/phantomDNS/internal/storage/repositories"
+	"github.com/hydradns/hydra-core/internal/blocklist/fetcher"
+	"github.com/hydradns/hydra-core/internal/blocklist/parser"
+	"github.com/hydradns/hydra-core/internal/logger"
+	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydra-core/internal/storage/repositories"
 )
 
 // Engine orchestrates fetching, parsing, and persisting blocklist snapshots.

@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/PhantomDNS/scanner/internal/checks"
+	"github.com/hydradns/scanner/internal/checks"
 )
 
 // SystemResolver returns the first nameserver entry found in a resolv.conf file.

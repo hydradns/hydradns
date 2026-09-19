@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/lopster568/phantomDNS/internal/blocklist/parser"
+	"github.com/hydradns/hydra-core/internal/blocklist/parser"
 )
 
 type HTTPFetcher struct {

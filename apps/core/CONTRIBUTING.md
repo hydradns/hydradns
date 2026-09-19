@@ -2,7 +2,7 @@
 
 [![Hacktoberfest 2025](https://img.shields.io/badge/Hacktoberfest-2025-orange.svg)](https://hacktoberfest.com)
 
-Thank you for your interest in contributing to **PhantomCore**! 🚀 This DNS-layer security and privacy gateway project thrives because of contributors like you who bring improvements in code, documentation, testing, and design.
+Thank you for your interest in contributing to **HydraCore**! 🚀 This DNS-layer security and privacy gateway project thrives because of contributors like you who bring improvements in code, documentation, testing, and design.
 
 ## 🎃 Hacktoberfest 2025
 
@@ -82,8 +82,8 @@ We're participating in Hacktoberfest 2025! Here's how you can help:
 ### Local Development
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/phantomcore.git
-cd phantomcore
+git clone https://github.com/YOUR_USERNAME/hydra-core.git
+cd hydra-core
 
 # Install dependencies
 go mod download
@@ -140,7 +140,7 @@ When reporting bugs or requesting features:
 Understanding the codebase helps with contributions:
 
 ```
-phantomcore/
+hydra-core/
 ├── cmd/                    # Application entry points
 │   ├── controlplane/      # Control plane service
 │   └── dataplane/         # Data plane service
@@ -175,7 +175,7 @@ Contributors are recognized through:
 
 ## 📜 License
 
-By contributing to PhantomCore, you agree that your contributions will be licensed under the project's [MIT License](LICENSE).
+By contributing to HydraCore, you agree that your contributions will be licensed under the project's [MIT License](LICENSE).
 
 ---
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-module github.com/lopster568/phantomDNS
+module github.com/hydradns/hydra-core
 
 go 1.24.0
 

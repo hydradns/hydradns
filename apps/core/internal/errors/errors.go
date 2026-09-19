@@ -1,7 +1,7 @@
 package errors
 
 // This package is intended to hold custom error types and error handling
-// helpers for the PhantomDNS application.
+// helpers for the HydraDNS application.
 
 // For example:
 // type NotFoundError struct {
