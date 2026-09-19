@@ -31,9 +31,11 @@ import type {
   QueryLogFilters,
   QueryLogPage,
 } from "./types"
+import { getApiBaseUrl } from "./api-base"
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
-const API = `${BASE_URL}/api/v1`
+function apiUrl(path: string): string {
+  return `${getApiBaseUrl()}/api/v1${path}`
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const controller = new AbortController()
@@ -49,7 +51,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   try {
     const { headers: extraHeaders, ...restOptions } = options || {}
-    const res = await fetch(`${API}${path}`, {
+    const res = await fetch(apiUrl(path), {
       ...restOptions,
       headers: { ...headers, ...(extraHeaders as Record<string, string>) },
       signal: controller.signal,
