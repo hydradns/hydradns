@@ -52,21 +52,26 @@ GitHub Release for the pushed tag via `softprops/action-gh-release@v3`. That
 action creates the release automatically if one doesn't already exist for the
 tag — you don't need to create it by hand first.
 
-### Known limitation: NEXT_PUBLIC_API_URL is baked, not configurable at runtime
+### NEXT_PUBLIC_API_URL is baked, but the dashboard resolves the API at runtime
 
-The `ui` image is built with `NEXT_PUBLIC_API_URL=http://localhost:8080`
-(`release.yml`'s `build-args`). Next.js inlines `NEXT_PUBLIC_*` values into
-the client JS bundle at build time — a container env var at runtime does
-**not** change it. This means the published `ghcr.io/hydradns/ui` image only
-works correctly when the browser and the `core` container are reachable at
-`localhost:8080` from the browser's point of view, i.e. same machine. Anyone
-pulling the published image to reach the dashboard over a LAN IP or hostname
-must instead run `docker compose build ui` locally with `NEXT_PUBLIC_API_URL`
-set to their real address (see `docs/pi-deployment.md`). This is a real
-product limitation, not just a doc gap — a proper fix needs a code change in
-`apps/ui` (e.g. reading the API URL at runtime instead of inlining it), which
-is out of scope here. Don't advertise "just pull and go" for LAN/Pi
-deployments until that's fixed.
+The `ui` image is still built with `NEXT_PUBLIC_API_URL=http://localhost:8080`
+(`release.yml`'s `build-args`), and Next.js still inlines `NEXT_PUBLIC_*`
+values into the client JS bundle at build time. But the dashboard's runtime
+code (`apps/ui/lib/api-base.ts`) treats that specific baked value as a
+sentinel: unless the page itself is being viewed on localhost, it's ignored
+in favor of deriving the API host from the page's own URL (same protocol and
+hostname, port 8080). So the published `ghcr.io/hydradns/ui` image works
+correctly over a LAN IP with no rebuild — opening the dashboard at
+`http://192.168.1.53:3000` calls `http://192.168.1.53:8080` automatically.
+The corresponding control-plane CORS change is in
+`apps/core/cmd/controlplane/middlewares/cors.go`.
+
+`NEXT_PUBLIC_API_URL` is still needed, and still requires a rebuild
+(`docker compose build ui`), for two cases: a genuinely custom API address
+(e.g. a reverse proxy in front of the API), and a dashboard served over
+HTTPS — the derived API URL then defaults to `https://`, but the control
+plane has no TLS of its own, so that setup needs a proxy in front of the API
+too. See `docs/pi-deployment.md` for both.
 
 ## Pre-flight checks (before tagging)
 

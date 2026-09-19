@@ -49,7 +49,7 @@ This will:
    - Select blocklist sources
 3. You'll be redirected to the dashboard
 
-> **Dashboard blank or stuck on "loading"?** See [Dashboard not accessible from LAN](#dashboard-not-accessible-from-lan) below — the default CORS and API-URL settings only work when you browse from the same machine the containers run on.
+> **Dashboard blank or stuck on "loading"?** See [Dashboard not accessible from LAN](#dashboard-not-accessible-from-lan) below. Opening the dashboard by IP (e.g. `http://192.168.1.53:3000`) works with no configuration; a named host (`pi.local`, a reverse-proxy domain) needs one setting added.
 
 ## Give the Device a Static IP
 
@@ -272,46 +272,40 @@ sudo ufw allow 3000/tcp
 sudo ufw allow 8080/tcp
 ```
 
-If the page loads but never gets past "loading" (or the browser console shows
-CORS errors), it's almost always one of two settings that default to
-same-machine-only:
+Opening the dashboard by the Pi's LAN IP, e.g. `http://192.168.1.53:3000`,
+works with no configuration:
 
-1. **CORS_ORIGINS.** The control plane only accepts API requests whose
-   `Origin` header is in this comma-separated allowlist; it defaults to
-   `http://localhost:3000`. When you open the dashboard at
-   `http://<pi-ip>:3000`, the browser sends `Origin: http://<pi-ip>:3000`,
-   which does not match the default and gets rejected. Fix: add the LAN
-   origin in `.env` and restart the `core` service:
+- The dashboard's JS derives the control plane's address from the page's own
+  URL at runtime (same protocol and hostname, port 8080), so it calls
+  `http://192.168.1.53:8080` automatically. `NEXT_PUBLIC_API_URL` is only for
+  overriding this, e.g. a reverse proxy or an API on a different host/port.
+- The control plane's CORS allowlist (`CORS_ORIGINS`, default
+  `http://localhost:3000`) is checked first, but the API also auto-allows a
+  request whose `Origin` hostname matches the `Host` header it was reached
+  on, as long as that hostname is an IP literal or `localhost`. So
+  `Origin: http://192.168.1.53:3000` against `Host: 192.168.1.53:8080` is
+  allowed without touching `CORS_ORIGINS`.
+
+If the page loads but never gets past "loading" (or the browser console shows
+CORS errors), it's one of these two remaining cases:
+
+1. **You're using a named host, not an IP.** `pi.local`, `hydra.lan`, or a
+   reverse-proxy domain don't get the automatic CORS pass — that rule is
+   restricted to IP literals and `localhost` specifically to avoid DNS
+   rebinding (an attacker page rebinding a name to your Pi's IP would
+   otherwise pass the same check). Add the exact origin to `.env` and
+   restart the `core` service:
 
    ```bash
-   echo "CORS_ORIGINS=http://localhost:3000,http://<pi-ip>:3000" >> .env
+   echo "CORS_ORIGINS=http://localhost:3000,http://pi.local:3000" >> .env
    docker compose up -d core
    ```
 
-   (There is no safe default that works out of the box for every LAN — the
-   Pi's IP isn't known ahead of time, and defaulting to `*` would let any
-   website's JavaScript call your control plane. See `docker-compose.yml`
-   for the reasoning.)
-
-2. **NEXT_PUBLIC_API_URL.** The dashboard's own JS is compiled with a fixed
-   API URL — `http://localhost:8080` in the published `ghcr.io/hydradns/ui`
-   image — because Next.js inlines `NEXT_PUBLIC_*` variables into the client
-   bundle at build time, not at container start. A container env var change
-   does **not** affect an already-built image. If the dashboard loads but
-   every API call fails (check the browser's Network tab for requests to
-   `localhost:8080` instead of your Pi), you're hitting this. Fix: rebuild
-   the UI locally with the right value baked in, instead of pulling the
-   published image:
-
-   ```bash
-   echo "NEXT_PUBLIC_API_URL=http://<pi-ip>:8080" >> .env
-   docker compose build ui
-   docker compose up -d ui
-   ```
-
-   This is a real limitation of the current image, not just a config
-   knob — track it before recommending the published image for LAN-facing
-   deployments without a rebuild step.
+2. **The dashboard is served over HTTPS in front of a proxy.** The dashboard
+   derives an `https://` API URL to match its own page, but the control
+   plane itself has no TLS. Point the dashboard at the proxy's HTTPS
+   endpoint for the API too, via `NEXT_PUBLIC_API_URL`, or terminate TLS for
+   both dashboard and API behind the same proxy.
 
 ### Slow first startup
 
