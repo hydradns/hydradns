@@ -17,7 +17,7 @@ Block ads, malware, and trackers at the DNS level, before they ever reach your d
 |:--|:--|:--|
 | Core | Go, gRPC control/data plane split | C (pihole-FTL), embedded web server |
 | Setup | `docker compose up`, full stack in ~5 min | installer script or Docker |
-| AI management (MCP) | ✅ built in (`hydra mcp`, 9 tools: block/unblock, policies, logs, metrics) | ❌ third-party community bridges only |
+| AI management (MCP) | ✅ built in (`hydra mcp`, 14 tools: block/unblock, policies, logs, metrics, anomaly explain) | ❌ third-party community bridges only |
 | DoH bypass blocking | ✅ curated DoH bootstrap endpoints blocked at query time | ⚠️ Firefox canary domain only; add third-party lists for the rest |
 | Policies | priority-based allow/block/redirect via API, UI, or CLI | groups, regex, and per-client rules (more mature today) |
 | Maturity | young, pre-1.0, moving fast | 10+ years, huge community, built-in DHCP |
@@ -188,6 +188,12 @@ Add to your Claude Code MCP config:
 | `list_blocklists` | List blocklist sources |
 | `get_query_logs` | Recent DNS query logs |
 | `get_metrics` | Latency percentiles and performance grade |
+| `create_policy` | Create an allow/block/redirect policy |
+| `delete_policy` | Delete a policy by ID |
+| `bulk_unblock` | Remove block policies for many domains at once |
+| `get_weekly_summary` | Week-over-week query and block summary |
+| `explain_anomaly` | Explain a block-rate or volume anomaly |
+| `compare_to_last_month` | Compare current stats against the previous month |
 
 **Example conversation:** "Block all social media domains" — Claude calls `block_domain` for each domain.
 
