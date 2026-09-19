@@ -1,7 +1,7 @@
 # Binaries
 /bin/
-controlplane
-dataplane
+/controlplane
+/dataplane
 
 # Data
 /data/
