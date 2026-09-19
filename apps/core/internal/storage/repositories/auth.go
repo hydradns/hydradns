@@ -3,7 +3,7 @@ package repositories
 import (
 	"errors"
 
-	"github.com/lopster568/phantomDNS/internal/storage/models"
+	"github.com/hydradns/hydra-core/internal/storage/models"
 	"gorm.io/gorm"
 )
 

@@ -5,9 +5,9 @@ dataplane
 
 # Data
 /data/
-data/phantomdns.db
-data/phantomdns.db-shm
-data/phantomdns.db-wal
+data/hydradns.db
+data/hydradns.db-shm
+data/hydradns.db-wal
 tmp/
 
 # Build artifacts

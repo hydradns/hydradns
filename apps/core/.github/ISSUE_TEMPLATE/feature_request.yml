@@ -1,5 +1,5 @@
 name: ✨ Feature Request
-description: Suggest a new feature or enhancement for PhantomCore
+description: Suggest a new feature or enhancement for HydraCore
 title: "[Feature]: "
 labels: ["enhancement", "triage"]
 assignees: []
@@ -30,7 +30,7 @@ body:
       label: Proposed Solution
       description: Describe the feature you'd like to see implemented
       placeholder: |
-        I would like PhantomCore to...
+        I would like HydraCore to...
         The feature should work by...
         Users would interact with it by...
     validations:
@@ -50,7 +50,7 @@ body:
     id: component
     attributes:
       label: Component
-      description: Which part of PhantomCore would this feature affect?
+      description: Which part of HydraCore would this feature affect?
       options:
         - DNS Engine
         - Policy Engine

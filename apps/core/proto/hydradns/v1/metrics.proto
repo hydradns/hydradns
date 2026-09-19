@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package phantomdns.v1;
+package hydradns.v1;
 
-option go_package = "github.com/lopster568/phantomDNS/internal/gen/proto/phantomdns/v1;v1";
+option go_package = "github.com/hydradns/hydra-core/internal/gen/proto/hydradns/v1;v1";
 
 import "google/protobuf/empty.proto";
 

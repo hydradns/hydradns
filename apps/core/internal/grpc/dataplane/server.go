@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 
-	pb "github.com/lopster568/phantomDNS/internal/gen/proto/phantomdns/v1"
+	pb "github.com/hydradns/hydra-core/internal/gen/proto/hydradns/v1"
 	"google.golang.org/grpc"
 )
 

@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/lopster568/phantomDNS/internal/config"
-	"github.com/lopster568/phantomDNS/internal/logger"
+	"github.com/hydradns/hydra-core/internal/config"
+	"github.com/hydradns/hydra-core/internal/logger"
 	"github.com/miekg/dns"
 )
 

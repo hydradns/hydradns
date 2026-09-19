@@ -4,7 +4,7 @@ package config
 import (
 	"os"
 
-	"github.com/lopster568/phantomDNS/internal/logger"
+	"github.com/hydradns/hydra-core/internal/logger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -74,7 +74,7 @@ var DefaultConfig = func() *Config {
 }()
 
 func configPath() string {
-	if p := os.Getenv("PHANTOM_CONFIG"); p != "" {
+	if p := os.Getenv("HYDRA_CONFIG"); p != "" {
 		return p
 	}
 	return "/app/configs/config.yaml"

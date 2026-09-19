@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lopster568/phantomDNS/internal/storage/models"
+	"github.com/hydradns/hydra-core/internal/storage/models"
 )
 
 // Blocklist represents a blocklist source in API responses

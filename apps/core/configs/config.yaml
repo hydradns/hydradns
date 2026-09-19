@@ -4,7 +4,7 @@ dataplane:
     - "8.8.8.8:53"
     - "1.1.1.1:53"
   anonymization:
-    secret: "${PHANTOM_ANON_SECRET:-change-me-in-production}"
+    secret: "${HYDRA_ANON_SECRET:-change-me-in-production}"
   blocklist_update_interval: "6h"
   grpc_server:
     port: 50051

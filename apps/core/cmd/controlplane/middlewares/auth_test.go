@@ -10,8 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
-	"github.com/lopster568/phantomDNS/internal/storage/models"
-	"github.com/lopster568/phantomDNS/internal/storage/repositories"
+	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydra-core/internal/storage/repositories"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )

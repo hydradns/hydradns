@@ -6,9 +6,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/lopster568/phantomDNS/internal/logger"
-	"github.com/lopster568/phantomDNS/internal/storage/models"
-	"github.com/lopster568/phantomDNS/internal/storage/repositories"
+	"github.com/hydradns/hydra-core/internal/logger"
+	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydra-core/internal/storage/repositories"
 )
 
 const (

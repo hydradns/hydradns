@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lopster568/phantomDNS/cmd/controlplane/audit"
-	"github.com/lopster568/phantomDNS/internal/storage/models"
-	"github.com/lopster568/phantomDNS/internal/storage/repositories"
+	"github.com/hydradns/hydra-core/cmd/controlplane/audit"
+	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydra-core/internal/storage/repositories"
 )
 
 // exemptPaths never hit auth: health, setup wizard, and login. Setup is

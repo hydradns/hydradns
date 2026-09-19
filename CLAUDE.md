@@ -75,7 +75,7 @@ There is **no postgres or redis service** in compose. `core` writes to a Docker 
 
 ### Intent vs Reality (Control Plane ↔ Data Plane)
 
-The control plane maintains **desired state** in SQLite (source of truth). The data plane holds **actual runtime state**. When a change is made (e.g., toggle DNS engine), the control plane persists intent to DB, then applies it to the data plane via gRPC (`SetAcceptQueries`). Status endpoints return both desired and actual state combined. gRPC services defined in `proto/phantomdns/v1/status.proto`.
+The control plane maintains **desired state** in SQLite (source of truth). The data plane holds **actual runtime state**. When a change is made (e.g., toggle DNS engine), the control plane persists intent to DB, then applies it to the data plane via gRPC (`SetAcceptQueries`). Status endpoints return both desired and actual state combined. gRPC services defined in `proto/hydradns/v1/status.proto`.
 
 ### DNS Query Pipeline (4-step, early exit)
 
@@ -117,9 +117,9 @@ Single admin user model (`AdminCredential` singleton in DB). Bearer token auth o
 
 | Env Variable | Default | Description |
 |:-------------|:--------|:------------|
-| `PHANTOM_CONFIG` | `/app/configs/config.yaml` | Path to config file |
-| `PHANTOM_DB` | `/app/data/phantomdns.db` | SQLite database path |
-| `PHANTOM_POLICIES` | `configs/policies.json` | Policy file path |
+| `HYDRA_CONFIG` | `/app/configs/config.yaml` | Path to config file |
+| `HYDRA_DB` | `/app/data/hydradns.db` | SQLite database path |
+| `HYDRA_POLICIES` | `configs/policies.json` | Policy file path |
 | `CORS_ORIGINS` | `http://localhost:3000` | Allowed CORS origins |
 | `DNS_LISTEN_ADDR` | (from config) | Override DNS listen address |
 | `BLOCKLIST_UPDATE_INTERVAL` | `6h` | Blocklist refresh interval |

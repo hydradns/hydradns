@@ -310,9 +310,9 @@ Then give the device a static IP and point your router's DNS server to it. Full 
 
 | Env Variable | Default | Description |
 |:-------------|:--------|:------------|
-| `PHANTOM_CONFIG` | `configs/config.yaml` | Path to config file |
-| `PHANTOM_DB` | `phantomdns.db` | SQLite database path |
-| `PHANTOM_POLICIES` | `configs/policies.json` | Policy file path |
+| `HYDRA_CONFIG` | `configs/config.yaml` | Path to config file |
+| `HYDRA_DB` | `hydradns.db` | SQLite database path |
+| `HYDRA_POLICIES` | `configs/policies.json` | Policy file path |
 | `CORS_ORIGINS` | `http://localhost:3000` | Allowed CORS origins |
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
 | `BLOCK_RESPONSE` | `zero` | Answer for blocked domains: `zero` (A `0.0.0.0`), `nxdomain`, or `refused` |
