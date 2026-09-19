@@ -32,11 +32,18 @@ services:
       - HYDRA_CONFIG=/app/configs/config.yaml
       - HYDRA_DB=/app/data/hydradns.db
       - HYDRA_POLICIES=/app/configs/policies.json
-      # Safe default: only the dashboard's own origin may call the API.
-      # Reached over LAN (e.g. a Pi at http://192.168.1.53:3000)? The browser
-      # sends that Origin, not localhost, so you must add it here — see
-      # docs/pi-deployment.md#dashboard-not-accessible-from-lan.
+      # CORS_ORIGINS is the explicit allowlist (comma-separated), always
+      # checked first. On top of it, the API automatically allows a request
+      # whose Origin hostname matches the Host header it was reached on
+      # (ports ignored), as long as that hostname is an IP literal or
+      # "localhost" — this is what lets a dashboard opened at
+      # http://192.168.1.53:3000 call the API at http://192.168.1.53:8080
+      # with no config changes. Named hosts (pi.local, hydra.lan, a
+      # reverse-proxy domain) are not covered by that automatic rule and
+      # need an explicit entry here. Set CORS_ALLOW_SAME_HOST=false to turn
+      # the automatic rule off.
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - CORS_ALLOW_SAME_HOST=${CORS_ALLOW_SAME_HOST:-true}
     volumes:
       - core-data:/app/data
     healthcheck:
@@ -56,15 +63,14 @@ services:
       context: ./apps/ui
       dockerfile: Dockerfile
       args:
-        # NOTE: Next.js inlines NEXT_PUBLIC_* vars into the client JS bundle
-        # at build time; it cannot be changed by a container env var at
-        # runtime. The published ghcr.io/hydradns/ui image is always built
-        # with NEXT_PUBLIC_API_URL=http://localhost:8080 (see
-        # .github/workflows/release.yml), which only works when the browser
-        # and the core API are on the same machine. If you reach the
-        # dashboard via a LAN IP or hostname, `docker compose build` locally
-        # with this arg set to that address instead of pulling the published
-        # image — see docs/pi-deployment.md.
+        # The dashboard derives the API's host from the page's own URL at
+        # runtime (protocol + hostname, port 8080), so opening it at
+        # http://192.168.1.53:3000 calls http://192.168.1.53:8080 with no
+        # build changes. NEXT_PUBLIC_API_URL only needs to be set for an
+        # override: a reverse proxy, or an API on a different host/port
+        # than the dashboard. Next.js still inlines this value at build
+        # time, so a runtime env var alone won't change it in an
+        # already-built image — set it here and rebuild.
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
     restart: unless-stopped
     ports:
