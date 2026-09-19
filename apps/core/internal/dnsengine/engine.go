@@ -36,6 +36,16 @@ type Engine struct {
 	logWriter       *QueryLogWriter
 	threatDetector  *threat.Detector
 	cache           *ResponseCache
+
+	// anonymizeClientIPs gates whether logQuery hashes the client IP
+	// (utils.AnonymizeIP) before it's persisted to the query log. Off by
+	// default — per-device visibility in the query log is a core feature
+	// of a home/office DNS firewall — and opt-in via
+	// dataplane.anonymization.enabled / HYDRA_ANONYMIZE_CLIENT_IPS. Set
+	// once in NewDNSEngine, before the engine is handed to the DNS server,
+	// and never written again, so concurrent query handling never races on
+	// it.
+	anonymizeClientIPs bool
 }
 
 // Upstream exchange budget: short per-attempt timeout with retries beats
@@ -59,13 +69,14 @@ func NewDNSEngine(cfg config.DataPlaneConfig, repos *repositories.Store, pE *pol
 		return nil, err
 	}
 	return &Engine{
-		upstreamManager: mgr,
-		policyEngine:    pE,
-		state:           state,
-		metrics:         qm,
-		logWriter:       NewQueryLogWriter(repos.QueryLogs, repos.Statistics),
-		threatDetector:  threat.NewDetector(),
-		cache:           NewResponseCache(defaultCacheMaxEntries),
+		upstreamManager:    mgr,
+		policyEngine:       pE,
+		state:              state,
+		metrics:            qm,
+		logWriter:          NewQueryLogWriter(repos.QueryLogs, repos.Statistics),
+		threatDetector:     threat.NewDetector(),
+		cache:              NewResponseCache(defaultCacheMaxEntries),
+		anonymizeClientIPs: cfg.Anonymization.Enabled,
 	}, nil
 }
 
@@ -341,13 +352,22 @@ func (e *Engine) logQuery(domain, clientIP, action string, tr threat.Result) {
 	if e.logWriter == nil {
 		return
 	}
+	// This is the single place every stored query-log row is built, so
+	// it's the one place anonymization needs to be applied: whatever
+	// reaches here is exactly what SaveBatch persists. When disabled
+	// (default), storedClientIP is clientIP unchanged — byte-for-byte
+	// today's behavior.
+	storedClientIP := clientIP
+	if e.anonymizeClientIPs {
+		storedClientIP = anonymizeClientIP(clientIP)
+	}
 	// Non-blocking handoff to the batched writer; never spawns per-query
 	// goroutines or touches the DB on the hot path. The writer folds
 	// "flagged" into allowed counts and persists the row with its real
 	// action.
 	e.logWriter.Enqueue(&models.DNSQuery{
 		Domain:          domain,
-		ClientIP:        clientIP,
+		ClientIP:        storedClientIP,
 		Action:          action,
 		IsSuspicious:    tr.IsSuspicious,
 		ThreatScore:     tr.ThreatScore,
