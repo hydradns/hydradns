@@ -3,8 +3,23 @@ dataplane:
   upstream_resolvers:
     - "8.8.8.8:53"
     - "1.1.1.1:53"
+  # Hashes client IPs in the query log instead of storing them as-is.
+  # Disabled by default: per-device visibility in the query log is a core
+  # feature of a home/office DNS firewall, so this trades that away and
+  # must be opted into, not shipped on. Enable via HYDRA_ANONYMIZE_CLIENT_IPS
+  # (true/1) or by setting enabled: true here.
+  #
+  # secret is only used when enabled is true, and only if HYDRA_ANON_SECRET
+  # is not set in the environment. Leaving it at "change-me-in-production"
+  # (the default) is safe: on first boot, once anonymization is enabled,
+  # the dataplane generates a random per-install secret and persists it
+  # next to the database, instead of using this shared string as the HMAC
+  # key. Note this file is loaded as plain YAML — "${VAR:-default}"
+  # shell-style substitution is NOT expanded here; set the env var directly
+  # to override.
   anonymization:
-    secret: "${HYDRA_ANON_SECRET:-change-me-in-production}"
+    enabled: false
+    secret: "change-me-in-production"
   blocklist_update_interval: "6h"
   grpc_server:
     port: 50051
