@@ -1,5 +1,5 @@
 name: ❓ Question
-description: Ask a question about HydraCore
+description: Ask a question about HydraDNS
 title: "[Question]: "
 labels: ["question", "triage"]
 assignees: []
@@ -8,7 +8,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Have a question about HydraCore? 🤔
+        Have a question about HydraDNS? 🤔
         
         We're here to help! Please provide as much context as possible.
 
@@ -65,7 +65,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: HydraCore Version
+      label: HydraDNS Version
       description: What version are you using? (if relevant)
       placeholder: "e.g., v1.0.0"
 

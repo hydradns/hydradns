@@ -10,7 +10,7 @@ body:
       value: |
         Thanks for helping improve our documentation! 📖
         
-        Good documentation makes HydraCore more accessible to everyone.
+        Good documentation makes HydraDNS more accessible to everyone.
 
   - type: dropdown
     id: doc-type
@@ -68,7 +68,7 @@ body:
       label: Target Audience
       description: Who would benefit from this documentation improvement?
       placeholder: |
-        - New users trying to set up HydraCore
+        - New users trying to set up HydraDNS
         - Developers contributing to the project
         - System administrators deploying in production
         - etc.
