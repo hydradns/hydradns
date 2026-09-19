@@ -358,8 +358,14 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Encrypted-DNS bypass attempts (I-108) */}
-        <BypassPanel data={bypass} />
+        {/* Encrypted-DNS bypass attempts (I-108). Hidden by default: for
+            non-technical buyers, surfacing a filtering limitation on the
+            dashboard is an anti-feature (mitigations should be invisible).
+            Set NEXT_PUBLIC_SHOW_BYPASS_PANEL=true to opt in (e.g. for
+            technical/internal deployments). */}
+        {process.env.NEXT_PUBLIC_SHOW_BYPASS_PANEL === "true" && (
+          <BypassPanel data={bypass} />
+        )}
 
         {/* Recent Activity table */}
         <div className="bg-card rounded-xl border border-border/20 overflow-hidden">
