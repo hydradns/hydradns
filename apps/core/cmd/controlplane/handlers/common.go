@@ -10,6 +10,6 @@ func (h *APIHandler) HealthCheck(c *gin.Context) {
 
 func (h *APIHandler) Root(c *gin.Context) {
 	c.JSON(200, gin.H{
-		"message": "Welcome to PhantomDNS Control Plane API",
+		"message": "Welcome to HydraDNS Control Plane API",
 	})
 }
