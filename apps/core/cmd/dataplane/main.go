@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -17,17 +18,28 @@ import (
 	"github.com/hydradns/hydra-core/internal/storage/db"
 	"github.com/hydradns/hydra-core/internal/storage/models"
 	"github.com/hydradns/hydra-core/internal/storage/repositories"
+	"github.com/hydradns/hydra-core/internal/utils"
 )
 
 func main() {
-	logger.Log.Info("Starting PhantomDNS Data Plane...")
+	logger.Log.Info("Starting HydraDNS Data Plane...")
 
 	// 1. Initialize DB
-	dbPath := "/app/data/phantomdns.db"
-	if p := os.Getenv("HYDRA_DB"); p != "" {
-		dbPath = p
-	}
+	dbPath := db.ResolveDBPath(os.Getenv("HYDRA_DB"))
 	db.InitDB(dbPath)
+
+	// 1b. Anonymization secret — HMAC key AnonymizeIP uses to hash client
+	// IPs before they're written to the query log, IF anonymization is
+	// enabled (it's off by default: per-device visibility in the query log
+	// is a core feature, so this is opt-in). Resolving/generating a secret
+	// nobody will use is harmless but surprising, so skip it entirely when
+	// disabled. Must run, and InitSecret must be called, before the DNS
+	// server starts accepting queries (srv.Run() below) — utils.secret is
+	// a package global written once here and never again. Never logged.
+	if config.DefaultConfig.DataPlane.Anonymization.Enabled {
+		anonSecret := config.ResolveAnonymizationSecret(config.DefaultConfig.DataPlane.Anonymization.Secret, filepath.Dir(dbPath))
+		utils.InitSecret(anonSecret)
+	}
 
 	// 2. Initialize Repositories
 	repos := repositories.NewStore(db.DB)
