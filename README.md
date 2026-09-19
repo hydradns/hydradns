@@ -9,7 +9,7 @@
 [![CI](https://github.com/hydradns/hydradns/actions/workflows/ci.yml/badge.svg)](https://github.com/hydradns/hydradns/actions/workflows/ci.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
-**[Live demo and screenshots at hydradns.app](https://hydradns.app)**
+**[Screenshots and product site at hydradns.app](https://hydradns.app)** (a marketing site with static screenshots, not an interactive demo)
 
 ![HydraDNS dashboard](docs/screenshots/overview.png)
 
@@ -20,15 +20,15 @@
 | | HydraDNS | Pi-hole |
 |:--|:--|:--|
 | Core | Go, gRPC control/data plane split | C (pihole-FTL), embedded web server |
-| Setup | `docker compose up`, full stack in ~5 min | installer script or Docker |
+| Setup | `docker compose up -d` builds core + dashboard from source and starts both | installer script or Docker |
 | AI management (MCP) | ✅ built in (`hydra mcp`, 14 tools: block/unblock, policies, logs, metrics, anomaly explain) | ❌ third-party community bridges only |
 | DoH bypass blocking | ✅ curated DoH bootstrap endpoints blocked at query time | ⚠️ Firefox canary domain only; add third-party lists for the rest |
-| Policies | priority-based allow/block/redirect via API, UI, or CLI | groups, regex, and per-client rules (more mature today) |
+| Policies | priority-based allow/block/redirect via API or UI; CLI covers block/unblock/list/delete (no generic create yet) | groups, regex, and per-client rules (more mature today) |
 | Maturity | young, pre-1.0, moving fast | 10+ years, huge community, built-in DHCP |
 
 Choose Pi-hole today for battle-tested stability, regex rules, and community support. Choose HydraDNS for a hackable Go codebase, an API-first control plane, and AI-agent management over MCP that self-hosted alternatives only get through third-party bridges.
 
-Honest limits: like every DNS-layer filter, HydraDNS cannot stop a client that hardcodes a DoH server by raw IP. Pair it with a firewall rule on 443/853 to close that path.
+Honest limits: like every DNS-layer filter, HydraDNS cannot stop a client that hardcodes a DoH server by raw IP. Pair it with a firewall rule on 443/853 to close that path. For the fuller list — no TLS on the dashboard/gRPC yet, no DNSSEC, regex/wildcard policies not enforced, and more — see [docs/limitations.md](docs/limitations.md).
 
 
 ---
@@ -112,12 +112,15 @@ That's it. DNS filtering is active. Give this machine a static IP and point your
 
 ### DNS Query Pipeline
 
-Every DNS query goes through a 4-step pipeline with early exit:
+Every DNS query is scored by a heuristic threat detector (domain entropy, DGA-pattern,
+length, subdomain depth) — non-blocking, tags the query log only, no auto-block yet — then
+goes through this pipeline with early exit:
 
-1. **Blocklist check** — in-memory membership test; if the domain is blocked, respond per `BLOCK_RESPONSE` (default: A/AAAA → `0.0.0.0`/`::`; `nxdomain` and `refused` also available)
-2. **Policy evaluation** — Bloom filter for O(1) negative lookup, then exact match. Highest priority wins
-3. **Response cache** — TTL-respecting LRU for allowed queries; blocked/redirect responses are never cached
-4. **Upstream forward** — pool-per-resolver with failover (1.5s per-attempt timeout, 2 retries)
+1. **DoH bootstrap interception** — known DoH provider bootstrap hostnames get NXDOMAIN so browsers fall back to system DNS
+2. **Blocklist check** — in-memory membership test; if the domain is blocked, respond per `BLOCK_RESPONSE` (default: A/AAAA → `0.0.0.0`/`::`; `nxdomain` and `refused` also available)
+3. **Policy evaluation** — Bloom filter for O(1) negative lookup, then exact match. Highest priority wins
+4. **Response cache** — TTL-respecting LRU for allowed queries; blocked/redirect responses are never cached
+5. **Upstream forward** — pool-per-resolver with failover (1.5s per-attempt timeout, 2 retries)
 
 ---
 
@@ -278,7 +281,6 @@ hydradns/
 │   │   ├── configs/    #   config.yaml + policies.json
 │   │   └── proto/      #   gRPC protobuf definitions
 │   ├── ui/             # Next.js dashboard
-│   ├── landing/        # Vite marketing site
 │   ├── scanner/        # Network detection worker
 │   └── cli/            # CLI + MCP server
 │       ├── cmd/        #   Cobra commands
@@ -318,6 +320,7 @@ Then give the device a static IP and point your router's DNS server to it. Full 
 
 - [Deployment Guide](docs/pi-deployment.md) — install on a Raspberry Pi or any always-on machine; static IP setup (Linux, macOS, Windows), per-router DNS configuration, troubleshooting
 - [Hardware Guide](docs/hardware-guide.md) — choosing a device to run HydraDNS on
+- [Known Limitations](docs/limitations.md) — what's not implemented yet, with impact and workarounds
 
 ---
 
@@ -325,15 +328,20 @@ Then give the device a static IP and point your router's DNS server to it. Full 
 
 | Env Variable | Default | Description |
 |:-------------|:--------|:------------|
-| `HYDRA_CONFIG` | `configs/config.yaml` | Path to config file |
-| `HYDRA_DB` | `hydradns.db` | SQLite database path |
-| `HYDRA_POLICIES` | `configs/policies.json` | Policy file path |
-| `CORS_ORIGINS` | `http://localhost:3000` | Allowed CORS origins |
+| `HYDRA_CONFIG` | `/app/configs/config.yaml` | Path to config file |
+| `HYDRA_DB` | `/app/data/hydradns.db` | SQLite database path |
+| `HYDRA_POLICIES` | `/app/configs/policies.json` | Policy file path |
+| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` (compose sets `*` for local demos) | Comma-separated allowed CORS origins |
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
+| `HYDRA_TOKEN` | (none; falls back to `~/.hydra/token`) | CLI/MCP bearer token |
+| `MCP_ROLE` | `admin` | Scopes MCP tool access: `admin`, `operator` (no `toggle_engine`), or `reporter` (read-only) |
+| `HYDRA_ANONYMIZE_CLIENT_IPS` | `false` | Hash client IPs before writing them to the query log instead of storing them as-is; off by default |
 | `BLOCK_RESPONSE` | `zero` | Answer for blocked domains: `zero` (A `0.0.0.0`), `nxdomain`, or `refused` |
 | `BLOCKLIST_UPDATE_INTERVAL` | `6h` | Blocklist refresh interval |
 | `QUERY_LOG_RETENTION_DAYS` | `7` | Delete query logs older than N days; `0` disables |
 | `QUERY_LOG_MAX_ROWS` | `1000000` | Keep at most N newest query-log rows; `0` disables |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Dashboard build-time API base URL |
+| `NEXT_PUBLIC_SHOW_BYPASS_PANEL` | unset (hidden) | Build-time flag to show the DoH-bypass-attempts panel on the dashboard |
 
 ---
 

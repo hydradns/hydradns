@@ -12,7 +12,7 @@ For **job interviews / portfolio**, Phases 1-3 are the credible PoC. Phases 4-5 
 
 ---
 
-## Phase 1 — Solid Core (Current)
+## Phase 1 — Solid Core (Done)
 
 **Goal:** The DNS engine is correct, reliable, and testable.
 
@@ -23,11 +23,11 @@ For **job interviews / portfolio**, Phases 1-3 are the credible PoC. Phases 4-5 
 - gRPC control/data plane split
 - Bug fixes (SERVFAIL on errors, domain normalization, nil guards)
 - Config via env vars for local dev
-
-### Remaining
-- Unit tests for critical path: dnsengine, policy, blocklist, storage repos
-- Wire mock handlers to real storage (blocklists CRUD, policies CRUD, query logs)
-- Remove all mock data from control plane handlers
+- Unit tests for the critical path ✅ (`internal/dnsengine`, `internal/policy`, `internal/blocklist`,
+  `internal/storage` all have `_test.go` coverage)
+- Mock handlers wired to real storage ✅ — `blocklists.go`/`policies.go` call the real repos,
+  not in-memory mocks
+- Mock data removed from control plane handlers ✅
 
 ### Exit Criteria
 `go test ./...` passes with meaningful coverage on the query pipeline, and every API endpoint hits real storage.
@@ -102,22 +102,22 @@ Someone lands on the GitHub repo or landing page and can go from zero to running
 **Goal:** Move from "demoable portfolio piece" to "safe to leave running for a paying customer".
 
 ### Live bugs (blocking — fix first)
-- `UNIQUE constraint failed: statistics.id` on every query, logged repeatedly. Breaks stats increment intermittently. _Fixed on `apps/core feat/bypass-mitigations`._
-- Blocklist ingestion persists the source row but `domains_count` never leaves 0. Fetch/parse/snapshot pipeline is not being triggered (or is silently failing) on `POST /api/v1/blocklists`. _Fixed on `apps/core feat/bypass-mitigations` (immediate async fetch on create)._
+- `UNIQUE constraint failed: statistics.id` on every query, logged repeatedly. Breaks stats increment intermittently. ✅ Fixed — the statistics row is seeded once with `INSERT OR IGNORE` on startup (`internal/storage/db/db.go`).
+- Blocklist ingestion persists the source row but `domains_count` never leaves 0. ✅ Fixed — creating a source (via the API or the setup wizard) now triggers an immediate async `BlocklistEngine.UpdateSource` fetch instead of waiting for the next refresh cycle.
 
 ### Operability
-- **Query log retention** — rotation job + configurable max-age so `DNSQuery` stops growing forever
-- **TLS on dashboard and gRPC** — stop shipping `grpc.WithInsecure()` and plain-text admin auth
-- **Update mechanism** — `hydra update` or container self-pull so Pis stay current without SSH
-- **Remote monitoring** — per-Pi heartbeat + basic alerting for multi-customer deploys
-- **Bare-metal systemd unit** for Pi deploys that want to skip Docker
+- **Query log retention** — ✅ done: `startQueryLogRetention` runs on startup and on `QUERY_LOG_CLEANUP_INTERVAL`, bounded by `QUERY_LOG_RETENTION_DAYS` and `QUERY_LOG_MAX_ROWS`
+- **TLS on dashboard and gRPC** — still open; gRPC still dials with `grpc.WithInsecure() // TLS later`, dashboard has no HTTPS termination
+- **Update mechanism** — partially done: `hydra update` self-updates the CLI binary; the `core`/`ui` containers still have no self-pull
+- **Remote monitoring** — still open; no heartbeat/alert pipeline anywhere in `apps/core`
+- **Bare-metal systemd unit** for Pi deploys that want to skip Docker — still open
 
 ### Feature gaps
-- **Regex / wildcard policy evaluation** (parsed but not enforced at query time)
-- **Policy + blocklist edit UI** (today: create + delete only)
-- **Query log pagination** (hard-capped at 100 entries, no paging)
-- **Settings page** (UI stub, no backend wiring)
-- **`/api/v1/dns/resolvers`** returns mock data — wire upstream editing
+- **Regex / wildcard policy evaluation** — still open (parsed but not enforced at query time)
+- **Policy + blocklist edit UI** — still open on the backend (create + delete only, no `PUT`/`PATCH` route)
+- **Query log pagination** — still open (hard-capped at 100 entries via `ListRecent(100)`, no paging)
+- **Settings page** — still open (UI page exists, no backend route)
+- **`/api/v1/dns/resolvers`** — reads real upstream resolvers from config now (no longer mock data), but is still read-only; wiring upstream editing is still open
 - **Scanner** currently only reads `/etc/resolv.conf`; LAN client enumeration not implemented
 
 ### Polish
@@ -145,12 +145,15 @@ Phases 6–9 move HydraDNS from "demoable portfolio piece + free homelab tool" t
 These are the **three non-negotiable gaps** from the gap analysis plus the operability items the Tier 3 hardening already named.
 
 ### Multi-user + RBAC
-- Drop the `AdminCredential` singleton in favour of a proper `User` model with roles: `admin`, `operator`, `read_only`
-- Per-user bearer tokens with rotation
-- Audit log table: `actor_id`, `action`, `target`, `before`, `after`, `ip`, `ts` on every write endpoint
-- Dashboard: user-management page, per-user MFA (TOTP), session timeout
+- Drop the `AdminCredential` singleton in favour of a proper `User` model with roles: `admin`, `operator`, `read_only` ✅
+- Per-user bearer tokens with rotation ✅
+- Audit log table: `actor_id`, `action`, `target`, `before`, `after`, `ip`, `ts` on every write endpoint ✅
+- Dashboard: user-management page ✅ (`apps/ui/app/dashboard/users/page.tsx`); per-user MFA (TOTP) — still open; session timeout — only the blanket 90-day token expiry, no configurable per-session timeout
 
-_Backend landed on `apps/core feat/rbac-and-audit` (8 commits) — User/Token/AuditEvent models, repos, middleware with RequireRole, audit on every mutating handler, GET /audit, user + token CRUD. Dashboard UI is the remaining piece._
+Backend and dashboard UI are both merged to main — User/Token/AuditEvent models, repos,
+`RequireRole` middleware, audit on every mutating handler, `GET /audit`, user + token CRUD
+API, and a working dashboard page for all of it. Remaining: MFA/TOTP, configurable session
+timeout, and a CLI for user/token management (dashboard/API-only today).
 
 ### SSO (SAML + OIDC)
 - OIDC first (Okta, Google Workspace, Microsoft Entra all support it, less painful than SAML)
@@ -172,11 +175,11 @@ _Backend landed on `apps/core feat/rbac-and-audit` (8 commits) — User/Token/Au
 ### Operability (rolled up from Tier 3)
 - Fix the `statistics.id` UNIQUE bug ✅
 - Fix blocklist ingestion so `domains_count` actually populates ✅
-- Query log retention + rotation
-- TLS on gRPC + dashboard
-- `hydra update` + Docker self-pull
+- Query log retention + rotation ✅
+- TLS on gRPC + dashboard — still open
+- `hydra update` + Docker self-pull — CLI self-update done ✅; container self-pull still open
 
-### Bypass mitigations (shipped on `feat/bypass-mitigations`)
+### Bypass mitigations (shipped)
 - DoH/DoT bootstrap blocklist baked into the engine — invisible to the dashboard, defeats default-on browser DoH for >80% of cases ✅
 - Router config script (`hydra setup-router`) generates pfSense/MikroTik/OpenWrt/ASUS firewall rules that lock outbound DNS to the HydraDNS Pi and optionally blackhole known DoH provider IPs on `:443` ✅
 - `BLOCK_RESPONSE` env switch (`zero` / `nxdomain` / `refused`) so operators can A/B test response shapes per deployment ✅
@@ -220,8 +223,11 @@ A 20-person company's IT admin can set up HydraDNS, hook it to their Okta, give 
 - Active-active with shared state is phase 8; active-passive is good enough for SMB
 
 ### DNS tunneling detection
-- Heuristics: long labels, high per-query entropy, NXDOMAIN bursts, fast-flux domain lookups
-- Flag as "suspicious" in logs, optional auto-block by threshold
+- Heuristics ✅ partially done — `internal/threat` scores every query for high entropy,
+  DGA-style patterns, excessive length, and subdomain depth; NXDOMAIN bursts and fast-flux
+  domain lookups are still open
+- Flag as "suspicious" in logs ✅ (`DNSQuery.IsSuspicious`, dashboard has a "suspicious only"
+  log filter); optional auto-block by threshold — still open (flagged queries still resolve)
 
 ### Exit Criteria
 HydraDNS wins a side-by-side POC against DNSFilter for a mid-market customer: it matches on filtering quality, wins on price / privacy / self-hostability, and doesn't get knocked out by missing features in procurement's checklist.
@@ -232,12 +238,12 @@ HydraDNS wins a side-by-side POC against DNSFilter for a mid-market customer: it
 
 **Goal:** Lean into the one place HydraDNS is genuinely ahead of the incumbents: agent-first control. This is a parallel track, not sequential — spin it alongside Phase 6/7 work.
 
-- **MCP tool coverage:** every write operation in the dashboard has an equivalent MCP tool. Today we have 9; we'll need closer to 30 as the product grows.
-- **MCP guardrails:** role scoping on tokens (an agent with the "reporter" role cannot `toggle_engine`). Rate limits. Confirmation prompts surfaced to the client for destructive ops.
-- **Agent-first UX patterns:** `create_policy` batch ops already exist. Build more batch-first tools: `bulk_unblock`, `suggest_categories_for_client`, `explain_why_blocked`.
-- **First-party agent experience:** publish a ready-to-install MCP config for Claude Desktop, Claude Code, Gemini CLI, and Cursor. A "one-click" registration in the dashboard that copies the right config block.
-- **Agent-driven reporting:** instead of a static PDF, "ask the agent" — `get_weekly_summary`, `explain_anomaly`, `compare_to_last_month`.
-- **Marketing play:** put MCP front and center on the landing page. No competitor is doing this. It's the moat.
+- **MCP tool coverage:** every write operation in the dashboard has an equivalent MCP tool. Today we have 14 (`apps/cli/mcp/server.go`); we'll need closer to 30 as the product grows.
+- **MCP guardrails:** role scoping on tokens ✅ — `MCP_ROLE` (`admin`/`operator`/`reporter`) gates tool access, an `operator` cannot `toggle_engine`, unrecognized roles safe-default to `reporter` (`apps/cli/mcp/roles.go`). Confirmation-required annotations on destructive tools ✅ (`ToolAnnotations.ConfirmationRequired`). Rate limits — still open.
+- **Agent-first UX patterns:** `create_policy` batch ops ✅ and `bulk_unblock` ✅ already exist. Still open: `suggest_categories_for_client`, `explain_why_blocked`.
+- **First-party agent experience:** the README documents a ready-to-install Claude Code MCP config block; a Gemini CLI / Cursor config and a dashboard "one-click" registration are still open.
+- **Agent-driven reporting:** ✅ done — `get_weekly_summary`, `explain_anomaly`, `compare_to_last_month` are all live MCP tools.
+- **Marketing play:** put MCP front and center on the landing page (now a separate repo, `hydradns/hydradns-landing` — not verifiable from this repo).
 
 ### Exit Criteria
 A customer's IT admin can manage HydraDNS end-to-end via conversation with Claude. Pitch decks and case studies lead with "the AI-native DNS firewall", not with the feature list.
