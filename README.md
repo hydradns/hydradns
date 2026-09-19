@@ -337,6 +337,19 @@ Then give the device a static IP and point your router's DNS server to it. Full 
 
 ---
 
+
+## Contributing & Community
+
+Contributions are welcome, HydraDNS is pre-1.0 and there is a lot to build.
+
+- [Contributing guide](CONTRIBUTING.md) how to set up, build, and open a pull request
+- [Roadmap](ROADMAP.md) what is planned and where help is most useful
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md) report vulnerabilities privately
+- [Changelog](CHANGELOG.md)
+- [Discussions](https://github.com/hydradns/hydradns/discussions) questions and ideas
+
+
 ## License
 
 [GPL-3.0](LICENSE)
