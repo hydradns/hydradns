@@ -1,6 +1,6 @@
 # Project Overview
 
-This project is a DNS-layer security and privacy gateway called PhantomDNS. It's written in Go and uses a microservices architecture with two main components:
+This project is a DNS-layer security and privacy gateway called HydraDNS. It's written in Go and uses a microservices architecture with two main components:
 
 *   **Data Plane**: The core DNS server that handles DNS queries and applies security filtering. It's built using the `miekg/dns` library.
 *   **Control Plane**: An administrative API for configuration and monitoring. It's a web service built with the Gin framework.
@@ -9,11 +9,11 @@ The two services are designed to be run in Docker containers and communicate wit
 
 # Architecture
 
-PhantomDNS is composed of two main services: the `dataplane` and the `controlplane`.
+HydraDNS is composed of two main services: the `dataplane` and the `controlplane`.
 
 ## Dataplane
 
-The `dataplane` is the core of PhantomDNS. It is responsible for:
+The `dataplane` is the core of HydraDNS. It is responsible for:
 
 *   **DNS Query Processing**: The `dnsengine` package contains the main logic for handling DNS queries. It listens for incoming queries, processes them, and sends responses.
 *   **Blocklist Management**: The `blocklist` package fetches, parses, and stores blocklists from various sources. The `dnsengine` uses these blocklists to filter out malicious or unwanted domains.
@@ -47,8 +47,8 @@ The project can be built and run using Docker Compose.
 1.  **Clone the repository:**
 
     ```sh
-    git clone https://github.com/lopster568/PhantomDNS.git
-    cd PhantomDNS
+    git clone https://github.com/hydradns/hydra-core.git
+    cd HydraDNS
     ```
 
 2.  **Build and run using Docker Compose:**

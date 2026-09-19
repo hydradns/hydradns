@@ -7,13 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/lopster568/phantomDNS/internal/config"
-	"github.com/lopster568/phantomDNS/internal/logger"
-	"github.com/lopster568/phantomDNS/internal/metrics"
-	"github.com/lopster568/phantomDNS/internal/policy"
-	"github.com/lopster568/phantomDNS/internal/storage/models"
-	"github.com/lopster568/phantomDNS/internal/storage/repositories"
-	"github.com/lopster568/phantomDNS/internal/threat"
+	"github.com/hydradns/hydra-core/internal/config"
+	"github.com/hydradns/hydra-core/internal/logger"
+	"github.com/hydradns/hydra-core/internal/metrics"
+	"github.com/hydradns/hydra-core/internal/policy"
+	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydra-core/internal/storage/repositories"
+	"github.com/hydradns/hydra-core/internal/threat"
 	"github.com/miekg/dns"
 )
 

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lopster568/phantomDNS/cmd/controlplane/middlewares"
-	"github.com/lopster568/phantomDNS/internal/storage/models"
+	"github.com/hydradns/hydra-core/cmd/controlplane/middlewares"
+	"github.com/hydradns/hydra-core/internal/storage/models"
 	"golang.org/x/crypto/bcrypt"
 )
 

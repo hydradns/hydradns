@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	pb "github.com/lopster568/phantomDNS/internal/gen/proto/phantomdns/v1"
-	v1 "github.com/lopster568/phantomDNS/internal/gen/proto/phantomdns/v1"
+	pb "github.com/hydradns/hydra-core/internal/gen/proto/hydradns/v1"
+	v1 "github.com/hydradns/hydra-core/internal/gen/proto/hydradns/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 )

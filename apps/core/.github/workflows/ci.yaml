@@ -121,7 +121,7 @@ jobs:
         context: .
         file: ./docker/controlplane.Dockerfile
         push: false
-        tags: phantomcore/controlplane:test
+        tags: hydra-core/controlplane:test
 
     - name: 🐳 Build Data Plane Image
       uses: docker/build-push-action@v5
@@ -129,7 +129,7 @@ jobs:
         context: .
         file: ./docker/dataplane.Dockerfile
         push: false
-        tags: phantomcore/dataplane:test
+        tags: hydra-core/dataplane:test
 
     - name: 🧪 Test Docker Compose
       run: |

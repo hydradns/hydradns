@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/PhantomDNS/scanner/internal/checks"
-	"github.com/PhantomDNS/scanner/internal/detection"
+	"github.com/hydradns/scanner/internal/checks"
+	"github.com/hydradns/scanner/internal/detection"
 )
 
 type ScannerResult struct {

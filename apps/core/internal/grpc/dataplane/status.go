@@ -3,8 +3,8 @@ package dataplane
 import (
 	"context"
 
-	"github.com/lopster568/phantomDNS/internal/dnsengine"
-	pb "github.com/lopster568/phantomDNS/internal/gen/proto/phantomdns/v1"
+	"github.com/hydradns/hydra-core/internal/dnsengine"
+	pb "github.com/hydradns/hydra-core/internal/gen/proto/hydradns/v1"
 )
 
 type StatusService struct {

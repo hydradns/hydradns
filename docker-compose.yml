@@ -12,9 +12,9 @@ services:
       - "53:1053/udp"   # DNS (UDP)
       - "53:1053/tcp"   # DNS (TCP)
     environment:
-      - PHANTOM_CONFIG=/app/configs/config.yaml
-      - PHANTOM_DB=/app/data/phantomdns.db
-      - PHANTOM_POLICIES=/app/configs/policies.json
+      - HYDRA_CONFIG=/app/configs/config.yaml
+      - HYDRA_DB=/app/data/hydradns.db
+      - HYDRA_POLICIES=/app/configs/policies.json
       - CORS_ORIGINS=*
     volumes:
       - core-data:/app/data

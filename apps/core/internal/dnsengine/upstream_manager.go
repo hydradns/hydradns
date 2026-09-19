@@ -5,7 +5,7 @@ package dnsengine
 import (
 	"time"
 
-	"github.com/lopster568/phantomDNS/internal/logger"
+	"github.com/hydradns/hydra-core/internal/logger"
 	"github.com/miekg/dns"
 )
 

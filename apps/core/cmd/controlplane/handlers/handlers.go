@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"github.com/lopster568/phantomDNS/cmd/controlplane/audit"
-	"github.com/lopster568/phantomDNS/internal/blocklist"
-	client "github.com/lopster568/phantomDNS/internal/grpc/controlplane"
-	"github.com/lopster568/phantomDNS/internal/storage/repositories"
+	"github.com/hydradns/hydra-core/cmd/controlplane/audit"
+	"github.com/hydradns/hydra-core/internal/blocklist"
+	client "github.com/hydradns/hydra-core/internal/grpc/controlplane"
+	"github.com/hydradns/hydra-core/internal/storage/repositories"
 )
 
 // APIHandler contains dependencies for API endpoints

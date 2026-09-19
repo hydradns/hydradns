@@ -8,15 +8,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/lopster568/phantomDNS/internal/blocklist"
-	"github.com/lopster568/phantomDNS/internal/config"
-	"github.com/lopster568/phantomDNS/internal/dnsengine"
-	dataplanegrpc "github.com/lopster568/phantomDNS/internal/grpc/dataplane"
-	"github.com/lopster568/phantomDNS/internal/logger"
-	"github.com/lopster568/phantomDNS/internal/policy"
-	"github.com/lopster568/phantomDNS/internal/storage/db"
-	"github.com/lopster568/phantomDNS/internal/storage/models"
-	"github.com/lopster568/phantomDNS/internal/storage/repositories"
+	"github.com/hydradns/hydra-core/internal/blocklist"
+	"github.com/hydradns/hydra-core/internal/config"
+	"github.com/hydradns/hydra-core/internal/dnsengine"
+	dataplanegrpc "github.com/hydradns/hydra-core/internal/grpc/dataplane"
+	"github.com/hydradns/hydra-core/internal/logger"
+	"github.com/hydradns/hydra-core/internal/policy"
+	"github.com/hydradns/hydra-core/internal/storage/db"
+	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydra-core/internal/storage/repositories"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func main() {
 
 	// 1. Initialize DB
 	dbPath := "/app/data/phantomdns.db"
-	if p := os.Getenv("PHANTOM_DB"); p != "" {
+	if p := os.Getenv("HYDRA_DB"); p != "" {
 		dbPath = p
 	}
 	db.InitDB(dbPath)
@@ -67,7 +67,7 @@ func main() {
 	// 4. Initialize Policy Engine — load from file + DB
 	policyEngine := policy.NewPolicyEngine()
 	policiesPath := "/app/configs/policies.json"
-	if p := os.Getenv("PHANTOM_POLICIES"); p != "" {
+	if p := os.Getenv("HYDRA_POLICIES"); p != "" {
 		policiesPath = p
 	}
 	filePolicies, err := policy.LoadPoliciesFromFile(policiesPath)

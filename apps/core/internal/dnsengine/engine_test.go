@@ -4,8 +4,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/lopster568/phantomDNS/internal/metrics"
-	"github.com/lopster568/phantomDNS/internal/policy"
+	"github.com/hydradns/hydra-core/internal/metrics"
+	"github.com/hydradns/hydra-core/internal/policy"
 	"github.com/miekg/dns"
 )
 
