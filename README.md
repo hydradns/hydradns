@@ -3,7 +3,7 @@
 **A self-hosted DNS firewall you can manage by talking to an AI agent.** Block ads, malware, and trackers at the DNS level like Pi-hole, rebuilt in Go with an API-first control plane and a built-in Model Context Protocol server, so Claude or any MCP agent can run your network for you.
 
 
-[![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go)](https://go.dev)
+[![Go](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go)](https://go.dev)
 [![Next.js](https://img.shields.io/badge/Next.js-16-000?logo=next.js)](https://nextjs.org)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)](https://docs.docker.com/compose/)
 [![CI](https://github.com/hydradns/hydradns/actions/workflows/ci.yml/badge.svg)](https://github.com/hydradns/hydradns/actions/workflows/ci.yml)
@@ -29,6 +29,22 @@
 Choose Pi-hole today for battle-tested stability, regex rules, and community support. Choose HydraDNS for a hackable Go codebase, an API-first control plane, and AI-agent management over MCP that self-hosted alternatives only get through third-party bridges.
 
 Honest limits: like every DNS-layer filter, HydraDNS cannot stop a client that hardcodes a DoH server by raw IP. Pair it with a firewall rule on 443/853 to close that path.
+
+
+---
+
+## Why HydraDNS
+
+I spent 15 months building an enterprise next-generation firewall in Go, and kept
+wishing the self-hosted version of that tooling existed: something a home or
+small-office network could run, with a real API and a control plane you could
+drive from a script or an AI agent instead of a settings page. HydraDNS is that
+tool. The built-in Model Context Protocol server comes from the same work I do
+upstream as a CNCF Jaeger contributor, where I build MCP tooling for observability.
+
+It is pre-1.0 and moving fast. If it is useful to you, a star and an issue both help.
+
+Built by Roshan Singh ([@lopster568](https://github.com/lopster568)).
 
 ---
 
