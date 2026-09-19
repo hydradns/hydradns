@@ -1,5 +1,16 @@
 # HydraDNS demo: install to first block, one loop
-# Render: vhs demo/install.tape  (needs vhs + ttyd + ffmpeg)
+#
+# Prerequisites to actually render this (not needed just to read it):
+#   - vhs, ttyd, ffmpeg (https://github.com/charmbracelet/vhs)  ->  vhs demo/install.tape
+#   - A clean host with git, Docker + Compose v2, and a Go toolchain matching
+#     apps/cli/go.mod (no tagged release exists yet, so the `hydra` CLI must
+#     be built locally — there is no prebuilt binary to download until
+#     v0.1.0 ships GitHub Release assets per .github/workflows/release.yml).
+#   - Port 53 free on the host (see README's "Port 53 already in use?" note).
+#   - Default docker-compose.yml env: no CORS_ORIGINS/BLOCK_RESPONSE override,
+#     so the dataplane answers blocked queries with A 0.0.0.0 (the "zero"
+#     default — see apps/core/internal/dnsengine/engine.go respondBlocked).
+#
 # Keep output under 2 MB or it will not load on mobile previews.
 
 Output demo/demo.gif
@@ -18,12 +29,26 @@ Type "docker compose up -d"
 Enter
 Sleep 4s
 
+# doubleclick.net is blocked out of the box by the "block-ads" policy shipped
+# in apps/core/configs/policies.json — no setup wizard needed for this part.
 Type "dig @localhost doubleclick.net +short"
 Enter
 Sleep 2s
-Type "# REFUSED. Blocked by HydraDNS."
+Type "# 0.0.0.0 - blocked (BLOCK_RESPONSE=zero, the default; not REFUSED)"
 Enter
 Sleep 1.5s
+
+# The CLI has no prebuilt binary pre-release, so build it first.
+Type "cd apps/cli && go build -o hydra . && cd ../.."
+Enter
+Sleep 3s
+
+# hydra block calls the control-plane API, which requires a bearer token.
+# First boot has no admin account yet, so mint one via the setup endpoint
+# (equivalent to the dashboard's first-run setup wizard) before blocking.
+Type "TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/setup -H 'Content-Type: application/json' -d '{\"password\":\"changeme12345\"}' | grep -o '\"token\":\"[^\"]*\"' | cut -d'\"' -f4) && export HYDRA_TOKEN=$TOKEN"
+Enter
+Sleep 2s
 
 Type "./apps/cli/hydra block tiktok.com"
 Enter
@@ -31,4 +56,7 @@ Sleep 2s
 
 Type "dig @localhost tiktok.com +short"
 Enter
-Sleep 3s
+Sleep 2s
+Type "# 0.0.0.0 - blocked"
+Enter
+Sleep 1.5s

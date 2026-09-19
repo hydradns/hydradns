@@ -35,9 +35,10 @@ curl -fsSL https://raw.githubusercontent.com/hydradns/hydradns/main/scripts/inst
 This will:
 1. Clone the repository
 2. Disable `systemd-resolved` if it's blocking port 53
-3. Build Docker images for arm64
-4. Start all services
-5. Print your Pi's IP address and dashboard URL
+3. Start all services — pulling the published `linux/arm64` images from GHCR
+   if a release exists, or building from source locally as a fallback
+   otherwise (see `docs/releasing.md`)
+4. Print your Pi's IP address and dashboard URL
 
 ## First-Time Setup
 
@@ -47,6 +48,8 @@ This will:
    - Choose upstream DNS providers
    - Select blocklist sources
 3. You'll be redirected to the dashboard
+
+> **Dashboard blank or stuck on "loading"?** See [Dashboard not accessible from LAN](#dashboard-not-accessible-from-lan) below — the default CORS and API-URL settings only work when you browse from the same machine the containers run on.
 
 ## Give the Device a Static IP
 
@@ -182,7 +185,7 @@ Point your router's DNS server to your device's static IP address. This makes ev
 
 ## Critical: DNS Configuration
 
-**Do NOT set a secondary/fallback DNS** (like 8.8.8.8) on the router. When HydraDNS blocks a domain by returning REFUSED, the operating system will try the secondary DNS server, which resolves the domain normally — bypassing the filter entirely.
+**Do NOT set a secondary/fallback DNS** (like 8.8.8.8) on the router. By default HydraDNS answers a blocked query with `A 0.0.0.0` (`BLOCK_RESPONSE=zero`, the default — see the `BLOCK_RESPONSE` env var), which most clients treat as "connection refused" and stop there. But some clients and routers just move on to the secondary DNS server on *any* non-standard answer, which resolves the domain normally and bypasses the filter entirely — this risk is worse if you switch `BLOCK_RESPONSE` to `refused`, which some OSes and routers explicitly treat as a signal to fail over.
 
 - **Primary DNS:** Your HydraDNS server IP
 - **Secondary DNS:** Leave empty (or set to the same HydraDNS IP)
@@ -204,9 +207,9 @@ From any device on the network:
 # Check DNS resolves through HydraDNS
 dig @<pi-ip> example.com
 
-# Check a known blocked domain
-dig @<pi-ip> ads.google.com
-# Should return REFUSED if blocklists are active
+# Check a known blocked domain (blocked by the default "block-ads" policy)
+dig @<pi-ip> doubleclick.net
+# Should return 0.0.0.0 (BLOCK_RESPONSE=zero, the default) if blocking is active
 ```
 
 Or open the dashboard at `http://<pi-ip>:3000` and watch the query log update in real time.
@@ -227,8 +230,8 @@ docker compose up -d
 
 # Update
 git pull
-docker compose build
-docker compose up -d
+docker compose pull   # fetch the latest published core/ui images, if any
+docker compose up -d  # recreates containers; builds from source only if no image was pulled
 ```
 
 ## CLI (Optional)
@@ -260,7 +263,7 @@ docker compose restart core
 
 ### Dashboard not accessible from LAN
 
-Check the Pi's firewall:
+First check the Pi's firewall:
 
 ```bash
 sudo ufw allow 53/udp
@@ -269,9 +272,54 @@ sudo ufw allow 3000/tcp
 sudo ufw allow 8080/tcp
 ```
 
+If the page loads but never gets past "loading" (or the browser console shows
+CORS errors), it's almost always one of two settings that default to
+same-machine-only:
+
+1. **CORS_ORIGINS.** The control plane only accepts API requests whose
+   `Origin` header is in this comma-separated allowlist; it defaults to
+   `http://localhost:3000`. When you open the dashboard at
+   `http://<pi-ip>:3000`, the browser sends `Origin: http://<pi-ip>:3000`,
+   which does not match the default and gets rejected. Fix: add the LAN
+   origin in `.env` and restart the `core` service:
+
+   ```bash
+   echo "CORS_ORIGINS=http://localhost:3000,http://<pi-ip>:3000" >> .env
+   docker compose up -d core
+   ```
+
+   (There is no safe default that works out of the box for every LAN — the
+   Pi's IP isn't known ahead of time, and defaulting to `*` would let any
+   website's JavaScript call your control plane. See `docker-compose.yml`
+   for the reasoning.)
+
+2. **NEXT_PUBLIC_API_URL.** The dashboard's own JS is compiled with a fixed
+   API URL — `http://localhost:8080` in the published `ghcr.io/hydradns/ui`
+   image — because Next.js inlines `NEXT_PUBLIC_*` variables into the client
+   bundle at build time, not at container start. A container env var change
+   does **not** affect an already-built image. If the dashboard loads but
+   every API call fails (check the browser's Network tab for requests to
+   `localhost:8080` instead of your Pi), you're hitting this. Fix: rebuild
+   the UI locally with the right value baked in, instead of pulling the
+   published image:
+
+   ```bash
+   echo "NEXT_PUBLIC_API_URL=http://<pi-ip>:8080" >> .env
+   docker compose build ui
+   docker compose up -d ui
+   ```
+
+   This is a real limitation of the current image, not just a config
+   knob — track it before recommending the published image for LAN-facing
+   deployments without a rebuild step.
+
 ### Slow first startup
 
-The first `docker compose build` on a Pi can take 10-15 minutes. Subsequent starts use cached images and take under 30 seconds.
+If a tagged release exists, `docker compose up -d` pulls prebuilt `linux/arm64`
+images and should be quick (network-bound). If no release exists yet, or the
+images aren't public, Compose falls back to building from source, and the
+first `docker compose build` on a Pi can take 10-15 minutes. Subsequent
+starts use cached images/layers either way and take under 30 seconds.
 
 ### SD card wear
 

@@ -1,8 +1,25 @@
+# Pull-first, build-fallback:
+#
+# Every service below declares both `image:` and `build:`. Per the Compose
+# Build Specification, when both are present and `pull_policy` is left unset,
+# Compose tries to pull the named image first and only builds from source if
+# that image isn't found in the registry or the local platform cache
+# (https://docs.docker.com/reference/compose-file/build/, "When Compose is
+# confronted with both a build subsection for a service and an image
+# attribute..."). Concretely:
+#   - After a GHCR release exists: `docker compose up -d` pulls the published
+#     image and never compiles anything.
+#   - Before the first release, or offline with no cached image: the pull
+#     fails to resolve and Compose builds locally from `build:`, exactly like
+#     today. Contributors can still force a rebuild with `docker compose build`
+#     or `docker compose up -d --build`.
+# Do not add an explicit `pull_policy:` here — it would remove this fallback.
 services:
   # -------------------------------------------------------------------------
   # CORE (Combined controlplane + dataplane)
   # -------------------------------------------------------------------------
   core:
+    image: ghcr.io/hydradns/core:${HYDRA_VERSION:-latest}
     build:
       context: ./apps/core
       dockerfile: Dockerfile
@@ -15,7 +32,11 @@ services:
       - HYDRA_CONFIG=/app/configs/config.yaml
       - HYDRA_DB=/app/data/hydradns.db
       - HYDRA_POLICIES=/app/configs/policies.json
-      - CORS_ORIGINS=*
+      # Safe default: only the dashboard's own origin may call the API.
+      # Reached over LAN (e.g. a Pi at http://192.168.1.53:3000)? The browser
+      # sends that Origin, not localhost, so you must add it here — see
+      # docs/pi-deployment.md#dashboard-not-accessible-from-lan.
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
     volumes:
       - core-data:/app/data
     healthcheck:
@@ -30,16 +51,26 @@ services:
   # ADMIN UI (Dashboard)
   # -------------------------------------------------------------------------
   ui:
+    image: ghcr.io/hydradns/ui:${HYDRA_VERSION:-latest}
     build:
       context: ./apps/ui
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=http://localhost:8080
+        # NOTE: Next.js inlines NEXT_PUBLIC_* vars into the client JS bundle
+        # at build time; it cannot be changed by a container env var at
+        # runtime. The published ghcr.io/hydradns/ui image is always built
+        # with NEXT_PUBLIC_API_URL=http://localhost:8080 (see
+        # .github/workflows/release.yml), which only works when the browser
+        # and the core API are on the same machine. If you reach the
+        # dashboard via a LAN IP or hostname, `docker compose build` locally
+        # with this arg set to that address instead of pulling the published
+        # image — see docs/pi-deployment.md.
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
     depends_on:
       core:
         condition: service_healthy
@@ -48,6 +79,8 @@ services:
 
   # -------------------------------------------------------------------------
   # SCANNER (Network Scanner Worker) — optional, not required for demo
+  # Not part of the published release (no GHCR image, no CI job for it), so
+  # this stays build-only. Uncomment to run it locally.
   # -------------------------------------------------------------------------
   # scanner:
   #   build:
@@ -57,10 +90,6 @@ services:
   #     - core
   #   networks:
   #     - hydra-net
-
-  # -------------------------------------------------------------------------
-  # LANDING PAGE (Marketing) — optional, not required for demo
-  # -------------------------------------------------------------------------
 
 networks:
   hydra-net:
