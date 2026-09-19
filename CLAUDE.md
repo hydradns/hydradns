@@ -162,7 +162,8 @@ expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/
 | `HYDRA_CONFIG` | `/app/configs/config.yaml` | Path to config file (`internal/config/config.go`) |
 | `HYDRA_DB` | `/app/data/hydradns.db` (`db.DefaultDBPath`) | SQLite database path. Resolved via `db.ResolveDBPath` (`internal/storage/db/dbpath.go`), which falls back to a pre-rename `phantomdns.db` in the same directory if that's the only DB file an existing install has — a one-time upgrade path, not the default for new installs |
 | `HYDRA_POLICIES` | `/app/configs/policies.json` | Policy file path (`cmd/dataplane/main.go`) |
-| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated allowed CORS origins (`cmd/controlplane/middlewares/cors.go`). The shipped `docker-compose.yml` overrides this to `*` for local demos |
+| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated allowed CORS origins (`cmd/controlplane/middlewares/cors.go`). The shipped `docker-compose.yml` sets `http://localhost:3000`. `*` still works but logs a warning |
+| `CORS_ALLOW_SAME_HOST` | `true` | Also allow an Origin whose hostname equals the request's Host hostname when that hostname is an IP literal or `localhost` (dashboard opened by LAN IP). Named hosts need a `CORS_ORIGINS` entry. Set `false` to disable |
 | `DNS_LISTEN_ADDR` | (from config, normally `0.0.0.0:1053`) | Override DNS listen address |
 | `BLOCKLIST_UPDATE_INTERVAL` | `6h` | Blocklist refresh interval |
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
@@ -176,7 +177,7 @@ expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/
 | `QUERY_LOG_RETENTION_DAYS` | `7` | Delete query logs older than N days; 0 disables |
 | `QUERY_LOG_MAX_ROWS` | `1000000` | Keep at most N newest query-log rows (SD-card insurance); 0 disables |
 | `QUERY_LOG_CLEANUP_INTERVAL` | `1h` | How often the retention loop runs |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Dashboard build-time API base URL (`apps/ui`, baked in at build, see compose `build.args`) |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Dashboard API base URL override, inlined at build time. Left at the default, the dashboard derives the API URL at runtime from the page's own protocol and hostname on port 8080 (`apps/ui/lib/api-base.ts`); set it only for a reverse proxy or a non-default API host/port |
 | `NEXT_PUBLIC_SHOW_BYPASS_PANEL` | unset (hidden) | Build-time flag to show the DoH-bypass-attempts panel on the dashboard; set to `true` for technical/internal deployments (`apps/ui/app/dashboard/page.tsx`) |
 
 Query-log IP note: client IP anonymization is implemented and wired into `Engine.logQuery`
@@ -240,9 +241,9 @@ split — everything below is main, checked at the branch point in this worktree
 - Settings page — dashboard page exists (`apps/ui/app/dashboard/settings/page.tsx`) and calls
   `getSettings`/`updateSettings`, but there is no `/settings` route or handler anywhere on
   the control plane — backend wiring is still absent
-- CORS origins — default is `http://localhost:3000,http://127.0.0.1:3000`; the shipped
-  `docker-compose.yml` overrides this to `*` for local demos, which is not what a production
-  deployment should use
+- CORS origins — explicit allowlist plus an automatic same-host rule for IP literals and
+  `localhost`; a dashboard reached by a named host (`pi.local`, a reverse-proxy domain) needs
+  its origin added to `CORS_ORIGINS`
 - Container self-update — none for the `core`/`ui` containers; the CLI does have `hydra
   update` self-update for the `hydra` binary itself (`apps/cli/cmd/update.go`)
 - Remote monitoring — no heartbeat/alert pipeline anywhere in `apps/core`
