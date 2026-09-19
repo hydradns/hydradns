@@ -1,13 +1,17 @@
 # HydraDNS
 
-**Network-wide DNS filtering in the spirit of Pi-hole, rebuilt in Go: gRPC control plane, modern dashboard, DoH-bypass blocking, and an MCP server in the box so Claude or any AI agent can manage your network.**
+**A self-hosted DNS firewall you can manage by talking to an AI agent.** Block ads, malware, and trackers at the DNS level like Pi-hole, rebuilt in Go with an API-first control plane and a built-in Model Context Protocol server, so Claude or any MCP agent can run your network for you.
 
-Block ads, malware, and trackers at the DNS level, before they ever reach your devices. Self-hosted, private, and fast.
 
 [![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go)](https://go.dev)
 [![Next.js](https://img.shields.io/badge/Next.js-16-000?logo=next.js)](https://nextjs.org)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)](https://docs.docker.com/compose/)
+[![CI](https://github.com/hydradns/hydradns/actions/workflows/ci.yml/badge.svg)](https://github.com/hydradns/hydradns/actions/workflows/ci.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+
+**[Live demo and screenshots at hydradns.app](https://hydradns.app)**
+
+![HydraDNS dashboard](apps/landing/src/assets/dashboard/overview.png)
 
 ---
 
@@ -31,7 +35,7 @@ Honest limits: like every DNS-layer filter, HydraDNS cannot stop a client that h
 ## Quick Start
 
 ```bash
-# Clone with submodules
+# Clone (single repo, no submodules)
 git clone https://github.com/hydradns/hydradns.git
 cd hydradns
 
@@ -44,6 +48,11 @@ dig @localhost example.com
 # Check the dashboard
 open http://localhost:3000
 ```
+
+> **Port 53 already in use?** On Linux or WSL2, `systemd-resolved` may already hold port 53.
+> Free it before starting: `sudo systemctl disable --now systemd-resolved` (then set a DNS
+> server in `/etc/resolv.conf`), or edit the port mapping in `docker-compose.yml`.
+> See [docs/pi-deployment.md](docs/pi-deployment.md) for details.
 
 That's it. DNS filtering is active. Give this machine a static IP and point your router's DNS to it — see [docs/pi-deployment.md](docs/pi-deployment.md) for static IP setup on Linux, macOS, and Windows plus per-router DNS instructions.
 
@@ -107,7 +116,9 @@ The web dashboard at `localhost:3000` lets you:
 - Create and delete DNS policies (block, allow, redirect)
 - Search and filter query logs
 
-<!-- TODO: Add screenshot -->
+![Query logs](apps/landing/src/assets/dashboard/query-logs.png)
+
+![Policies](apps/landing/src/assets/dashboard/policies.png)
 
 ---
 
