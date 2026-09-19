@@ -14,8 +14,8 @@ Thanks for your interest in contributing! HydraDNS is an open-source DNS securit
 ### Development Setup
 
 ```bash
-# Clone with submodules
-git clone --recursive https://github.com/hydradns/hydradns.git
+# Clone (single repo, no submodules)
+git clone https://github.com/hydradns/hydradns.git
 cd hydradns
 
 # Start the full stack
@@ -29,17 +29,18 @@ cd apps/cli && go build -o hydra .
 
 ## Repository Structure
 
-This is a monorepo of Git submodules. Each service has its own repository:
+This is a single monorepo. Each service lives under `apps/`:
 
-| Service | Repo |
+| Service | Path |
 |:--------|:-----|
-| Core | `hydradns/hydra-core` |
-| Dashboard | `hydradns/hydra-ui` |
-| Landing | `hydradns/hydradns-landing` |
-| Scanner | `hydradns/scanner` |
-| CLI | `hydradns/hydra-cli` |
+| Core (control + data plane) | `apps/core` |
+| Dashboard | `apps/ui` |
+| Scanner | `apps/scanner` |
+| CLI | `apps/cli` |
 
-Work inside each `apps/<service>` directory and push to that service's repo.
+Work inside the relevant `apps/<service>` directory and open one pull request
+against this repository. The landing site (hydradns.app) is maintained separately
+at `hydradns/hydradns-landing`.
 
 ## Making Changes
 

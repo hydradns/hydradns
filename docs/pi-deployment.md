@@ -226,7 +226,7 @@ docker compose stop
 docker compose up -d
 
 # Update
-git pull --recurse-submodules
+git pull
 docker compose build
 docker compose up -d
 ```
