@@ -24,9 +24,6 @@ jobs:
           - service: ui
             context: apps/ui
             build-args: "NEXT_PUBLIC_API_URL=http://localhost:8080"
-          - service: landing
-            context: apps/landing
-            build-args: ""
     steps:
       - uses: actions/checkout@v4
 
