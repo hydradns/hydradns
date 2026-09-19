@@ -1,0 +1,51 @@
+{
+  "version": "v1.0.0",
+  "entity": {
+    "type": "individual",
+    "role": "owner",
+    "name": "Roshan Singh",
+    "email": "inbox@roshansingh.systems",
+    "description": "Go systems engineer working on DNS, network security and observability tooling. Maintainer of HydraDNS; upstream contributor to CNCF Jaeger.",
+    "webpageUrl": {
+      "url": "https://roshansingh.systems"
+    }
+  },
+  "projects": [
+    {
+      "guid": "hydradns",
+      "name": "HydraDNS",
+      "description": "Network-wide DNS filtering rebuilt in Go: a gRPC control/data plane split, a web dashboard, DoH-bypass blocking, and a built-in Model Context Protocol server exposing 14 tools so an AI agent can manage the DNS firewall directly. Self-hosted and GPL-3.0.",
+      "webpageUrl": {
+        "url": "https://github.com/hydradns/hydradns"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/hydradns/hydradns",
+        "wellKnown": "https://github.com/hydradns/hydradns/blob/main/funding.json"
+      },
+      "licenses": ["spdx:GPL-3.0-only"],
+      "tags": ["dns", "network-security", "self-hosted", "golang", "privacy", "adblocking", "mcp"]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "bank-in",
+        "type": "bank",
+        "address": "",
+        "description": "Direct bank transfer to an Indian account (INR). Details shared on request."
+      }
+    ],
+    "plans": [
+      {
+        "guid": "hardening-2026",
+        "status": "active",
+        "name": "Security hardening and pre-1.0 stabilisation",
+        "description": "Dedicated engineering time to take HydraDNS from a working pre-1.0 tool to something a cautious operator can run on a home or small-office network: hardening the resolver path, expanding test coverage, a security review of the gRPC control plane, and documentation.",
+        "amount": 600000,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": ["bank-in"]
+      }
+    ]
+  }
+}
