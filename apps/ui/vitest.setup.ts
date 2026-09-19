@@ -6,6 +6,40 @@ import "@testing-library/jest-dom/vitest"
 // Provide minimal shims so component tests can render dialogs, drawers, and
 // switches without throwing.
 if (typeof window !== "undefined") {
+  // Node's own built-in `localStorage`/`sessionStorage` globals (stable since
+  // Node 22) shadow jsdom's working implementation: Vitest's jsdom environment
+  // only forwards window keys that aren't already present as global keys, and
+  // Node defines these two unconditionally (returning `undefined` unless
+  // `--localstorage-file` is passed). Without this shim every `localStorage.*`
+  // call in app code throws `Cannot read properties of undefined`. Replace
+  // both with a minimal in-memory Storage implementation.
+  const createMemoryStorage = (): Storage => {
+    let store = new Map<string, string>()
+    return {
+      getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+      setItem: (key: string, value: string) => {
+        store.set(key, String(value))
+      },
+      removeItem: (key: string) => {
+        store.delete(key)
+      },
+      clear: () => {
+        store = new Map<string, string>()
+      },
+      key: (index: number) => Array.from(store.keys())[index] ?? null,
+      get length() {
+        return store.size
+      },
+    }
+  }
+
+  if (!window.localStorage) {
+    window.localStorage = createMemoryStorage()
+  }
+  if (!window.sessionStorage) {
+    window.sessionStorage = createMemoryStorage()
+  }
+
   if (!window.matchMedia) {
     window.matchMedia = (query: string) =>
       ({
