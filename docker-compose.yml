@@ -61,14 +61,6 @@ services:
   # -------------------------------------------------------------------------
   # LANDING PAGE (Marketing) — optional, not required for demo
   # -------------------------------------------------------------------------
-  # landing:
-  #   build:
-  #     context: ./apps/landing
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "3001:80"
-  #   networks:
-  #     - hydra-net
 
 networks:
   hydra-net:
