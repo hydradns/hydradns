@@ -10,46 +10,42 @@ jobs:
   core:
     name: Core (Go)
     runs-on: ubuntu-latest
+    env:
+      GOWORK: "off"
     defaults:
       run:
         working-directory: apps/core
     steps:
       - uses: actions/checkout@v4
-        with:
-
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
-
+          go-version-file: apps/core/go.mod
       - name: Vet
         run: go vet ./...
-
       - name: Test
         run: go test -race -coverprofile=coverage.out ./...
-
       - name: Build controlplane
         run: go build -o /dev/null ./cmd/controlplane
-
       - name: Build dataplane
         run: go build -o /dev/null ./cmd/dataplane
 
   cli:
     name: CLI (Go)
     runs-on: ubuntu-latest
+    env:
+      GOWORK: "off"
     defaults:
       run:
         working-directory: apps/cli
     steps:
       - uses: actions/checkout@v4
-        with:
-
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
-
+          go-version-file: apps/cli/go.mod
       - name: Vet
         run: go vet ./...
-
+      - name: Test
+        run: go test ./...
       - name: Build
         run: go build -o /dev/null .
 
@@ -61,18 +57,13 @@ jobs:
         working-directory: apps/ui
     steps:
       - uses: actions/checkout@v4
-        with:
-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-
       - name: Install
         run: npm ci
-
       - name: Lint
         run: npm run lint
-
       - name: Build
         run: npm run build
 
@@ -84,18 +75,13 @@ jobs:
         working-directory: apps/landing
     steps:
       - uses: actions/checkout@v4
-        with:
-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-
       - name: Install
         run: npm ci
-
       - name: Lint
         run: npm run lint
-
       - name: Build
         run: npm run build
 
@@ -105,13 +91,9 @@ jobs:
     needs: [core, cli, dashboard, landing]
     steps:
       - uses: actions/checkout@v4
-        with:
-
       - name: Build core
         run: docker build -t hydradns/core:test apps/core
-
       - name: Build dashboard
         run: docker build -t hydradns/ui:test apps/ui --build-arg NEXT_PUBLIC_API_URL=http://localhost:8080
-
       - name: Build landing
         run: docker build -t hydradns/landing:test apps/landing
