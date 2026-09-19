@@ -331,7 +331,8 @@ Then give the device a static IP and point your router's DNS server to it. Full 
 | `HYDRA_CONFIG` | `/app/configs/config.yaml` | Path to config file |
 | `HYDRA_DB` | `/app/data/hydradns.db` | SQLite database path |
 | `HYDRA_POLICIES` | `/app/configs/policies.json` | Policy file path |
-| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` (compose sets `*` for local demos) | Comma-separated allowed CORS origins |
+| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` (compose sets `http://localhost:3000`) | Comma-separated allowed CORS origins |
+| `CORS_ALLOW_SAME_HOST` | `true` | Also allow the dashboard when it is opened by the box's own IP address (Origin host equals the API host and is an IP or `localhost`). Named hosts need a `CORS_ORIGINS` entry |
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
 | `HYDRA_TOKEN` | (none; falls back to `~/.hydra/token`) | CLI/MCP bearer token |
 | `MCP_ROLE` | `admin` | Scopes MCP tool access: `admin`, `operator` (no `toggle_engine`), or `reporter` (read-only) |
@@ -340,7 +341,7 @@ Then give the device a static IP and point your router's DNS server to it. Full 
 | `BLOCKLIST_UPDATE_INTERVAL` | `6h` | Blocklist refresh interval |
 | `QUERY_LOG_RETENTION_DAYS` | `7` | Delete query logs older than N days; `0` disables |
 | `QUERY_LOG_MAX_ROWS` | `1000000` | Keep at most N newest query-log rows; `0` disables |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Dashboard build-time API base URL |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Dashboard API URL override (build time). By default the dashboard uses the page's own hostname on port 8080 |
 | `NEXT_PUBLIC_SHOW_BYPASS_PANEL` | unset (hidden) | Build-time flag to show the DoH-bypass-attempts panel on the dashboard |
 
 ---
