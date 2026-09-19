@@ -55,10 +55,10 @@ fi
 if [ -d "$INSTALL_DIR" ]; then
     info "Updating existing installation at $INSTALL_DIR"
     cd "$INSTALL_DIR"
-    git pull --recurse-submodules
+    git pull --ff-only
 else
     info "Cloning HydraDNS to $INSTALL_DIR"
-    git clone --recursive -b "$BRANCH" "$REPO" "$INSTALL_DIR"
+    git clone -b "$BRANCH" "$REPO" "$INSTALL_DIR"
     cd "$INSTALL_DIR"
 fi
 

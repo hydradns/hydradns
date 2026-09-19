@@ -10,7 +10,7 @@ Set Height 600
 Set TypingSpeed 40ms
 Set Theme "Catppuccin Mocha"
 
-Type "git clone --recursive https://github.com/hydradns/hydradns.git && cd hydradns"
+Type "git clone https://github.com/hydradns/hydradns.git && cd hydradns"
 Enter
 Sleep 2s
 

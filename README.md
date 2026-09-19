@@ -219,7 +219,7 @@ Add to your Claude Code MCP config:
 
 ### Working on a Service
 
-Each service is a separate Git submodule. Work inside the service directory:
+Each service lives under `apps/` in this repo. Work inside its directory:
 
 ```bash
 cd apps/core
@@ -240,10 +240,10 @@ go build -o hydra .  # Build CLI binary
 ### Full Stack Commands (from root)
 
 ```bash
-make setup        # Initialize submodules
+make setup        # One-time local setup (.env)
 make start        # docker compose up -d
 make stop         # docker compose down
-make update       # Pull latest submodule changes
+make update       # git pull --ff-only
 make logs         # Tail all logs
 make build-core   # Rebuild core service
 make restart-core # Rebuild + restart core

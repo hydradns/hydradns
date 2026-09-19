@@ -4,17 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HydraDNS is a DNS-layer security and privacy gateway built as a monorepo of Git submodules orchestrated by Docker Compose. Each service lives in its own GitHub repository and is aggregated here under `apps/`.
+HydraDNS is a DNS-layer security and privacy gateway built as a single monorepo orchestrated by Docker Compose. Each service lives under `apps/` in this repository.
 
 ## Build & Run Commands
 
 ### Full Stack (root)
-- `make setup` — initialize submodules and project
+- `make setup` — one-time local setup (.env)
 - `make start` — `docker compose up -d` (all services)
 - `make stop` — `docker compose down`
-- `make update` — pull latest submodule changes (`git submodule update --remote --merge`)
-- `make logs` / `make core-logs` / `make ui-logs` / `make scanner-logs` / `make landing-logs` — tail logs
-- `make build-core` / `make build-ui` / `make build-landing` / `make build-scanner` — build individual services
+- `make update` — `git pull --ff-only`
+- `make logs` / `make core-logs` / `make ui-logs` / `make scanner-logs` — tail logs
+- `make build-core` / `make build-ui` / `make build-scanner` — build individual services
 - `make restart-core` / `make restart-ui` / etc. — rebuild and restart a single service
 
 ### Core (Go DNS Engine) — `apps/core/`
@@ -29,10 +29,6 @@ HydraDNS is a DNS-layer security and privacy gateway built as a monorepo of Git 
 - `npm run dev` — dev server on port 3000
 - `npm run build` / `npm run lint`
 
-### Landing (Vite + React) — `apps/landing/`
-- `npm run dev` — dev server on port 3001
-- `npm run build` / `npm run lint`
-- `npm run test` / `npm run test:watch` — Vitest with jsdom
 
 ### CLI — `apps/cli/`
 - `go build -o hydra .` — build CLI binary
@@ -60,10 +56,9 @@ Root (orchestrator)
 │   └── proto/              — Protobuf definitions (buf for codegen → internal/gen/proto/)
 │   NOTE: in production compose, controlplane + dataplane run as one combined `core` container
 ├── apps/ui         — Next.js 16, React 19, TypeScript, Tailwind v4, shadcn/ui (port 3000)
-├── apps/landing    — Vite, React 18, TypeScript, Tailwind v3, shadcn/ui (port 3001)
 ├── apps/scanner    — Go 1.25, network scanning worker (no exposed port; commented out in compose)
 ├── apps/cli        — Cobra CLI + MCP stdio server (talks to controlplane API)
-├── docker-compose.yml          — base: only `core` and `ui` are active; scanner/landing commented out
+├── docker-compose.yml          — base: only `core` and `ui` are active; scanner commented out
 ├── docker-compose.override.yml — local-dev overlay (auto-merged): WSL2-safe DNS port, `BLOCK_RESPONSE` env
 ├── docs/                       — user-facing docs; docs/internal/ (gitignored) — phase plans, critiques, report.md
 └── scripts/                    — setup.sh, install.sh, stress-test.sh
@@ -156,7 +151,7 @@ Note: SQLite `DELETE` reuses freed pages rather than shrinking the file, so the 
 
 ## Known Incomplete Features
 
-(Accurate for the shipped stack — i.e. the pinned submodule checkouts — as of 2026-09-01.)
+(Accurate for the shipped stack as of 2026-09-01.)
 
 - Regex/wildcard policy evaluation — parsed but not evaluated at query time (fix exists on `apps/core origin/feat/enforce-regex-wildcard-policies`, unmerged)
 - TLS on gRPC — uses `grpc.WithInsecure()`
@@ -180,9 +175,6 @@ All control plane responses use a standard envelope:
 {"status": "success", "data": {...}, "error": "message if error"}
 ```
 
-## Submodule Workflow
-
-Each app is a separate Git repo (see `.gitmodules`). Clone with `git clone --recursive`. Work inside each `apps/<service>` directory and push to that service's repo. Run `make update` from root to sync. Submodule URLs all live under `github.com/hydradns/`.
 
 ## Docs & session retrospectives
 
@@ -191,7 +183,7 @@ Each app is a separate Git repo (see `.gitmodules`). Clone with `git clone --rec
 ## CI
 
 Two GitHub Actions workflows:
-- `ci.yml` — on push/PR to main: vet + test core, vet + build CLI, lint + build dashboard, lint + build landing, Docker build verification
+- `ci.yml` — on push/PR to main: vet + test core, vet + build CLI, lint + build dashboard, Docker build verification
 - `release.yml` — on tag push: multi-arch Docker images (amd64/arm64) to GHCR + cross-compiled CLI binaries
 
 ## Known Live Bugs (caught in real stack)
