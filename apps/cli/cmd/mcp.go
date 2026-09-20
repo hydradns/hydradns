@@ -23,7 +23,7 @@ var mcpCmd = &cobra.Command{
 		"request must carry a bearer token. The HTTP transport carries management traffic only\n" +
 		"(engine/policy control), never DNS query data.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		server := mcpserver.NewServer(client)
+		server := mcpserver.NewServer(client, Version)
 
 		// Default (no --http): stdio transport, unchanged.
 		if mcpHTTPAddr == "" {

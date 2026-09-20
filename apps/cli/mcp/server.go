@@ -121,57 +121,106 @@ type CallToolParams struct {
 
 // Server
 
+// defaultServerVersion is reported in serverInfo.version when the caller
+// (cmd/mcp.go, or a test using NewServerWithRole) doesn't supply one. It
+// intentionally does not hardcode a CLI version string — see NewServer.
+const defaultServerVersion = "dev"
+
 type Server struct {
-	client apiClient
-	role   Role
+	client  apiClient
+	role    Role
+	version string
 }
 
 // NewServer constructs an MCP server, resolving its permission role from the
 // MCP_ROLE environment variable. When MCP_ROLE is unset the server runs as
 // admin (no restriction), preserving prior behaviour.
-func NewServer(client *api.Client) *Server {
-	return &Server{client: client, role: resolveRole(os.Getenv("MCP_ROLE"))}
+//
+// version is reported to MCP clients in the "initialize" response's
+// serverInfo.version. Callers pass cmd.Version (see cmd/mcp.go) so the MCP
+// handshake reports the same version as `hydra version` instead of a
+// separate hardcoded string that silently drifts from it. mcp cannot
+// import cmd itself (cmd already imports mcp), hence the parameter instead
+// of a direct reference.
+func NewServer(client *api.Client, version string) *Server {
+	if version == "" {
+		version = defaultServerVersion
+	}
+	return &Server{client: client, role: resolveRole(os.Getenv("MCP_ROLE")), version: version}
 }
 
 // NewServerWithRole constructs a server with an explicit role, bypassing the
-// MCP_ROLE environment lookup. Primarily useful for tests.
+// MCP_ROLE environment lookup. Primarily useful for tests; reports
+// defaultServerVersion since tests don't generally care about it.
 func NewServerWithRole(client *api.Client, role Role) *Server {
-	return &Server{client: client, role: role}
+	return &Server{client: client, role: role, version: defaultServerVersion}
 }
 
-func (s *Server) tools() []Tool {
-	list := []Tool{
-		{
-			Name:        "get_status",
-			Description: "Get DNS engine status and query statistics",
-			InputSchema: InputSchema{Type: "object"},
-		},
-		{
-			Name:        "toggle_engine",
-			Description: "Enable or disable the DNS engine",
-			InputSchema: InputSchema{
+// toolSpec pairs a Tool definition with its read-only classification. This
+// is the single source of truth for a tool's identity: its registration
+// (name, description, schema) and whether it only reads state travel
+// together, so there is nowhere else — an annotation step, a role check —
+// that can independently guess at classification from the tool's name.
+//
+// classified is set only by roTool/mutTool: a toolSpec built any other way
+// (a bare struct literal) leaves it false, which
+// TestToolRegistryAllClassified treats as "nobody decided this tool's
+// classification" rather than silently defaulting to mutating.
+type toolSpec struct {
+	Tool
+	ReadOnly   bool
+	classified bool
+}
+
+// roTool registers a read-only tool: it may only ever query state, so it
+// is always permitted for every MCP role and never marked
+// confirmation-required.
+func roTool(name, description string, schema InputSchema) toolSpec {
+	return toolSpec{
+		Tool:       Tool{Name: name, Description: description, InputSchema: schema},
+		ReadOnly:   true,
+		classified: true,
+	}
+}
+
+// mutTool registers a mutating tool: subject to role restrictions and
+// annotated confirmation-required.
+func mutTool(name, description string, schema InputSchema) toolSpec {
+	return toolSpec{
+		Tool:       Tool{Name: name, Description: description, InputSchema: schema},
+		ReadOnly:   false,
+		classified: true,
+	}
+}
+
+// toolRegistry is the full, ordered list of tools this server exposes. It
+// is the single place a new tool is added, and the single place its
+// read-only/mutating classification is declared.
+func toolRegistry() []toolSpec {
+	return []toolSpec{
+		roTool("get_status", "Get DNS engine status and query statistics",
+			InputSchema{Type: "object"}),
+
+		mutTool("toggle_engine", "Enable or disable the DNS engine",
+			InputSchema{
 				Type: "object",
 				Properties: map[string]any{
 					"enabled": Property{Type: "boolean", Description: "true to enable, false to disable"},
 				},
 				Required: []string{"enabled"},
-			},
-		},
-		{
-			Name:        "block_domain",
-			Description: "Block a domain by creating a block policy",
-			InputSchema: InputSchema{
+			}),
+
+		mutTool("block_domain", "Block a domain by creating a block policy",
+			InputSchema{
 				Type: "object",
 				Properties: map[string]any{
 					"domain": Property{Type: "string", Description: "Domain name to block (e.g. ads.example.com)"},
 				},
 				Required: []string{"domain"},
-			},
-		},
-		{
-			Name:        "create_policy",
-			Description: "Create a DNS policy to block, allow, or redirect multiple domains in one rule. Use this instead of block_domain when handling multiple domains (e.g. 'block all social media').",
-			InputSchema: InputSchema{
+			}),
+
+		mutTool("create_policy", "Create a DNS policy to block, allow, or redirect multiple domains in one rule. Use this instead of block_domain when handling multiple domains (e.g. 'block all social media').",
+			InputSchema{
 				Type: "object",
 				Properties: map[string]any{
 					"name":     Property{Type: "string", Description: "Human-readable policy name (e.g. 'Block Social Media')"},
@@ -180,60 +229,51 @@ func (s *Server) tools() []Tool {
 					"priority": Property{Type: "integer", Description: "Priority (higher wins). Default 100."},
 				},
 				Required: []string{"name", "action", "domains"},
-			},
-		},
-		{
-			Name:        "unblock_domain",
-			Description: "Remove a block policy by its ID",
-			InputSchema: InputSchema{
+			}),
+
+		mutTool("unblock_domain", "Remove a block policy by its ID",
+			InputSchema{
 				Type: "object",
 				Properties: map[string]any{
 					"policy_id": Property{Type: "string", Description: "The policy ID to remove"},
 				},
 				Required: []string{"policy_id"},
-			},
-		},
-		{
-			Name:        "list_policies",
-			Description: "List all DNS policies",
-			InputSchema: InputSchema{Type: "object"},
-		},
-		{
-			Name:        "list_blocklists",
-			Description: "List blocklist sources and domain counts",
-			InputSchema: InputSchema{Type: "object"},
-		},
-		{
-			Name:        "get_query_logs",
-			Description: "Get recent DNS query logs",
-			InputSchema: InputSchema{Type: "object"},
-		},
-		{
-			Name:        "get_metrics",
-			Description: "Get DNS query performance metrics including latency percentiles",
-			InputSchema: InputSchema{Type: "object"},
-		},
-		{
-			Name:        "get_weekly_summary",
-			Description: "Get a natural-language rollup of DNS security activity (traffic, block rate, performance, and protection coverage) built from live stats, metrics, and query logs. Best for an at-a-glance report.",
-			InputSchema: InputSchema{Type: "object"},
-		},
-		{
-			Name:        "explain_anomaly",
-			Description: "Inspect current DNS activity and describe anything unusual (elevated error rate, degraded latency, block-rate spikes, or a single client dominating traffic). Optionally pass a baseline to compare against.",
-			InputSchema: InputSchema{
+			}),
+
+		roTool("list_policies", "List all DNS policies",
+			InputSchema{Type: "object"}),
+
+		roTool("list_blocklists", "List blocklist sources and domain counts",
+			InputSchema{Type: "object"}),
+
+		roTool("get_query_logs", "Get recent DNS query logs",
+			InputSchema{Type: "object"}),
+
+		roTool("get_metrics", "Get DNS query performance metrics including latency percentiles",
+			InputSchema{Type: "object"}),
+
+		roTool("get_weekly_summary", "Get a natural-language rollup of DNS security activity (traffic, block rate, performance, and protection coverage) built from live stats, metrics, and query logs. Best for an at-a-glance report.",
+			InputSchema{Type: "object"}),
+
+		// explain_anomaly and compare_to_last_month only read data (dashboard
+		// summary, metrics, query logs) — they must be classified read-only
+		// here even though their names don't start with get_/list_. That
+		// naming mismatch is exactly the bug this registry replaces: a
+		// prefix-based heuristic previously treated both as mutating, which
+		// blocked the reporter role from calling them and marked them
+		// confirmation-required for no reason.
+		roTool("explain_anomaly", "Inspect current DNS activity and describe anything unusual (elevated error rate, degraded latency, block-rate spikes, or a single client dominating traffic). Optionally pass a baseline to compare against.",
+			InputSchema{
 				Type: "object",
 				Properties: map[string]any{
 					"baseline_block_rate":     Property{Type: "number", Description: "Prior block rate percent to compare current block rate against (optional)"},
 					"max_error_rate_percent":  Property{Type: "number", Description: "Error-rate threshold that counts as an anomaly. Default 5.0"},
 					"block_rate_jump_percent": Property{Type: "number", Description: "Increase in block rate (percentage points) vs baseline that counts as a spike. Default 15.0"},
 				},
-			},
-		},
-		{
-			Name:        "compare_to_last_month",
-			Description: "Compare current DNS traffic and block rate against a baseline window (e.g. last month) and describe the changes in plain language. Supply the baseline figures from a prior summary.",
-			InputSchema: InputSchema{
+			}),
+
+		roTool("compare_to_last_month", "Compare current DNS traffic and block rate against a baseline window (e.g. last month) and describe the changes in plain language. Supply the baseline figures from a prior summary.",
+			InputSchema{
 				Type: "object",
 				Properties: map[string]any{
 					"baseline_total_queries":   Property{Type: "integer", Description: "Total queries during the baseline period (optional)"},
@@ -241,40 +281,39 @@ func (s *Server) tools() []Tool {
 					"baseline_block_rate":      Property{Type: "number", Description: "Block rate percent during the baseline period (optional)"},
 					"label":                    Property{Type: "string", Description: "Name of the baseline period for the report. Default 'last month'"},
 				},
-			},
-		},
-		{
-			Name:        "bulk_unblock",
-			Description: "Remove multiple policies at once by their IDs. Reports which were removed and which failed.",
-			InputSchema: InputSchema{
+			}),
+
+		mutTool("bulk_unblock", "Remove multiple policies at once by their IDs. Reports which were removed and which failed.",
+			InputSchema{
 				Type: "object",
 				Properties: map[string]any{
 					"policy_ids": ArrayProperty{Type: "array", Description: "List of policy IDs to remove", Items: ItemType{Type: "string"}},
 				},
 				Required: []string{"policy_ids"},
-			},
-		},
-		{
-			Name:        "delete_policy",
-			Description: "Delete a single DNS policy by its ID. Works for BLOCK, ALLOW, and REDIRECT policies.",
-			InputSchema: InputSchema{
+			}),
+
+		mutTool("delete_policy", "Delete a single DNS policy by its ID. Works for BLOCK, ALLOW, and REDIRECT policies.",
+			InputSchema{
 				Type: "object",
 				Properties: map[string]any{
 					"policy_id": Property{Type: "string", Description: "The policy ID to delete"},
 				},
 				Required: []string{"policy_id"},
-			},
-		},
+			}),
 	}
+}
 
-	// Attach behavioural annotations derived from the tool classification so
-	// clients can flag read-only vs destructive (confirmation-required) tools.
-	for i := range list {
-		if isReadOnly(list[i].Name) {
-			list[i].Annotations = &ToolAnnotations{ReadOnlyHint: true}
+func (s *Server) tools() []Tool {
+	reg := toolRegistry()
+	list := make([]Tool, len(reg))
+	for i, spec := range reg {
+		tool := spec.Tool
+		if spec.ReadOnly {
+			tool.Annotations = &ToolAnnotations{ReadOnlyHint: true}
 		} else {
-			list[i].Annotations = &ToolAnnotations{DestructiveHint: true, ConfirmationRequired: true}
+			tool.Annotations = &ToolAnnotations{DestructiveHint: true, ConfirmationRequired: true}
 		}
+		list[i] = tool
 	}
 	return list
 }
@@ -343,7 +382,7 @@ func (s *Server) handleRequest(req Request) Response {
 				},
 				ServerInfo: ServerInfo{
 					Name:    "hydradns",
-					Version: "1.0.0",
+					Version: s.version,
 				},
 			},
 		}

@@ -45,10 +45,18 @@ func resolveRole(raw string) Role {
 	}
 }
 
-// isReadOnly reports whether a tool only reads state. Read-only tools are named
-// with a get_ or list_ prefix and are always permitted for every role.
+// isReadOnly reports whether a tool only reads state, per its explicit
+// classification in toolRegistry() (see server.go) — not a name-prefix
+// guess. A name unregistered in toolRegistry() is treated as not read-only
+// (the safe default: subject to role restrictions) rather than granting it
+// access by accident.
 func isReadOnly(toolName string) bool {
-	return strings.HasPrefix(toolName, "get_") || strings.HasPrefix(toolName, "list_")
+	for _, spec := range toolRegistry() {
+		if spec.Name == toolName {
+			return spec.ReadOnly
+		}
+	}
+	return false
 }
 
 // Allows reports whether the role may invoke the named tool.

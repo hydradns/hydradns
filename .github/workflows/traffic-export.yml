@@ -19,6 +19,14 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch: {}
 
+# A manual workflow_dispatch firing while the weekly schedule run is still in flight would have
+# both runs pushing to traffic-data at once. This serialises them (queueing the second, rather
+# than cancelling the first mid-push) so that's a queued run instead of a rejected
+# non-fast-forward push and a spurious red X.
+concurrency:
+  group: traffic-export
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -60,8 +68,11 @@ jobs:
 
       - name: Commit and push traffic data
         working-directory: traffic-data-wt
-        env:
-          GH_TOKEN: ${{ github.token }}
+        # No GH_TOKEN here: this step runs plain git, not the gh CLI. Auth for the push comes
+        # from the credential helper actions/checkout persisted in the "Checkout main" step
+        # (using the default GITHUB_TOKEN, which the `contents: write` permission above scopes
+        # for pushing). A GH_TOKEN env var here was previously set but never read by anything in
+        # this step -- misleading, since it looked like it was doing the auth work.
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
