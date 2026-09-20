@@ -180,6 +180,9 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from v0.1.0
   a real install into a demo.
 
 ### Security
+- Blocklist downloads refuse non-http(s) URLs and loopback, link-local (cloud metadata),
+  unspecified and multicast targets, checked at connect time on every redirect hop. Redirects
+  are capped at 5 and a download at 128 MiB. Private LAN hosts remain allowed.
 - Per-IP rate limiting on `POST /auth/login` and `POST /auth/setup` (fixed window, 10
   attempts / 5 minutes by default, shared across both endpoints), plus `TRUSTED_PROXIES`
   (comma-separated CIDRs/IPs) so the control plane only honors `X-Forwarded-For` from a

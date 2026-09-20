@@ -61,12 +61,14 @@ If something here changes, update this file in the same commit.
   entirely by spoofing `X-Forwarded-For`, per `TRUSTED_PROXIES`' own default of trusting
   nothing). *Workaround:* set `TRUSTED_PROXIES` correctly if you're behind a reverse proxy;
   don't rely on this limiter surviving a restart or coordinating across multiple instances.
-- **The blocklist fetcher follows HTTP redirects to any host, including private addresses.**
-  Blocklist source URLs are fetched with a plain `http.Client` and no redirect restriction, so
-  a source URL that redirects to an internal address (e.g. `http://169.254.169.254/...` or a
-  LAN-only host) is fetched like any other. *Impact:* this only matters if you add a blocklist
-  URL you don't control — the threat model assumes the operator adding sources is trusted.
-  *Workaround:* do not add blocklist source URLs from untrusted third parties.
+- **The blocklist fetcher will download from hosts on your LAN.** Blocklist URLs must be
+  `http` or `https`. The fetcher refuses loopback, link-local (including the `169.254.169.254`
+  cloud metadata address), unspecified and multicast addresses, checks the address at connect
+  time on every redirect hop, follows at most 5 redirects and caps a download at 128 MiB.
+  Private LAN addresses are allowed on purpose, because people host lists on their own network.
+  *Impact:* an operator account, or a list host that redirects, can make the box request a URL
+  on your LAN. *Workaround:* only give operator accounts to people you trust and only add list
+  URLs from hosts you trust.
 - **No MFA/TOTP or SSO.** Login is email + password only; roles (`admin`/`operator`/
   `read_only`) exist, but there's no second factor and no OIDC/SAML integration.
   *Workaround:* use a strong, unique password per account and rotate tokens periodically
