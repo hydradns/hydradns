@@ -73,6 +73,20 @@ func EnsureDemoUser(store *repositories.Store) error {
 	}
 
 	if n == 0 {
+		// A DB with query-log history but no users at all is not a fresh
+		// demo volume, even though the "zero users" check alone would let
+		// it through: it's a pre-RBAC volume, or one where migration
+		// hasn't run yet. Proceeding would seed the demo user over it, and
+		// the periodic Refresh loop would then delete that real history on
+		// its very first tick (M7 in the launch-prep review).
+		if queryCount, qerr := store.QueryLogs.Count(); qerr != nil {
+			return fmt.Errorf("demoseed: counting query logs: %w", qerr)
+		} else if queryCount > 0 {
+			return fmt.Errorf("demoseed: HYDRA_DEMO_MODE=true but the database has %d query log row(s) and no users — "+
+				"refusing to seed a public demo (whose periodic refresh deletes and regenerates dns_queries) over what "+
+				"looks like real history; use a fresh volume for the demo (see demo/docker-compose.demo.yml)", queryCount)
+		}
+
 		hash, err := bcrypt.GenerateFromPassword([]byte(DemoUserPassword), bcrypt.DefaultCost)
 		if err != nil {
 			return fmt.Errorf("demoseed: hashing demo password: %w", err)
@@ -132,20 +146,38 @@ func SeedIfEmpty(store *repositories.Store) error {
 // is simpler to get right (no per-row arithmetic across SQLite's several
 // on-disk datetime formats, see repositories.parseSQLiteTime) and produces
 // an identical-shaped dataset every time.
-func Refresh(store *repositories.Store, db *gorm.DB) error {
-	if err := db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.DNSQuery{}).Error; err != nil {
-		return fmt.Errorf("demoseed: clearing query logs for refresh: %w", err)
-	}
-	if err := db.Model(&models.Statistics{}).Where("id = ?", 1).Updates(map[string]interface{}{
-		"total_queries":      0,
-		"blocked_queries":    0,
-		"allowed_queries":    0,
-		"redirected_queries": 0,
-		"updated_at":         time.Now(),
-	}).Error; err != nil {
-		return fmt.Errorf("demoseed: resetting statistics for refresh: %w", err)
-	}
-	return seedAll(store, time.Now())
+//
+// The whole thing runs inside one transaction (M7 in the launch-prep
+// review): the delete, the statistics reset, and the batched re-insert
+// used to be three independent writes, so a dashboard request landing
+// between them could see an empty or half-populated table — charts
+// dropping to zero mid-demo, for no reason a viewer could tell apart from
+// a real outage. WAL readers see either the pre-refresh or post-refresh
+// state, never a gap, and the batched inserts inside seedQueryLogs
+// (CreateInBatches, 200 rows at a time) keep the transaction itself short
+// — a few thousand rows is comfortably sub-second on SQLite.
+func Refresh(db *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.DNSQuery{}).Error; err != nil {
+			return fmt.Errorf("demoseed: clearing query logs for refresh: %w", err)
+		}
+		if err := tx.Model(&models.Statistics{}).Where("id = ?", 1).Updates(map[string]interface{}{
+			"total_queries":      0,
+			"blocked_queries":    0,
+			"allowed_queries":    0,
+			"redirected_queries": 0,
+			"updated_at":         time.Now(),
+		}).Error; err != nil {
+			return fmt.Errorf("demoseed: resetting statistics for refresh: %w", err)
+		}
+		// seedAll (specifically seedQueryLogs) must run against tx, not the
+		// outer db, so its batched inserts join the same transaction as
+		// the delete and the statistics reset above — a tx-scoped store is
+		// built here (repositories only hold a *gorm.DB handle, and
+		// NewStore(tx) makes every repository method issue its queries
+		// against tx instead of the connection pool).
+		return seedAll(repositories.NewStore(tx), time.Now())
+	})
 }
 
 // StartRefreshLoop runs Refresh on a ticker until stop is closed. Intended
@@ -153,13 +185,13 @@ func Refresh(store *repositories.Store, db *gorm.DB) error {
 // only when HYDRA_DEMO_MODE=true. Errors are logged, not fatal — a failed
 // refresh leaves the previous (still valid, just older) dataset in place
 // rather than crashing a running public demo.
-func StartRefreshLoop(store *repositories.Store, db *gorm.DB, interval time.Duration, stop <-chan struct{}) {
+func StartRefreshLoop(db *gorm.DB, interval time.Duration, stop <-chan struct{}) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			if err := Refresh(store, db); err != nil {
+			if err := Refresh(db); err != nil {
 				log.Printf("demoseed: periodic refresh failed: %v", err)
 			}
 		case <-stop:

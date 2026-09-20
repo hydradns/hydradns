@@ -117,22 +117,49 @@ func (h *APIHandler) GetAuditLogs(c *gin.Context) {
 	})
 }
 
-// Query-log pagination bounds. maxPageSize is a hard upper bound
-// regardless of what the client requests — dns_queries can hold up to
-// ~1,000,000 rows on an SD-card install, so an unbounded page size would
-// let a single request force a huge scan+serialize.
+// Query-log pagination bounds.
+//
+//   - maxQueryLogPageSize is a hard upper bound regardless of what the
+//     client requests — dns_queries can hold up to ~1,000,000 rows on an
+//     SD-card install, so an unbounded page size would let a single
+//     request force a huge scan+serialize.
+//   - maxQueryLogReach caps page*page_size: OFFSET is still a linear scan
+//     in SQLite even with an index on the ORDER BY column, so
+//     ?page=999999 is a cheap way for any authenticated user (including a
+//     public demo visitor holding the documented demo password) to force
+//     a large scan on every request. 100,000 is comfortably past anything
+//     a human would page to by hand.
+//   - queryLogCountCap bounds CountFilteredCapped the same way, for the
+//     unindexed filters (Suspicious has no index by design) where the
+//     COUNT itself would otherwise be a full table scan every time the
+//     page loads.
 const (
 	defaultQueryLogPageSize = 50
 	maxQueryLogPageSize     = 200
+	maxQueryLogReach        = 100000
+	queryLogCountCap        = 100000
 )
 
 // parseQueryLogFilter parses and validates GET /analytics/logs query
 // params. Matches apps/ui/lib/api.ts getQueryLogs(): client, action,
 // domain, suspicious, start, end, page, page_size.
-func parseQueryLogFilter(c *gin.Context) (repositories.QueryLogFilter, error) {
+//
+// Method (not a free function) so it can apply h.resolveClientIPFilter —
+// demo mode rejects the client filter outright (see M8: an exact-match
+// filter over masked-on-output-but-unmasked-in-storage rows is an IP
+// recovery oracle), and anonymization hashes it to match the hashed values
+// actually stored in client_ip (see M3).
+func (h *APIHandler) parseQueryLogFilter(c *gin.Context) (repositories.QueryLogFilter, error) {
 	f := repositories.QueryLogFilter{
-		ClientIP: strings.TrimSpace(c.Query("client")),
-		Domain:   strings.ToLower(strings.TrimSpace(c.Query("domain"))),
+		Domain: strings.ToLower(strings.TrimSpace(c.Query("domain"))),
+	}
+
+	if rawClient := strings.TrimSpace(c.Query("client")); rawClient != "" {
+		clientFilter, err := h.resolveClientIPFilter(rawClient)
+		if err != nil {
+			return f, err
+		}
+		f.ClientIP = clientFilter
 	}
 
 	if action := strings.ToLower(strings.TrimSpace(c.Query("action"))); action != "" && action != "all" {
@@ -179,14 +206,31 @@ func parseQueryLogFilter(c *gin.Context) (repositories.QueryLogFilter, error) {
 	}
 	f.PageSize = pageSize
 
+	if int64(f.Page)*int64(f.PageSize) > maxQueryLogReach {
+		return f, fmt.Errorf("page %d with page_size %d exceeds the maximum reachable offset (page*page_size must be <= %d)", f.Page, f.PageSize, maxQueryLogReach)
+	}
+
 	return f, nil
+}
+
+// countQueryLogs uses the bounded-cost count (repositories.QueryLogCapper)
+// when the configured QueryLogRepository implements it — true for the real
+// GormQueryLogRepo — and falls back to plain CountFiltered otherwise. See
+// QueryLogCapper's doc comment for why this is a type assertion rather
+// than a new method on QueryLogRepository itself.
+func (h *APIHandler) countQueryLogs(filter repositories.QueryLogFilter) (total int64, capped bool, err error) {
+	if capper, ok := h.Store.QueryLogs.(repositories.QueryLogCapper); ok {
+		return capper.CountFilteredCapped(filter, queryLogCountCap)
+	}
+	n, err := h.Store.QueryLogs.CountFiltered(filter)
+	return n, false, err
 }
 
 // GetQueryLogsPage handles GET /analytics/logs: server-side pagination,
 // search and filtering for the Logs page. Open to every authenticated
 // role (read-only included), like the other read endpoints.
 func (h *APIHandler) GetQueryLogsPage(c *gin.Context) {
-	filter, err := parseQueryLogFilter(c)
+	filter, err := h.parseQueryLogFilter(c)
 	if err != nil {
 		errMsg := err.Error()
 		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "error": errMsg})
@@ -198,7 +242,7 @@ func (h *APIHandler) GetQueryLogsPage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "error": "failed to fetch query logs"})
 		return
 	}
-	total, err := h.Store.QueryLogs.CountFiltered(filter)
+	total, capped, err := h.countQueryLogs(filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "error": "failed to count query logs"})
 		return
@@ -209,14 +253,24 @@ func (h *APIHandler) GetQueryLogsPage(c *gin.Context) {
 		items = append(items, h.queryLogEntryFromModel(q))
 	}
 
+	data := gin.H{
+		"items":     items,
+		"total":     total,
+		"page":      filter.Page,
+		"page_size": filter.PageSize,
+	}
+	if capped {
+		// Extra field, ignored by clients that don't know about it (see
+		// apps/ui/lib/types.ts's QueryLogPage — a plain TS interface with
+		// no runtime schema validation on the fetch path). Lets the UI
+		// render "100,000+" instead of a number that looks exact but was
+		// deliberately never computed past the cap.
+		data["total_capped"] = true
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data": gin.H{
-			"items":     items,
-			"total":     total,
-			"page":      filter.Page,
-			"page_size": filter.PageSize,
-		},
+		"data":   data,
 	})
 }
 

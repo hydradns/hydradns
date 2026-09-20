@@ -4,6 +4,7 @@ package db
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"path/filepath"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -134,6 +135,25 @@ func TestMigrate_Idempotent(t *testing.T) {
 	db.Model(&models.Token{}).Count(&tokenCount)
 	if tokenCount != 1 {
 		t.Errorf("expected 1 token after two migrations, got %d", tokenCount)
+	}
+}
+
+// TestInitDB_SetsBusyTimeout is the regression test for M5: both
+// cmd/controlplane and cmd/dataplane call InitDB against the same SQLite
+// file, and without a busy_timeout a concurrent AutoMigrate (e.g. the new
+// index on dns_queries.action, over a table that can hold ~1M rows) can
+// hit an immediate "database is locked" instead of waiting briefly for the
+// other process's migration to finish.
+func TestInitDB_SetsBusyTimeout(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "busy-timeout-test.db")
+	InitDB(path)
+
+	var timeoutMS int
+	if err := DB.Raw("PRAGMA busy_timeout").Scan(&timeoutMS).Error; err != nil {
+		t.Fatalf("query busy_timeout: %v", err)
+	}
+	if timeoutMS <= 0 {
+		t.Errorf("expected a positive busy_timeout, got %d", timeoutMS)
 	}
 }
 

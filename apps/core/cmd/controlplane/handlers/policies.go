@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hydradns/hydra-core/internal/storage/models"
@@ -50,6 +53,37 @@ type CreatePolicyRequest struct {
 	RedirectIP  string   `json:"redirect_ip"`
 	Domains     []string `json:"domains" binding:"required"`
 	Priority    int      `json:"priority"`
+}
+
+// validatePolicyAction checks action (and, for REDIRECT, redirectIP)
+// against what the dataplane's policy engine and file loader actually
+// understand — BLOCK/ALLOW/REDIRECT, matched case-insensitively (see
+// internal/policy/engine.go's policyDecision switch and
+// internal/policy/loader.go's ValidatePolicy, which apply the identical
+// rule to configs/policies.json). The engine's switch silently falls
+// through to ActionAllow for anything it doesn't recognize, so without
+// this check, POST/PUT with a typo'd action (e.g. "DENY") returns 200 and
+// a policy that was supposed to BLOCK a category starts silently allowing
+// it (M10 in the launch-prep review). REDIRECT additionally requires a
+// real IP in redirect_ip — the field the dataplane forwards matched
+// queries to — since an empty or unparseable target is not a usable
+// redirect either.
+func validatePolicyAction(action, redirectIP string) (errMsg string, ok bool) {
+	switch strings.ToUpper(strings.TrimSpace(action)) {
+	case "BLOCK", "ALLOW":
+		return "", true
+	case "REDIRECT":
+		redirectIP = strings.TrimSpace(redirectIP)
+		if redirectIP == "" {
+			return "redirect action requires a non-empty redirect_ip", false
+		}
+		if net.ParseIP(redirectIP) == nil {
+			return fmt.Sprintf("invalid redirect_ip %q: must be a valid IP address", redirectIP), false
+		}
+		return "", true
+	default:
+		return fmt.Sprintf("unsupported action %q: must be one of BLOCK, ALLOW, REDIRECT", action), false
+	}
 }
 
 func policyFromModel(m models.Policy) Policy {
@@ -123,6 +157,11 @@ func (h *APIHandler) CreatePolicy(c *gin.Context) {
 		return
 	}
 
+	if errMsg, ok := validatePolicyAction(req.Action, req.RedirectIP); !ok {
+		c.JSON(http.StatusBadRequest, ResponsePolicySingle{Status: "error", Error: &errMsg})
+		return
+	}
+
 	domainsJSON, _ := json.Marshal(req.Domains)
 
 	m := &models.Policy{
@@ -192,6 +231,11 @@ func (h *APIHandler) UpdatePolicy(c *gin.Context) {
 	var req UpdatePolicyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errMsg := err.Error()
+		c.JSON(http.StatusBadRequest, ResponsePolicySingle{Status: "error", Error: &errMsg})
+		return
+	}
+
+	if errMsg, ok := validatePolicyAction(req.Action, req.RedirectIP); !ok {
 		c.JSON(http.StatusBadRequest, ResponsePolicySingle{Status: "error", Error: &errMsg})
 		return
 	}

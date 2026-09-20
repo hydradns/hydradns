@@ -43,11 +43,18 @@ type AnonymizationConfig struct {
 	Secret  string `yaml:"secret"`
 }
 
-// parseBoolEnvValue interprets a raw env var value as a boolean override.
+// ParseBoolEnvValue interprets a raw env var value as a boolean override.
 // ok is false for an empty or unrecognized value, meaning "leave the
 // configured value alone." Recognizes the same truthy/falsy tokens
-// (case-insensitive) on both sides.
-func parseBoolEnvValue(raw string) (value bool, ok bool) {
+// (case-insensitive, whitespace-trimmed) on both sides.
+//
+// Exported so every boolean env var across the control plane parses the
+// same way — see MustParseBoolEnv, and the launch-prep review (H1): before
+// this, HYDRA_DEMO_MODE used a strict EqualFold("true") with no trim (so
+// "1", "yes", or a trailing space from a Docker env_file line silently
+// left demo mode OFF), and CORS_ALLOW_SAME_HOST treated anything except
+// the literal "false" as "on". One parser, one set of accepted spellings.
+func ParseBoolEnvValue(raw string) (value bool, ok bool) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "1", "true", "yes", "on":
 		return true, true
@@ -56,6 +63,38 @@ func parseBoolEnvValue(raw string) (value bool, ok bool) {
 	default:
 		return false, false
 	}
+}
+
+// FatalFunc is invoked by MustParseBoolEnv when an environment variable is
+// set to a value ParseBoolEnvValue does not recognize. It defaults to
+// logger.Log.Fatalf (which exits the process) but is a variable
+// specifically so tests can override it and assert the fatal path without
+// killing the test binary.
+var FatalFunc = func(format string, args ...interface{}) {
+	logger.Log.Fatalf(format, args...)
+}
+
+// MustParseBoolEnv reads name from the OS environment and resolves it to a
+// boolean, falling back to def when the variable is unset or empty. A
+// non-empty value that ParseBoolEnvValue does not recognize is a
+// misconfiguration, not something to silently paper over: it calls
+// FatalFunc naming both the variable and the offending value, so a
+// near-miss (a typo, a stray space, "1" where only "true" used to work)
+// fails loudly at startup instead of quietly taking the default — see H1
+// in the launch-prep review, where exactly this silently disabled
+// HYDRA_DEMO_MODE and left a public demo's /auth/setup open to the first
+// visitor.
+func MustParseBoolEnv(name string, def bool) bool {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return def
+	}
+	v, ok := ParseBoolEnvValue(raw)
+	if !ok {
+		FatalFunc("invalid %s=%q: expected one of true/false/1/0/yes/no/on/off (case-insensitive, whitespace trimmed)", name, raw)
+		return def // unreachable when FatalFunc actually exits; keeps a test-overridden FatalFunc from continuing with a bogus value
+	}
+	return v
 }
 
 type ControlPlaneConfig struct {
@@ -103,8 +142,14 @@ var DefaultConfig = func() *Config {
 	if interval := os.Getenv("BLOCKLIST_UPDATE_INTERVAL"); interval != "" {
 		cfg.DataPlane.BlocklistUpdateInterval = interval
 	}
+	// Not routed through MustParseBoolEnv: this runs inside DefaultConfig's
+	// package-level initializer, which executes once at import time, before
+	// any test has a chance to set the env var or override FatalFunc — a
+	// Fatal here would not be testable without restructuring config loading
+	// into a lazy call, which is a larger change than this fix warrants.
+	// Warn-and-keep-configured-value is the existing, deliberate behavior.
 	if raw := os.Getenv("HYDRA_ANONYMIZE_CLIENT_IPS"); raw != "" {
-		if v, ok := parseBoolEnvValue(raw); ok {
+		if v, ok := ParseBoolEnvValue(raw); ok {
 			cfg.DataPlane.Anonymization.Enabled = v
 		} else {
 			logger.Log.Warnf("invalid HYDRA_ANONYMIZE_CLIENT_IPS=%q, keeping configured value %v", raw, cfg.DataPlane.Anonymization.Enabled)

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -48,6 +49,33 @@ type CreateBlocklistRequest struct {
 	URL      string `json:"url" binding:"required"`
 	Format   string `json:"format" binding:"required"`
 	Category string `json:"category"`
+}
+
+// validateBlocklistURL is the one scheme check every write path that
+// accepts a blocklist URL must go through — CreateBlocklist, UpdateBlocklist,
+// and the setup wizard's optional blocklist bootstrap (handlers/auth.go's
+// Setup). Before this it was duplicated ad hoc and only applied to some of
+// them: UpdateBlocklist had the check, CreateBlocklist did not (M4 in the
+// launch-prep review), meaning an operator-role user could POST a
+// blocklist source pointing at an internal URL
+// (http://169.254.169.254/latest/meta-data/, http://192.168.1.1/admin,
+// etc.) and the appliance would fetch it.
+//
+// Deliberately does NOT allowlist/denylist destinations (no RFC1918,
+// loopback, or link-local blocking): this is a home/office appliance where
+// operator-role is a trusted role (the same trust level already extended
+// to configs/policies.json on disk), not a multi-tenant service isolating
+// untrusted callers from each other. Blocking obviously-wrong schemes
+// (file://, ftp://, javascript:, anything that isn't http/https) closes
+// the "useless or actively dangerous" cases without pretending to be a
+// real SSRF allowlist. If this trust model ever changes, fetch
+// destinations need real hardening (deny loopback/link-local/RFC1918/cloud
+// metadata IPs) — out of scope here.
+func validateBlocklistURL(raw string) error {
+	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
+		return fmt.Errorf("url must use http:// or https://")
+	}
+	return nil
 }
 
 func blocklistFromSource(src models.BlocklistSource, count int64) Blocklist {
@@ -115,6 +143,12 @@ func (h *APIHandler) GetBlocklist(c *gin.Context) {
 func (h *APIHandler) CreateBlocklist(c *gin.Context) {
 	var req CreateBlocklistRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		errMsg := err.Error()
+		c.JSON(http.StatusBadRequest, ResponseBlocklistSingle{Status: "error", Error: &errMsg})
+		return
+	}
+
+	if err := validateBlocklistURL(req.URL); err != nil {
 		errMsg := err.Error()
 		c.JSON(http.StatusBadRequest, ResponseBlocklistSingle{Status: "error", Error: &errMsg})
 		return
@@ -223,8 +257,8 @@ func (h *APIHandler) UpdateBlocklist(c *gin.Context) {
 		src.Name = *req.Name
 	}
 	if req.URL != nil && *req.URL != src.URL {
-		if !strings.HasPrefix(*req.URL, "http://") && !strings.HasPrefix(*req.URL, "https://") {
-			errMsg := "url must use http:// or https://"
+		if err := validateBlocklistURL(*req.URL); err != nil {
+			errMsg := err.Error()
 			c.JSON(http.StatusBadRequest, ResponseBlocklistSingle{Status: "error", Error: &errMsg})
 			return
 		}

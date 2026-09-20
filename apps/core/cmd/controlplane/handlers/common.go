@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"strings"
@@ -55,6 +58,67 @@ func maskClientIP(ip string) string {
 		return masked + ":" + port
 	}
 	return masked
+}
+
+// resolveClientIPFilter turns the raw `client=` query value from GET
+// /analytics/logs into what should actually be compared against the
+// stored client_ip column, given demo mode and anonymization (M3 and M8
+// in the launch-prep review). raw is assumed already non-empty and
+// trimmed by the caller.
+//
+// Demo mode: responses mask client_ip to "x.x.x.x" / "192.168.1.x" (see
+// maskClientIP above), but the underlying rows are unmasked, and an
+// exact-match filter compares against the real value. That turns the
+// filter into a 256-guess oracle for the last octet a masked IP is
+// supposedly hiding — so demo mode rejects the filter outright rather
+// than silently ignoring it (silently ignoring it would return unfiltered
+// results under a URL that looks filtered, which is its own kind of
+// wrong).
+//
+// Anonymization: when HYDRA_ANONYMIZE_CLIENT_IPS is on, the dataplane
+// stores an HMAC-SHA256 of the client IP (first 16 hex chars — see
+// utils.AnonymizeIP), not the raw address, so `client_ip = <raw ip>` can
+// never match a row. h.AnonymizeSecret (resolved in main.go via
+// config.ResolveAnonymizationSecret, the same secret file the dataplane
+// reads) lets this hash the filter value the same way before querying.
+func (h *APIHandler) resolveClientIPFilter(raw string) (string, error) {
+	if h.DemoMode {
+		return "", fmt.Errorf("client filtering is unavailable in demo mode (client IPs are masked in responses)")
+	}
+	if h.AnonymizeSecret == "" {
+		return raw, nil
+	}
+	hashed, ok := hashClientIPForFilter(h.AnonymizeSecret, raw)
+	if !ok {
+		return "", fmt.Errorf("invalid client filter value %q", raw)
+	}
+	return hashed, nil
+}
+
+// hashClientIPForFilter mirrors utils.AnonymizeIP's hashed path exactly
+// (HMAC-SHA256 over the 16-byte form of the address, first 16 hex chars)
+// without depending on that package's process-global secret variable —
+// this runs in the control plane, a separate process from the dataplane
+// that actually wrote the hashes being compared against, so there is no
+// shared state to piggyback on (and no reason to introduce any: the
+// secret is passed in explicitly, resolved once in main.go). ok is false
+// when raw does not parse as an IP (with or without a port suffix), so
+// callers can 400 instead of silently comparing against a filter that can
+// never match.
+func hashClientIPForFilter(secret, raw string) (hashed string, ok bool) {
+	host, _, err := net.SplitHostPort(raw)
+	if err != nil {
+		host = raw
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return "", false
+	}
+	ip = ip.To16()
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(ip)
+	return hex.EncodeToString(mac.Sum(nil))[:16], true
 }
 
 func (h *APIHandler) HealthCheck(c *gin.Context) {
