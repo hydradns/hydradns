@@ -177,7 +177,7 @@ func TestUpdateBlocklist_NameAndCategoryEdit(t *testing.T) {
 	}
 }
 
-// --- M4: CreateBlocklist must validate URL scheme, same as UpdateBlocklist ---
+// --- CreateBlocklist must validate URL scheme, same as UpdateBlocklist ---
 
 func TestCreateBlocklist_URLMustBeHTTP(t *testing.T) {
 	th := newBlocklistsHarness(t)

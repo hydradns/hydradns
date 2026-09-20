@@ -124,7 +124,7 @@ func TestResolveAnonymizationSecret_UnwritableDataDirFallsBackWithoutPanic(t *te
 	if err := os.MkdirAll(roParent, 0o500); err != nil {
 		t.Fatalf("test setup: %v", err)
 	}
-	// A data dir that doesn't exist yet, under a parent we can't write to —
+	// A data dir that doesn't exist yet, under a parent we can't write to:
 	// MkdirAll must fail here.
 	dataDir := filepath.Join(roParent, "data")
 

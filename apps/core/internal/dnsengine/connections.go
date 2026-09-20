@@ -57,7 +57,7 @@ func (u *UDPClient) Exchange(q *dns.Msg, timeout time.Duration) (*dns.Msg, error
 	}
 	// The socket is shared across queries, so a late answer to an earlier
 	// timed-out query may still be sitting in the buffer. A response is
-	// only accepted if both the ID and the echoed Question match — ID
+	// only accepted if both the ID and the echoed Question match: ID
 	// alone is 16 bits and collides under load (and is spoofable). The
 	// deadline bounds the loop in time, maxStaleReads bounds it in
 	// iterations so a datagram flood can't pin the socket mutex.
@@ -237,7 +237,7 @@ func (p *UpstreamPool) releaseTCPConn(idx int, hadErr bool) {
 // 1) Try UDP with shared socket (fast). If UDP returns a response and TC == false, return it.
 // 2) Otherwise (error or truncated), use a pooled TCP connection and return that response.
 //
-// Important: callers should not assume Exchange is cheap — it performs network IO and may block.
+// Important: callers should not assume Exchange is cheap; it performs network IO and may block.
 func (p *UpstreamPool) Exchange(q *dns.Msg, timeout time.Duration) (*dns.Msg, error) {
 	// First, try UDP (fast path)
 	if p.udp != nil {

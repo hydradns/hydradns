@@ -63,7 +63,7 @@ func TestMemoryChecker_SingleLabelNeverBlocked(t *testing.T) {
 
 func TestMemoryChecker_EmptyFailsOpen(t *testing.T) {
 	m := NewMemoryChecker()
-	// No Reload yet — nothing is blocked.
+	// No Reload yet, nothing is blocked.
 	if got, _ := m.IsBlocked("ads.google.com"); got {
 		t.Error("empty checker must not block (fail-open during startup)")
 	}
@@ -116,7 +116,7 @@ func TestMemoryChecker_ConcurrentReadDuringReload(t *testing.T) {
 	wg.Wait()
 }
 
-// TestMemoryChecker_ReloadMemoryFootprint gives a rough (not exact —
+// TestMemoryChecker_ReloadMemoryFootprint gives a rough (not exact:
 // GC timing and map bucket growth make this noisy) estimate of bytes per
 // entry for the blocklist design doc's "1GB Pi holds two full sets during
 // a rebuild" concern. Run with -v to see the reported figure; it is not
@@ -126,10 +126,10 @@ func TestMemoryChecker_ConcurrentReadDuringReload(t *testing.T) {
 //
 // Measured in this environment (go1.24-ish, linux/amd64) with 300k
 // ~35-byte synthetic domains: ~30 bytes/entry heap growth for the
-// map[string]struct{} (this run's HeapAlloc delta ÷ entry count — see the
+// map[string]struct{} (this run's HeapAlloc delta ÷ entry count; see the
 // t.Logf output; GC timing makes the exact number noisy run to run,
 // roughly 20-40 bytes/entry observed). Extrapolated: a few million entries
-// (a large aggregated blocklist set) is tens to ~100MB for one set —
+// (a large aggregated blocklist set) is tens to ~100MB for one set,
 // comfortably fine on a 1GB Pi for one set, but Reload briefly holds
 // old+new simultaneously (the atomic swap only drops the old map after the
 // new one is built), so peak usage during a rebuild is roughly double the

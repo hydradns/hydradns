@@ -33,9 +33,9 @@ func (f *fakeRepo) Signature() (repositories.BlocklistSignature, error) {
 	return f.signature, f.signatureErr
 }
 
-// Engine.List must read from GetAllEnabled, not the unfiltered GetAll —
-// this is the fix for a disabled source's entries still blocking. If this
-// regresses back to GetAll, this test catches it.
+// Engine.List must read from GetAllEnabled, not the unfiltered GetAll, or
+// a disabled source's entries would still block. If this regresses back
+// to GetAll, this test catches it.
 func TestEngine_List_UsesGetAllEnabled(t *testing.T) {
 	repo := &fakeRepo{}
 	e := NewEngine(repo)

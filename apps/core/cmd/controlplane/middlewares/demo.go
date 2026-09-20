@@ -13,7 +13,7 @@ import (
 //
 // POST /api/v1/auth/login is allowed so a visitor can actually sign in as
 // the seeded demo user. There is currently no dedicated logout endpoint in
-// this codebase (see cmd/controlplane/routes/router.go) — if one is added
+// this codebase (see cmd/controlplane/routes/router.go); if one is added
 // later, it belongs in this map too.
 //
 // POST /api/v1/auth/setup is deliberately NOT allowlisted. Demo mode always
@@ -27,12 +27,12 @@ var demoGuardAllowed = map[string]string{
 // DemoGuard rejects every mutating request (any method other than GET,
 // HEAD, or OPTIONS) with 403, except the narrow allowlist above. It is the
 // actual security boundary for a public demo deployment (HYDRA_DEMO_MODE=
-// true): everything the UI does to look "read-only" — the banner, the
-// disabled-looking buttons — is cosmetic on top of this.
+// true): everything the UI does to look "read-only" (the banner, the
+// disabled-looking buttons) is cosmetic on top of this.
 //
 // This must be installed BEFORE Auth() in the middleware chain (see
-// main.go) so it runs, and can reject, before any role — including admin,
-// if a demo deployment somehow had one — is even resolved. A role check
+// main.go) so it runs, and can reject, before any role (including admin,
+// if a demo deployment somehow had one) is even resolved. A role check
 // alone would not be a sufficient boundary here: RequireRole is opt-in per
 // route and admin bypasses it entirely, so a guard that ran after Auth (or
 // that was expressed as a role restriction) could be defeated by any

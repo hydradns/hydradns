@@ -39,8 +39,8 @@ func TestAnonymizeIP_DifferentSecretsProduceDifferentHashes(t *testing.T) {
 }
 
 func TestInitSecret_UsesKeyBytesVerbatimNotBase64(t *testing.T) {
-	// "not-base64!!" is not valid base64 — InitSecret must still accept it
-	// since it no longer base64-decodes its input.
+	// "not-base64!!" is not valid base64; InitSecret must still accept it
+	// since it does not base64-decode its input.
 	InitSecret("not-base64!!")
 	defer func() { secret = nil }()
 
@@ -49,13 +49,13 @@ func TestInitSecret_UsesKeyBytesVerbatimNotBase64(t *testing.T) {
 	}
 }
 
-// TestAnonymizeIP_WithSecretDistinguishesDevicesOnSameLAN is a regression
-// test for the pre-hash masking bug: the old implementation zeroed the
-// last IPv4 octet (or last 80 IPv6 bits) BEFORE hashing, which mapped
-// every device on the same /24 (i.e., in practice every device on one
-// home/office LAN) to the identical hash — a 100% collision rate, not
-// merely a truncation-length risk. With a secret configured, two different
-// hosts on the same /24 must produce different anonymized values.
+// TestAnonymizeIP_WithSecretDistinguishesDevicesOnSameLAN guards against
+// masking the address before hashing: zeroing the last IPv4 octet (or last
+// 80 IPv6 bits) before hashing would map every device on the same /24 (in
+// practice, every device on one home/office LAN) to the identical hash, a
+// 100% collision rate, not merely a truncation-length risk. With a secret
+// configured, two different hosts on the same /24 must produce different
+// anonymized values.
 func TestAnonymizeIP_WithSecretDistinguishesDevicesOnSameLAN(t *testing.T) {
 	InitSecret("household-secret")
 	defer func() { secret = nil }()

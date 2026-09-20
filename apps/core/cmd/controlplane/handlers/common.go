@@ -19,8 +19,8 @@ import (
 //
 // Belt-and-suspenders: in a correctly-run public demo (HYDRA_DEMO_MODE=true,
 // DNS ports unpublished per demo/docker-compose.demo.yml) every row in
-// these tables is synthetic seed data to begin with — see
-// cmd/controlplane/demoseed — because no real DNS traffic is ever
+// these tables is synthetic seed data to begin with (see
+// cmd/controlplane/demoseed), because no real DNS traffic is ever
 // forwarded and mutating requests (the only way to add new rows outside
 // the DNS hot path) are rejected by middlewares.DemoGuard before they
 // reach a handler. This redaction does not depend on that invariant
@@ -41,7 +41,7 @@ func maskClientIP(ip string) string {
 	parsed := net.ParseIP(host)
 	if parsed == nil {
 		// Not a parseable IP (e.g. already redacted, or malformed legacy
-		// data) — do not echo it back unmasked.
+		// data); do not echo it back unmasked.
 		return "x.x.x.x"
 	}
 
@@ -62,21 +62,20 @@ func maskClientIP(ip string) string {
 
 // resolveClientIPFilter turns the raw `client=` query value from GET
 // /analytics/logs into what should actually be compared against the
-// stored client_ip column, given demo mode and anonymization (M3 and M8
-// in the launch-prep review). raw is assumed already non-empty and
-// trimmed by the caller.
+// stored client_ip column, given demo mode and anonymization. raw is
+// assumed already non-empty and trimmed by the caller.
 //
 // Demo mode: responses mask client_ip to "x.x.x.x" / "192.168.1.x" (see
 // maskClientIP above), but the underlying rows are unmasked, and an
 // exact-match filter compares against the real value. That turns the
 // filter into a 256-guess oracle for the last octet a masked IP is
-// supposedly hiding — so demo mode rejects the filter outright rather
+// supposedly hiding, so demo mode rejects the filter outright rather
 // than silently ignoring it (silently ignoring it would return unfiltered
 // results under a URL that looks filtered, which is its own kind of
 // wrong).
 //
 // Anonymization: when HYDRA_ANONYMIZE_CLIENT_IPS is on, the dataplane
-// stores an HMAC-SHA256 of the client IP (first 16 hex chars — see
+// stores an HMAC-SHA256 of the client IP (first 16 hex chars; see
 // utils.AnonymizeIP), not the raw address, so `client_ip = <raw ip>` can
 // never match a row. h.AnonymizeSecret (resolved in main.go via
 // config.ResolveAnonymizationSecret, the same secret file the dataplane
@@ -97,8 +96,8 @@ func (h *APIHandler) resolveClientIPFilter(raw string) (string, error) {
 
 // hashClientIPForFilter mirrors utils.AnonymizeIP's hashed path exactly
 // (HMAC-SHA256 over the 16-byte form of the address, first 16 hex chars)
-// without depending on that package's process-global secret variable —
-// this runs in the control plane, a separate process from the dataplane
+// without depending on that package's process-global secret variable: this
+// runs in the control plane, a separate process from the dataplane
 // that actually wrote the hashes being compared against, so there is no
 // shared state to piggyback on (and no reason to introduce any: the
 // secret is passed in explicitly, resolved once in main.go). ok is false

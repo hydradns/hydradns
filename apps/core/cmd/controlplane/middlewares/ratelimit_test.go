@@ -42,10 +42,10 @@ func newTestLimiter(limit int, window time.Duration, maxEntries int, clock *fake
 
 // --- RateLimiter unit tests ---
 //
-// RecordFailure is the only thing that consumes budget (see M1 in the
-// launch-prep review: the old Allow() consumed budget on every call,
-// including successful logins, which could lock out a legitimate admin
-// behind a shared NAT). Blocked() is a pure check-without-consuming.
+// RecordFailure is the only thing that consumes budget: an Allow() that
+// consumed budget on every call, including successful logins, could lock
+// out a legitimate admin behind a shared NAT. Blocked() is a pure
+// check-without-consuming.
 
 func TestRateLimiter_AllowsUpToLimit(t *testing.T) {
 	clock := newFakeClock()
@@ -94,9 +94,9 @@ func TestRateLimiter_IndependentPerKey(t *testing.T) {
 }
 
 func TestRateLimiter_SuccessDoesNotConsumeBudget(t *testing.T) {
-	// This is the direct regression test for M1: repeatedly checking
-	// Blocked() (what a successful, non-failing request does under the
-	// new LoginThrottle) must never by itself exhaust the budget.
+	// Repeatedly checking Blocked() (what a successful, non-failing
+	// request does under LoginThrottle) must never by itself exhaust the
+	// budget.
 	clock := newFakeClock()
 	rl := newTestLimiter(2, time.Minute, 100, clock)
 
@@ -181,14 +181,13 @@ func TestRateLimiter_EvictsExpiredEntriesBeforeOldestLive(t *testing.T) {
 	}
 }
 
-// TestRateLimiter_EvictionIsBoundedWork proves M2's fix directly: eviction
+// TestRateLimiter_EvictionUnderAllLiveEntriesStaysBounded proves eviction
 // under sustained pressure (every entry live, none expired) must not scan
-// the entire map on every insert — it resets the map instead once a bounded
+// the entire map on every insert: it resets the map instead once a bounded
 // sample finds nothing to reclaim. We can't easily assert "didn't do O(n)
 // work" from outside, so this asserts the observable contract instead: the
-// map never exceeds maxEntries even when every single entry is live
-// (worst case for the old "scan everything, evict the single oldest"
-// approach, and exactly the case where a bounded scan resets instead).
+// map never exceeds maxEntries even when every single entry is live, the
+// worst case for a naive "scan everything" eviction strategy.
 func TestRateLimiter_EvictionUnderAllLiveEntriesStaysBounded(t *testing.T) {
 	clock := newFakeClock()
 	rl := newTestLimiter(10, time.Hour, 100, clock)
@@ -209,7 +208,7 @@ func TestRateLimiter_EvictionUnderAllLiveEntriesStaysBounded(t *testing.T) {
 //
 // The stub handler's status is configurable so tests can distinguish
 // "successful login" (must not consume budget) from "failed login" (must
-// consume budget) — see M1.
+// consume budget).
 
 func newThrottledRouter(rl *RateLimiter, status int) *gin.Engine {
 	r := gin.New()
@@ -253,10 +252,10 @@ func TestLoginThrottle_TripsWithRetryAfterHeaderOnFailures(t *testing.T) {
 	}
 }
 
-// TestLoginThrottle_SuccessfulLoginsDoNotConsumeBudget is the direct
-// regression test for M1: a legitimate admin behind a shared NAT, or the
-// dashboard/CLI/phone all re-authenticating in the same window, must never
-// be locked out purely by succeeding repeatedly.
+// TestLoginThrottle_SuccessfulLoginsDoNotConsumeBudget verifies a
+// legitimate admin behind a shared NAT, or the dashboard/CLI/phone all
+// re-authenticating in the same window, must never be locked out purely
+// by succeeding repeatedly.
 func TestLoginThrottle_SuccessfulLoginsDoNotConsumeBudget(t *testing.T) {
 	clock := newFakeClock()
 	rl := newTestLimiter(2, 5*time.Minute, 1000, clock)
@@ -295,7 +294,7 @@ func TestLoginThrottle_FailuresStillTripAfterManySuccesses(t *testing.T) {
 
 func TestLoginThrottle_ServerErrorDoesNotConsumeBudget(t *testing.T) {
 	// A 5xx is the server's own fault (e.g. a bcrypt or DB error), not
-	// evidence of a brute-force attempt or a mistyped password — only
+	// evidence of a brute-force attempt or a mistyped password: only
 	// 4xx (401/400/409 etc.) counts against the budget.
 	clock := newFakeClock()
 	rl := newTestLimiter(1, 5*time.Minute, 1000, clock)
@@ -323,8 +322,8 @@ func TestLoginThrottle_DifferentIPsAreIndependent(t *testing.T) {
 }
 
 func TestLoginThrottle_SpoofedXFFDoesNotBypassLimiter(t *testing.T) {
-	// With gin's default (untrusted-proxy) ClientIP resolution — the same
-	// posture main.go configures via SetTrustedProxies(nil) — a caller
+	// With gin's default (untrusted-proxy) ClientIP resolution (the same
+	// posture main.go configures via SetTrustedProxies(nil)), a caller
 	// cannot dodge its own budget by sending a different X-Forwarded-For
 	// on every request; ClientIP() must key off the real socket address.
 	clock := newFakeClock()

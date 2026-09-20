@@ -30,17 +30,16 @@ type BlocklistEntry struct {
 	ID         uint   `gorm:"primaryKey"`
 	SnapshotID uint   `gorm:"index"`
 	Domain     string `gorm:"index;size:255"`
-	// SourceID is indexed (M9 in the go-review): both DeleteSource and
-	// SaveSnapshotWithEntries's replace-on-ingest DELETE filter by this
-	// column, and without an index each is a full table scan over a table
-	// that can hold millions of rows on a full Pi blocklist install. NOTE
-	// for whoever ships this: on an existing large blocklist_entries table,
-	// AutoMigrate will run a CREATE INDEX for this the first time a build
-	// with this tag starts, which holds a write lock for the duration of
-	// the index build; see the H3 write-up in the review doc for the
-	// concurrent-AutoMigrate risk this shares with M5 (both controlplane
-	// and dataplane call AutoMigrate against the same single-writer SQLite
-	// file at startup).
+	// SourceID is indexed: both DeleteSource and SaveSnapshotWithEntries's
+	// replace-on-ingest DELETE filter by this column, and without an index
+	// each is a full table scan over a table that can hold millions of
+	// rows on a full Pi blocklist install. On an existing large
+	// blocklist_entries table, AutoMigrate runs a CREATE INDEX for this
+	// the first time a build with this tag starts, which holds a write
+	// lock for the duration of the index build. Both controlplane and
+	// dataplane call AutoMigrate against the same single-writer SQLite
+	// file at startup, so this shares the same concurrent-AutoMigrate
+	// risk as db.go's busy_timeout (see storage/db/db.go).
 	SourceID  string `gorm:"index"`
 	Category  string
 	CreatedAt time.Time

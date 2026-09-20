@@ -31,7 +31,7 @@ const anonSecretByteLen = 32
 // use to hash client IPs before they're written to the query log, when
 // anonymization is enabled. Callers should only invoke this (and only call
 // utils.InitSecret with the result) when
-// config.DefaultConfig.DataPlane.Anonymization.Enabled is true — resolving
+// config.DefaultConfig.DataPlane.Anonymization.Enabled is true: resolving
 // or generating a secret that nothing will ever use is harmless but
 // surprising (a mystery file appearing in the data dir on every install).
 //
@@ -45,7 +45,7 @@ const anonSecretByteLen = 32
 //     O_EXCL-guarded so concurrent loaders (e.g. controlplane + dataplane
 //     starting in the same container) converge on one value instead of
 //     racing.
-//  4. If dataDir isn't writable, a random in-memory secret — logged as a
+//  4. If dataDir isn't writable, a random in-memory secret, logged as a
 //     warning since hashes won't survive a restart. The secret value
 //     itself is never logged.
 func ResolveAnonymizationSecret(cfgValue, dataDir string) string {
@@ -60,12 +60,12 @@ func ResolveAnonymizationSecret(cfgValue, dataDir string) string {
 	if err != nil {
 		fallback, genErr := generateSecretHex()
 		if genErr != nil {
-			// crypto/rand is broken — every install would otherwise share
+			// crypto/rand is broken: every install would otherwise share
 			// the same hardcoded "unavailable-anon-secret" HMAC key,
-			// which defeats anonymization for all of them at once (L6 in
-			// the launch-prep review). crypto/rand failure is effectively
-			// fatal for anything else that needs randomness too, so fail
-			// closed here rather than silently handing out a known key.
+			// which defeats anonymization for all of them at once.
+			// crypto/rand failure is effectively fatal for anything else
+			// that needs randomness too, so fail closed here rather than
+			// silently handing out a known key.
 			FatalFunc("anonymization: failed to generate a secret (crypto/rand: %v) — refusing to start with HYDRA_ANONYMIZE_CLIENT_IPS enabled rather than use a shared fallback key", genErr)
 			return "" // unreachable when FatalFunc actually exits; keeps a test-overridden FatalFunc from continuing with a bogus secret
 		}
@@ -78,7 +78,7 @@ func ResolveAnonymizationSecret(cfgValue, dataDir string) string {
 // realSecretValue returns v if it looks like an operator-supplied secret,
 // or "" if it's empty, the documented placeholder, or an unexpanded
 // shell-style default (e.g. a stale "${HYDRA_ANON_SECRET:-...}" left in
-// config.yaml — the app's YAML loader does not expand that syntax, so it
+// config.yaml; the app's YAML loader does not expand that syntax, so it
 // must never be used verbatim as key material).
 func realSecretValue(v string) string {
 	v = strings.TrimSpace(v)
@@ -119,7 +119,7 @@ func loadOrCreatePersistedSecret(dataDir string) (string, error) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		if os.IsExist(err) {
-			// Lost the race to create it — wait for the winner to finish
+			// Lost the race to create it: wait for the winner to finish
 			// writing and read back what they wrote.
 			return waitForPersistedSecret(path)
 		}

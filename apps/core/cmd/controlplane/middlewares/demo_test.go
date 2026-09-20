@@ -12,7 +12,7 @@ import (
 
 // buildDemoGuardRouter mounts DemoGuard in front of the same routes the
 // production router registers for /auth, plus a representative mutating
-// route (POST /api/v1/policies) — enough to prove the guard blocks
+// route (POST /api/v1/policies), enough to prove the guard blocks
 // mutations generically rather than by an allowlist of blocked paths.
 func buildDemoGuardRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)

@@ -134,7 +134,7 @@ func TestBlocklistRepo_SaveSnapshotWithEntries(t *testing.T) {
 	}
 }
 
-// H3: a source's entries must be the *current* snapshot's contents, not the
+// A source's entries must be the *current* snapshot's contents, not the
 // union of every snapshot ever ingested. A domain the upstream list dropped
 // must stop being blocked once the next fetch lands.
 func TestBlocklistRepo_SaveSnapshotWithEntries_ReplacesPriorEntries(t *testing.T) {
@@ -187,8 +187,8 @@ func TestBlocklistRepo_SaveSnapshotWithEntries_ReplacesPriorEntries(t *testing.T
 	}
 }
 
-// H3: a fetch that finds the content unchanged (same checksum as the
-// source's last successful ingest) must be a no-op — it must not delete and
+// A fetch that finds the content unchanged (same checksum as the
+// source's last successful ingest) must be a no-op: it must not delete and
 // re-insert the identical entries.
 func TestBlocklistRepo_SaveSnapshotWithEntries_UnchangedChecksumLeavesEntriesAlone(t *testing.T) {
 	db := setupTestDB(t)
@@ -226,8 +226,8 @@ func TestBlocklistRepo_SaveSnapshotWithEntries_UnchangedChecksumLeavesEntriesAlo
 	}
 }
 
-// H3: editing a source's URL (or the upstream content changing entirely)
-// followed by a fetch must leave only the new list's domains — none of the
+// Editing a source's URL (or the upstream content changing entirely)
+// followed by a fetch must leave only the new list's domains: none of the
 // old URL's entries survive.
 func TestBlocklistRepo_SaveSnapshotWithEntries_URLEditThenFetchLeavesOnlyNewList(t *testing.T) {
 	db := setupTestDB(t)
@@ -266,7 +266,7 @@ func TestBlocklistRepo_SaveSnapshotWithEntries_URLEditThenFetchLeavesOnlyNewList
 	}
 }
 
-// H3 retention: snapshot *metadata* rows are capped per source so the table
+// Retention: snapshot *metadata* rows are capped per source so the table
 // doesn't grow without bound across years of refreshes, while still keeping
 // some history. The exact cap is an implementation choice (see
 // snapshotRetentionPerSource); this test only asserts it is enforced and
@@ -306,7 +306,7 @@ func TestBlocklistRepo_SaveSnapshotWithEntries_PrunesOldSnapshotMetadata(t *test
 	}
 }
 
-// M9: DeleteSource's and H3's replace-on-ingest DELETE both filter by
+// DeleteSource's and the replace-on-ingest DELETE both filter by
 // source_id; without an index both are full table scans over
 // blocklist_entries, which can hold millions of rows on a Pi.
 func TestBlocklistRepo_BlocklistEntriesSourceIDIsIndexed(t *testing.T) {
@@ -636,7 +636,7 @@ func TestBlocklistRepo_DeleteSourceCascades(t *testing.T) {
 		t.Fatalf("expected 2 entries before delete, got %d", count)
 	}
 
-	// Delete source — should cascade
+	// Delete source: should cascade
 	repo.DeleteSource("src1")
 
 	count, _ = repo.CountEntriesBySource("src1")
@@ -646,9 +646,9 @@ func TestBlocklistRepo_DeleteSourceCascades(t *testing.T) {
 }
 
 // GetAllEnabled must exclude entries whose source is disabled, even though
-// the rows are still in the DB — this is the bug behind "I turned the list
-// off and it still blocks". GetAll (unfiltered) deliberately keeps the old
-// behaviour for any other future caller.
+// the rows are still in the DB, or a toggled-off list would keep blocking.
+// GetAll (unfiltered) deliberately keeps the old behavior for any other
+// future caller.
 func TestBlocklistRepo_GetAllEnabled_ExcludesDisabledSources(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewBlocklistRepo(db)
@@ -672,8 +672,9 @@ func TestBlocklistRepo_GetAllEnabled_ExcludesDisabledSources(t *testing.T) {
 		t.Fatalf("GetAllEnabled() = %v, want [enabled.com]", domains)
 	}
 
-	// Sanity: GetAll (unfiltered) still returns both — this is what makes
-	// the bug possible if the wrong method is wired into the DNS hot path.
+	// Sanity: GetAll (unfiltered) still returns both. Wiring this method
+	// into the DNS hot path instead of GetAllEnabled would reintroduce
+	// the toggle-doesn't-block bug.
 	all, err := repo.GetAll()
 	if err != nil {
 		t.Fatal(err)

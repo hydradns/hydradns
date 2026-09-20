@@ -8,10 +8,9 @@ import (
 	"github.com/hydradns/hydra-core/internal/storage/models"
 )
 
-// TestQueryLog_BypassAttempts_DropsRowWithUnparseableTimestamp is the
-// regression test for L7 in the launch-prep review: a row whose
-// last_attempt text doesn't match any of the recognized SQLite datetime
-// layouts used to be shipped anyway with the Go zero time
+// TestQueryLog_BypassAttempts_DropsRowWithUnparseableTimestamp verifies a
+// row whose last_attempt text doesn't match any of the recognized SQLite
+// datetime layouts is dropped rather than shipped with the Go zero time
 // (0001-01-01T00:00:00Z), which looks like real (if absurdly old) data to
 // any caller. It must be dropped from the per-group Rows instead, while
 // the separately-computed aggregate counts (TotalAttempts, UniqueClients)
@@ -26,7 +25,7 @@ func TestQueryLog_BypassAttempts_DropsRowWithUnparseableTimestamp(t *testing.T) 
 		DetectionMethod: models.DetectionMethodDoHBootstrap, Timestamp: time.Now(),
 	})
 
-	// A row whose timestamp text is not one of sqliteTimeLayouts — inserted
+	// A row whose timestamp text is not one of sqliteTimeLayouts, inserted
 	// via raw SQL so the on-disk text is exactly controlled (GORM would
 	// otherwise always write a parseable format).
 	if err := db.Exec(

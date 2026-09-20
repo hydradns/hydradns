@@ -52,14 +52,12 @@ type CreateBlocklistRequest struct {
 }
 
 // validateBlocklistURL is the one scheme check every write path that
-// accepts a blocklist URL must go through — CreateBlocklist, UpdateBlocklist,
+// accepts a blocklist URL must go through: CreateBlocklist, UpdateBlocklist,
 // and the setup wizard's optional blocklist bootstrap (handlers/auth.go's
-// Setup). Before this it was duplicated ad hoc and only applied to some of
-// them: UpdateBlocklist had the check, CreateBlocklist did not (M4 in the
-// launch-prep review), meaning an operator-role user could POST a
-// blocklist source pointing at an internal URL
+// Setup). Skipping it on any one of them would let an operator-role user
+// POST a blocklist source pointing at an internal URL
 // (http://169.254.169.254/latest/meta-data/, http://192.168.1.1/admin,
-// etc.) and the appliance would fetch it.
+// etc.) and have the appliance fetch it.
 //
 // Deliberately does NOT allowlist/denylist destinations (no RFC1918,
 // loopback, or link-local blocking): this is a home/office appliance where
@@ -70,7 +68,7 @@ type CreateBlocklistRequest struct {
 // the "useless or actively dangerous" cases without pretending to be a
 // real SSRF allowlist. If this trust model ever changes, fetch
 // destinations need real hardening (deny loopback/link-local/RFC1918/cloud
-// metadata IPs) — out of scope here.
+// metadata IPs); that is out of scope here.
 func validateBlocklistURL(raw string) error {
 	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
 		return fmt.Errorf("url must use http:// or https://")
@@ -197,7 +195,7 @@ func (h *APIHandler) CreateBlocklist(c *gin.Context) {
 // UpdateBlocklistRequest carries only the fields the UI's PATCH
 // /blocklists/:id can send (see apps/ui/lib/api.ts updateBlocklist and
 // toggleBlocklist). Every field is a pointer so an absent field leaves
-// the existing value untouched — this is a partial update, unlike
+// the existing value untouched. This is a partial update, unlike
 // UpdatePolicyRequest, because the only caller wired up in the shipped
 // UI today (the enable/disable switch) sends a single field.
 type UpdateBlocklistRequest struct {
@@ -210,16 +208,16 @@ type UpdateBlocklistRequest struct {
 
 // UpdateBlocklist handles PATCH /blocklists/:id.
 //
-// Propagation: exactly the same mechanism CreateBlocklist already uses —
-// on a URL or format change, an immediate background fetch is kicked off
+// Propagation: exactly the same mechanism CreateBlocklist already uses.
+// On a URL or format change, an immediate background fetch is kicked off
 // via BlocklistEngine.UpdateSource, which refreshes the DB (BlocklistEntry
 // rows). Separately, the dataplane's in-memory blocklist set (what the DNS
 // hot path actually checks) is kept in sync by a lightweight signature
 // poll in cmd/dataplane (BlocklistSignature, default BLOCKLIST_POLL_INTERVAL=
 // 5s): it detects a source/entry change cheaply (without scanning
 // blocklist_entries) and rebuilds the in-memory set from enabled sources
-// only when the signature changes, so an edit here — including flipping
-// Enabled — reaches the DNS engine within about 5 seconds, not the full
+// only when the signature changes, so an edit here, including flipping
+// Enabled, reaches the DNS engine within about 5 seconds, not the full
 // BLOCKLIST_UPDATE_INTERVAL (default 6h) periodic refresh window.
 //
 // Ingested-entries semantics on a URL/format change: SaveSnapshotWithEntries

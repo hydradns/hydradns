@@ -85,7 +85,7 @@ func TestCORS_SameHostIPv4Allowed(t *testing.T) {
 	r := buildCORSRouter()
 
 	// Dashboard opened at http://192.168.1.53:3000 calling the API at
-	// http://192.168.1.53:8080 — not in the static allowlist, must come
+	// http://192.168.1.53:8080, not in the static allowlist, must come
 	// from the same-host fallback.
 	rec := corsRequest(r, http.MethodGet, "http://192.168.1.53:3000", "192.168.1.53:8080")
 	if rec.Code != http.StatusOK {
@@ -192,7 +192,7 @@ func TestCORS_MalformedOriginDenied(t *testing.T) {
 	t.Setenv("CORS_ALLOW_SAME_HOST", "")
 	r := buildCORSRouter()
 
-	// No scheme at all — fails the http/https scheme check.
+	// No scheme at all: fails the http/https scheme check.
 	rec := corsRequest(r, http.MethodGet, "192.168.1.53:3000", "192.168.1.53:8080")
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("got %d, want 403", rec.Code)
@@ -214,7 +214,7 @@ func TestCORS_NoOriginHeaderPassesThrough(t *testing.T) {
 	}
 }
 
-// --- H2: CORS_ORIGINS must not panic on human-typed whitespace/commas ---
+// --- CORS_ORIGINS must not panic on human-typed whitespace/commas ---
 
 func TestCORS_TrimsWhitespaceAroundOrigins(t *testing.T) {
 	t.Setenv("CORS_ORIGINS", "http://a.lan:3000, http://b.lan:3000")
@@ -305,7 +305,7 @@ func TestCORS_ValidEntryDoesNotCallFatalf(t *testing.T) {
 	_ = CORS()
 }
 
-// --- L3: AllowCredentials must never be paired with a wildcard origin ---
+// --- AllowCredentials must never be paired with a wildcard origin ---
 
 func TestCORS_WildcardDisablesAllowCredentials(t *testing.T) {
 	t.Setenv("CORS_ORIGINS", "*")
@@ -335,8 +335,8 @@ func TestCORS_ExplicitAllowlistStillSetsAllowCredentials(t *testing.T) {
 	}
 }
 
-// --- H1 (CORS_ALLOW_SAME_HOST slice): every falsy spelling must disable it,
-// not just the literal "false" ---
+// --- CORS_ALLOW_SAME_HOST: every falsy spelling must disable it, not just
+// the literal "false" ---
 
 func TestCORS_SameHostDisabledByOtherFalsySpellings(t *testing.T) {
 	for _, v := range []string{"0", "no", "off", "FALSE"} {

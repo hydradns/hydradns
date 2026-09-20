@@ -76,7 +76,7 @@ func (d *Detector) checkEntropy(label, domain string) Result {
 
 	entropy := shannonEntropy(label)
 
-	// Adjust threshold based on label length — longer labels naturally have higher entropy
+	// Adjust threshold based on label length: longer labels naturally have higher entropy
 	threshold := d.entropyThreshold
 	if len(label) > 20 {
 		threshold = 3.5

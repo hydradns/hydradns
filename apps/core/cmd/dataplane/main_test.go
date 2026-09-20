@@ -41,10 +41,10 @@ func (f *fakeBlocklistRepo) Signature() (repositories.BlocklistSignature, error)
 	return repositories.BlocklistSignature{}, nil
 }
 
-// M12 regression: the 6h refreshSources pass must force an in-memory
-// rebuild regardless of signature, even when there are no sources
-// configured — restoring the safety net the signature-based poll loop
-// removed (see the review's M12 write-up).
+// TestRefreshSources_ForcesRebuildWithNoSources verifies the 6h
+// refreshSources pass forces an in-memory rebuild regardless of
+// signature, even when there are no sources configured: the signature-
+// based poll loop alone would skip a rebuild here since nothing changed.
 func TestRefreshSources_ForcesRebuildWithNoSources(t *testing.T) {
 	repo := &fakeBlocklistRepo{}
 	engine := blocklist.NewEngine(repo)
@@ -61,7 +61,7 @@ func TestRefreshSources_ForcesRebuildWithNoSources(t *testing.T) {
 	waitUntil(t, time.Second, func() bool { return fakeSrc.calls() == 2 })
 }
 
-// Same safety net must still fire even when listing sources itself errors —
+// Same safety net must still fire even when listing sources itself errors:
 // refreshSources must not skip the forced rebuild just because it couldn't
 // refresh anything this pass.
 func TestRefreshSources_ForcesRebuildOnListSourcesError(t *testing.T) {

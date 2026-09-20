@@ -67,8 +67,8 @@ func TestMustParseBoolEnv_RecognizedValues(t *testing.T) {
 
 // TestMustParseBoolEnv_UnrecognizedValueCallsFatalFunc proves the fatal
 // path fires exactly on an unrecognized value, without exiting the test
-// binary — see H1: a near-miss value must fail loudly, not silently take
-// the default.
+// binary: a near-miss value must fail loudly, not silently take the
+// default.
 func TestMustParseBoolEnv_UnrecognizedValueCallsFatalFunc(t *testing.T) {
 	orig := FatalFunc
 	defer func() { FatalFunc = orig }()

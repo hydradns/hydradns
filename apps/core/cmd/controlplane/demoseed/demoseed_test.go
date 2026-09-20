@@ -110,12 +110,12 @@ func TestEnsureDemoUser_RefusesMultipleUsers(t *testing.T) {
 	}
 }
 
-// TestEnsureDemoUser_RefusesExistingQueryLogHistoryWithNoUsers is the
-// regression test for M7: a DB with query-log rows but zero users (a
-// pre-RBAC volume, or one where migration hasn't run) is not a fresh demo
-// volume, even though "zero users" alone would let it through — and
-// proceeding would hand that history to the periodic Refresh loop, which
-// deletes dns_queries on its very first tick.
+// TestEnsureDemoUser_RefusesExistingQueryLogHistoryWithNoUsers covers a DB
+// with query-log rows but zero users (a pre-RBAC volume, or one where
+// migration hasn't run): that is not a fresh demo volume, even though
+// "zero users" alone would let it through, and proceeding would hand that
+// history to the periodic Refresh loop, which deletes dns_queries on its
+// very first tick.
 func TestEnsureDemoUser_RefusesExistingQueryLogHistoryWithNoUsers(t *testing.T) {
 	db := openSeedTestDB(t)
 	store := newTestStore(db)
@@ -247,14 +247,13 @@ func TestRefresh_ReanchorsWithoutDuplicatingRowsOrPolicies(t *testing.T) {
 	}
 }
 
-// TestRefresh_FailurePartwayThroughRollsBackTheDelete is the regression
-// test for M7's transaction wrap: before this fix, the DNSQuery delete and
-// the statistics reset were two independent writes, so a failure between
-// them left the query log deleted but statistics untouched (or vice
-// versa) — a reader in that window sees an empty table. Forcing the
-// statistics step to fail (by dropping the table it targets) and then
-// asserting the delete never took effect proves both writes are now one
-// atomic unit.
+// TestRefresh_FailurePartwayThroughRollsBackTheDelete verifies the
+// DNSQuery delete and the statistics reset are one atomic unit: without
+// that, a failure between them could leave the query log deleted but
+// statistics untouched (or vice versa), and a reader in that window would
+// see an empty table. Forcing the statistics step to fail (by dropping the
+// table it targets) and then asserting the delete never took effect proves
+// both writes commit or roll back together.
 func TestRefresh_FailurePartwayThroughRollsBackTheDelete(t *testing.T) {
 	db := openSeedTestDB(t)
 	store := newTestStore(db)

@@ -9,7 +9,7 @@ func TestIsDoHBootstrap(t *testing.T) {
 		want   bool
 		note   string
 	}{
-		// Direct hits — exact strings from the curated list.
+		// Direct hits: exact strings from the curated list.
 		{"dns.google", true, "Google DoH endpoint"},
 		{"cloudflare-dns.com", true, "Cloudflare apex"},
 		{"chrome.cloudflare-dns.com", true, "Chrome's DoH endpoint"},
@@ -23,7 +23,7 @@ func TestIsDoHBootstrap(t *testing.T) {
 		{"sub.chrome.cloudflare-dns.com", true, "deep subdomain of listed parent"},
 		{"a.b.c.dns.google", true, "deep subdomain of dns.google"},
 
-		// Negatives — domains that look related but are not in the
+		// Negatives: domains that look related but are not in the
 		// list. These must not match, otherwise the curated guarantee
 		// is broken.
 		{"google.com", false, "real google.com is unrelated to DoH"},
