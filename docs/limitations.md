@@ -72,13 +72,12 @@ If something here changes, update this file in the same commit.
   a no-op. *Impact:* a policy that looks like it blocks `*.badsite.com` via regex won't
   actually block anything beyond exact domain matches. *Workaround:* list every domain you
   want blocked explicitly, or use a blocklist source instead of a regex policy.
-- **Editing a blocklist's URL keeps the old entries.** Adding, enabling, disabling or deleting
-  a blocklist reaches the DNS engine within about 5 seconds (`BLOCKLIST_POLL_INTERVAL`), the
-  same as policy edits, and a new list starts blocking once its first download finishes. But
-  changing a source's URL does not remove the entries fetched from the old URL. *Impact:* the
-  old list's domains stay blocked. *Workaround:* delete the source and add the new URL as a
-  new source.
-
+- **A new or edited blocklist starts working after its download finishes.** Adding, enabling,
+  disabling or deleting a blocklist reaches the DNS engine within about 5 seconds
+  (`BLOCKLIST_POLL_INTERVAL`), the same as policy edits. A new source, or a source whose URL
+  you changed, takes effect when the download of the new list completes; the previous list's
+  entries are replaced at that point. *Impact:* seconds to a few minutes of delay for large
+  lists on slow links.
 ## Dashboard and operations
 
 - **Dashboard recent-activity widget shows the newest 100 queries only.** The dedicated Logs
