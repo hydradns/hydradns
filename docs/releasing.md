@@ -59,7 +59,7 @@ so a plain `docker compose up -d` after this release tracks `latest` unless
 `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64` (`GOWORK=off`, so
 the workspace's `go 1.25.4` directive doesn't leak in; the build uses
 `apps/cli/go.mod`'s own `go 1.25.0`) and attaches the four binaries to a
-GitHub Release for the pushed tag via `softprops/action-gh-release@v2`. That
+GitHub Release for the pushed tag via `softprops/action-gh-release@v3`. That
 action creates the release automatically if one doesn't already exist for the
 tag; you don't need to create it by hand first.
 
