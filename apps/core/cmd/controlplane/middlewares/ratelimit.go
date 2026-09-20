@@ -14,9 +14,9 @@ import (
 // for an already-expired one, regardless of maxEntries. Without this bound,
 // a full map with no expired entries forces a scan of every one of
 // maxEntries entries, under the single global mutex, on every request from
-// a new key — an attacker with a large address pool (e.g. an IPv6 /64) can
+// a new key. An attacker with a large address pool (e.g. an IPv6 /64) can
 // turn that into an O(maxEntries) lock hold on every login/setup request
-// from a fresh IP (M2 in the launch-prep review).
+// from a fresh IP.
 const evictScanLimit = 64
 
 // RateLimiter is a fixed-window, per-key budget tracker: at most `limit`
@@ -24,19 +24,18 @@ const evictScanLimit = 64
 // before Blocked(key) starts returning true (with the remaining time until
 // the window resets). Safe for concurrent use.
 //
-// Blocked and RecordFailure are deliberately separate (see M1 in the
-// launch-prep review): checking whether a key is currently blocked must
-// not, by itself, consume any budget, so a caller can check-then-only-
-// record-on-failure (see LoginThrottle) instead of every call — success or
-// failure — counting against the same budget.
+// Blocked and RecordFailure are deliberately separate: checking whether a
+// key is currently blocked must not, by itself, consume any budget, so a
+// caller can check-then-only-record-on-failure (see LoginThrottle) instead
+// of every call, success or failure, counting against the same budget.
 //
 // Memory is bounded by maxEntries: once the entry map is full, a new key
 // tries to evict an already-expired entry first (bounded to evictScanLimit
 // entries inspected); if none is found in that sample, the entire map is
 // reset rather than scanning the rest of it under the lock. A fixed-window
-// limiter loses little by resetting occasionally under sustained pressure
-// — every tracked key gets a fresh budget slightly early, which is no
-// worse than the window boundary it would have hit anyway.
+// limiter loses little by resetting occasionally under sustained pressure:
+// every tracked key gets a fresh budget slightly early, which is no worse
+// than the window boundary it would have hit anyway.
 type RateLimiter struct {
 	mu         sync.Mutex
 	entries    map[string]*rateLimitEntry
@@ -93,7 +92,7 @@ func (rl *RateLimiter) Blocked(key string) (blocked bool, retryAfter time.Durati
 // RecordFailure counts one failed attempt against key's budget, starting a
 // fresh window if key is new or its previous window has expired. Callers
 // must only invoke this after the request's outcome is known to be a
-// failure (see LoginThrottle) — a successful request must never call this,
+// failure (see LoginThrottle); a successful request must never call this,
 // or it defeats the whole point of separating Blocked from RecordFailure.
 func (rl *RateLimiter) RecordFailure(key string) {
 	rl.mu.Lock()
@@ -117,9 +116,9 @@ func (rl *RateLimiter) RecordFailure(key string) {
 // evictScanLimit entries (Go's map iteration order is randomized, so this
 // is an effectively random sample, not always the same entries) looking
 // for one whose window has already expired. If it finds one, that single
-// entry is deleted — the common case under normal traffic, where expired
-// entries are plentiful. If the sample turns up nothing evictable (every
-// entry it looked at is still live), the whole map is reset instead of
+// entry is deleted. This is the common case under normal traffic, where
+// expired entries are plentiful. If the sample turns up nothing evictable
+// (every entry it looked at is still live), the whole map is reset instead of
 // scanning the remaining maxEntries-evictScanLimit entries under the lock.
 // Called with rl.mu held.
 func (rl *RateLimiter) evictLocked(now time.Time) {
@@ -142,21 +141,20 @@ func (rl *RateLimiter) evictLocked(now time.Time) {
 
 // LoginThrottle wraps a RateLimiter as gin middleware keyed by the
 // request's client IP. Intended for POST /auth/login and POST
-// /auth/setup only — unauthenticated endpoints where a brute-force
+// /auth/setup only: unauthenticated endpoints where a brute-force
 // attempt is otherwise unthrottled.
 //
-// Only failed attempts (a 4xx response — invalid credentials, a bad
+// Only failed attempts (a 4xx response: invalid credentials, a bad
 // request body, setup-already-complete, etc.) consume budget; the
 // middleware checks the budget before the handler runs (so an
 // already-blocked caller never reaches bcrypt or the DB), then records a
-// failure only after seeing the response status (M1 in the launch-prep
-// review). Before this, every call to Allow() — success or failure — cost
-// budget identically, so a legitimate admin behind a shared NAT (an
-// office, a coaching centre, the demo's own reverse proxy) could be locked
-// out of their own appliance purely by the dashboard, the CLI, and a phone
-// all re-authenticating successfully in the same window. A 5xx (the
-// server's own fault — a bcrypt or DB error) does not count either: it is
-// not evidence of a brute-force attempt or a mistyped password.
+// failure only after seeing the response status. Charging every call
+// equally, success or failure, would let a legitimate admin behind a
+// shared NAT (an office, a coaching centre, the demo's own reverse proxy)
+// get locked out of their own appliance purely by the dashboard, the CLI,
+// and a phone all re-authenticating successfully in the same window. A 5xx
+// (the server's own fault: a bcrypt or DB error) does not count either: it
+// is not evidence of a brute-force attempt or a mistyped password.
 //
 // The key MUST come from a client IP that cannot be spoofed by the
 // caller. c.ClientIP() falls back to trusting X-Forwarded-For /

@@ -33,19 +33,18 @@ func InitDB(path string) *gorm.DB {
 
 	// busy_timeout makes SQLite retry internally (up to this many ms)
 	// instead of immediately returning SQLITE_BUSY when another process
-	// holds the write lock. Without it, the default is 0 — no retry at
+	// holds the write lock. Without it, the default is 0, no retry at
 	// all. This matters specifically at migration time: cmd/controlplane
 	// and cmd/dataplane both call InitDB (and therefore AutoMigrate)
 	// against the same single-writer SQLite file, and on the combined
 	// `core` container they can start simultaneously. AutoMigrate adding
 	// an index to dns_queries (see models.DNSQuery's Action field) is a
 	// CREATE INDEX over a table that can hold up to ~1M rows on an
-	// existing install — a real write that can take more than an instant.
+	// existing install, a real write that can take more than an instant.
 	// 30s comfortably covers that on a Pi's SD card; the alternative
 	// (only one process ever migrates) would require the dataplane to
 	// wait/retry opening until the schema is ready, which is a change to
-	// cmd/dataplane/main.go outside this package's scope. See M5 in the
-	// launch-prep review.
+	// cmd/dataplane/main.go outside this package's scope.
 	db.Exec("PRAGMA busy_timeout=30000;")
 
 	// Run migrations

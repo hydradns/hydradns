@@ -39,8 +39,8 @@ type Engine struct {
 
 	// anonymizeClientIPs gates whether logQuery hashes the client IP
 	// (utils.AnonymizeIP) before it's persisted to the query log. Off by
-	// default — per-device visibility in the query log is a core feature
-	// of a home/office DNS firewall — and opt-in via
+	// default (per-device visibility in the query log is a core feature
+	// of a home/office DNS firewall) and opt-in via
 	// dataplane.anonymization.enabled / HYDRA_ANONYMIZE_CLIENT_IPS. Set
 	// once in NewDNSEngine, before the engine is handed to the DNS server,
 	// and never written again, so concurrent query handling never races on
@@ -49,7 +49,7 @@ type Engine struct {
 }
 
 // Upstream exchange budget: short per-attempt timeout with retries beats
-// one long wait — a lost UDP packet costs 1.5s, not 5s, before failover.
+// one long wait. A lost UDP packet costs 1.5s, not 5s, before failover.
 const (
 	upstreamTimeout    = 1500 * time.Millisecond
 	upstreamMaxRetries = 2
@@ -363,7 +363,7 @@ func (e *Engine) logQuery(domain, clientIP, action string, tr threat.Result) {
 	// This is the single place every stored query-log row is built, so
 	// it's the one place anonymization needs to be applied: whatever
 	// reaches here is exactly what SaveBatch persists. clientIP is
-	// normally w.RemoteAddr().String() — always "host:port" for UDP/TCP —
+	// normally w.RemoteAddr().String() (always "host:port" for UDP/TCP),
 	// so the ephemeral port is stripped unconditionally, whether or not
 	// anonymization is enabled: a per-connection port breaks per-device
 	// filtering/display just as badly unhashed as it would hashed. When

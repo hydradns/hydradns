@@ -138,7 +138,7 @@ func TestMigrate_Idempotent(t *testing.T) {
 	}
 }
 
-// TestInitDB_SetsBusyTimeout is the regression test for M5: both
+// TestInitDB_SetsBusyTimeout verifies busy_timeout is set: both
 // cmd/controlplane and cmd/dataplane call InitDB against the same SQLite
 // file, and without a busy_timeout a concurrent AutoMigrate (e.g. the new
 // index on dns_queries.action, over a table that can hold ~1M rows) can

@@ -10,7 +10,7 @@ import (
 // anonymizeClientIP hashes clientIP for storage in the query log, when
 // anonymization is enabled (see Engine.anonymizeClientIPs).
 //
-// clientIP is normally w.RemoteAddr().String() — for UDP/TCP that is always
+// clientIP is normally w.RemoteAddr().String(); for UDP/TCP that is always
 // a "host:port" (or "[host]:port" for IPv6) string, never a bare IP, so the
 // port must be stripped first: net.ParseIP (called inside
 // utils.AnonymizeIP) rejects anything with a port suffix and would

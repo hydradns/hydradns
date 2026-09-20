@@ -119,7 +119,7 @@ func (c *ResponseCache) Get(q *dns.Msg) *dns.Msg {
 // Set stores an upstream response. Truncated responses and rcodes other
 // than NOERROR/NXDOMAIN are not cached. Empty NOERROR responses are only
 // cached when the Authority section carries a SOA (a genuine NODATA answer
-// per RFC 2308) — an empty answer without one may be a referral.
+// per RFC 2308); an empty answer without one may be a referral.
 func (c *ResponseCache) Set(q, resp *dns.Msg) {
 	key, ok := cacheKeyFor(q)
 	if !ok || resp == nil || resp.Truncated {

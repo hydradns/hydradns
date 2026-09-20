@@ -34,7 +34,7 @@ type DataPlaneConfig struct {
 // core feature of a home/office DNS firewall, so turning this on is an
 // explicit opt-in (HYDRA_ANONYMIZE_CLIENT_IPS=true/1, or this field), not
 // the default. Secret is the raw config-file value; it is not the final
-// secret used at runtime — see ResolveAnonymizationSecret, which applies
+// secret used at runtime; see ResolveAnonymizationSecret, which applies
 // the HYDRA_ANON_SECRET env override and, only when anonymization is
 // enabled, generates+persists a per-install secret if this is left at the
 // documented placeholder.
@@ -49,11 +49,12 @@ type AnonymizationConfig struct {
 // (case-insensitive, whitespace-trimmed) on both sides.
 //
 // Exported so every boolean env var across the control plane parses the
-// same way — see MustParseBoolEnv, and the launch-prep review (H1): before
-// this, HYDRA_DEMO_MODE used a strict EqualFold("true") with no trim (so
-// "1", "yes", or a trailing space from a Docker env_file line silently
-// left demo mode OFF), and CORS_ALLOW_SAME_HOST treated anything except
-// the literal "false" as "on". One parser, one set of accepted spellings.
+// same way: see MustParseBoolEnv. A bespoke strings.EqualFold(v, "true")
+// check would silently leave HYDRA_DEMO_MODE off given "1", "yes", or a
+// trailing space from a Docker env_file line, and a check that only
+// special-cased the literal "false" would leave CORS_ALLOW_SAME_HOST on
+// for any other value. One parser, one set of accepted spellings avoids
+// both.
 func ParseBoolEnvValue(raw string) (value bool, ok bool) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "1", "true", "yes", "on":
@@ -79,10 +80,10 @@ var FatalFunc = func(format string, args ...interface{}) {
 // non-empty value that ParseBoolEnvValue does not recognize is a
 // misconfiguration, not something to silently paper over: it calls
 // FatalFunc naming both the variable and the offending value, so a
-// near-miss (a typo, a stray space, "1" where only "true" used to work)
-// fails loudly at startup instead of quietly taking the default — see H1
-// in the launch-prep review, where exactly this silently disabled
-// HYDRA_DEMO_MODE and left a public demo's /auth/setup open to the first
+// near-miss (a typo, a stray space, or "1" submitted where a check
+// expects exactly "true") fails loudly at startup instead of quietly
+// taking the default. A silent fallback here once left HYDRA_DEMO_MODE
+// effectively disabled and a public demo's /auth/setup open to the first
 // visitor.
 func MustParseBoolEnv(name string, def bool) bool {
 	raw := os.Getenv(name)
@@ -144,10 +145,10 @@ var DefaultConfig = func() *Config {
 	}
 	// Not routed through MustParseBoolEnv: this runs inside DefaultConfig's
 	// package-level initializer, which executes once at import time, before
-	// any test has a chance to set the env var or override FatalFunc — a
+	// any test has a chance to set the env var or override FatalFunc. A
 	// Fatal here would not be testable without restructuring config loading
-	// into a lazy call, which is a larger change than this fix warrants.
-	// Warn-and-keep-configured-value is the existing, deliberate behavior.
+	// into a lazy call. Warn-and-keep-configured-value is the deliberate
+	// fallback instead.
 	if raw := os.Getenv("HYDRA_ANONYMIZE_CLIENT_IPS"); raw != "" {
 		if v, ok := ParseBoolEnvValue(raw); ok {
 			cfg.DataPlane.Anonymization.Enabled = v

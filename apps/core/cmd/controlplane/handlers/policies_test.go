@@ -99,7 +99,7 @@ type policyResponse struct {
 	Data   Policy `json:"data"`
 }
 
-// --- M10: action must be validated against the real action set ---
+// --- action must be validated against the real action set ---
 
 func TestCreatePolicy_InvalidActionIsBadRequest(t *testing.T) {
 	th := newPoliciesHarness(t)
@@ -179,7 +179,7 @@ func TestUpdatePolicy_InvalidActionIsBadRequest(t *testing.T) {
 		t.Fatalf("got %d, want 400 for an unrecognized action", rec.Code)
 	}
 
-	// The policy must be unchanged — still BLOCK, not silently downgraded.
+	// The policy must be unchanged: still BLOCK, not silently downgraded.
 	got, _ := th.store.Policies.GetByID("p1")
 	if got.Action != "BLOCK" {
 		t.Errorf("expected the stored action to remain BLOCK, got %q", got.Action)
@@ -238,7 +238,7 @@ func TestUpdatePolicy_PathIDWinsOverBodyID(t *testing.T) {
 
 	// Body carries a different id; the struct bound for PUT has no id
 	// field at all, so this is also a compile-time guarantee, not just a
-	// runtime one — but assert the observable behavior too.
+	// runtime one. Assert the observable behavior too.
 	rec := th.do("PUT", "/api/v1/policies/real-id", tok, gin.H{
 		"id": "attacker-id", "name": "Renamed", "action": "BLOCK", "domains": []string{"a.com"},
 	})
@@ -311,7 +311,7 @@ func TestUpdatePolicy_MissingRequiredFieldIsBadRequest(t *testing.T) {
 		"id": "p1", "name": "P1", "action": "BLOCK", "domains": []string{"a.com"},
 	})
 
-	// Missing "action" — same required-field validation as create.
+	// Missing "action": same required-field validation as create.
 	rec := th.do("PUT", "/api/v1/policies/p1", tok, gin.H{
 		"name": "P1", "domains": []string{"a.com"},
 	})

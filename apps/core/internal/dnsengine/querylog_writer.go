@@ -55,7 +55,7 @@ func NewQueryLogWriter(ql repositories.QueryLogRepository, stats repositories.St
 }
 
 // Enqueue submits a query log without blocking. If the queue is full
-// (writer can't keep up), the entry is dropped and counted — resolution
+// (writer can't keep up), the entry is dropped and counted: resolution
 // is never delayed by logging.
 func (w *QueryLogWriter) Enqueue(q *models.DNSQuery) {
 	if w == nil || q == nil {

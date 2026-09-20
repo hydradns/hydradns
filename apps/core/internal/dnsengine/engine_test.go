@@ -179,7 +179,7 @@ func TestProcessDNSQuery_BlockedByPolicy(t *testing.T) {
 }
 
 func TestProcessDNSQuery_BlocklistBeforePolicy(t *testing.T) {
-	// Domain is in both blocklist and policy — blocklist should win (checked first)
+	// Domain is in both blocklist and policy; blocklist should win (checked first)
 	bl := &mockBlocklist{blocked: map[string]bool{"both.com": true}}
 	policies := []policy.Policy{
 		{ID: "allow-both", Action: "ALLOW", Priority: 100, Domains: []string{"both.com"}},
@@ -216,7 +216,7 @@ func TestProcessDNSQuery_DomainNormalization(t *testing.T) {
 }
 
 func TestProcessDNSQuery_BlocklistErrorContinues(t *testing.T) {
-	// Blocklist returns an error — should continue to policy evaluation, not hang
+	// Blocklist returns an error; should continue to policy evaluation, not hang
 	bl := &mockBlocklist{err: net.ErrClosed}
 	policies := []policy.Policy{
 		{ID: "block-fallback", Action: "BLOCK", Priority: 100, Domains: []string{"test.com"}},
@@ -239,7 +239,7 @@ func TestProcessDNSQuery_PolicyAllowNoUpstream(t *testing.T) {
 	// This tests that the engine doesn't panic with nil upstreamManager
 	bl := &mockBlocklist{blocked: map[string]bool{}}
 	e := newTestEngine(bl, nil)
-	// upstreamManager is nil — forwardUpstream will be called
+	// upstreamManager is nil; forwardUpstream will be called
 
 	w := &mockResponseWriter{}
 	// This will panic if nil upstreamManager isn't handled

@@ -22,11 +22,11 @@ const (
 	// demoLoginRateLimitAttempts relaxes the login budget when
 	// HYDRA_DEMO_MODE=true. The demo password is fixed and publicly
 	// documented (see demo/README.md), so throttling it tighter buys no
-	// confidentiality — the only remaining purpose of a limit here is
+	// confidentiality; the only remaining purpose of a limit here is
 	// abuse/log-spam protection, not secrecy. A public demo is commonly
 	// reached by many visitors behind one shared NAT/proxy IP (an office,
 	// a campus, or the demo's own reverse proxy if TRUSTED_PROXIES isn't
-	// configured for it — see demo/README.md), and 10 attempts/5min shared
+	// configured for it; see demo/README.md), and 10 attempts/5min shared
 	// across all of them would routinely lock everyone out over one
 	// visitor's "Enter Demo" clicks. A higher ceiling keeps a bound in
 	// place while tolerating that.
@@ -52,7 +52,7 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler, demoMode boo
 	r.GET("/health", apiHandler.HealthCheck)
 	r.GET("/", apiHandler.Root)
 	{
-		// Auth endpoints (unprotected — middleware exempts these paths).
+		// Auth endpoints (unprotected: middleware exempts these paths).
 		// /setup and /login are additionally throttled per client IP:
 		// they are the only endpoints an unauthenticated caller can hit
 		// repeatedly to brute-force a password. See middlewares.LoginThrottle
@@ -75,7 +75,7 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler, demoMode boo
 			dashboard.GET("/summary", apiHandler.GetDashboardSummary)
 		}
 
-		// DNS Engine endpoints — read open, write requires operator+
+		// DNS Engine endpoints: read open, write requires operator+
 		dns := api.Group("/dns")
 		{
 			dns.GET("/engine", apiHandler.GetDnsEngineStatus)

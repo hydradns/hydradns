@@ -21,7 +21,7 @@ type DNSQuery struct {
 
 // DetectionMethodDoHBootstrap marks DNSQuery rows produced by the
 // DoH/DoT/DoQ bootstrap-hostname interception in
-// internal/dnsengine.ProcessDNSQuery (Step 0 — see doh_bootstrap.go).
+// internal/dnsengine.ProcessDNSQuery (Step 0; see doh_bootstrap.go).
 // Shared here (rather than duplicated as a string literal) because both
 // internal/dnsengine (writer) and internal/storage/repositories (reader,
 // for GET /analytics/bypass) need the exact same value, and dnsengine

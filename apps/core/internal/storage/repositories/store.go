@@ -18,7 +18,7 @@ type Store struct {
 }
 
 func NewStore(db *gorm.DB) *Store {
-	// Migrations run in db.InitDB() — single source of truth.
+	// Migrations run in db.InitDB(); single source of truth.
 	return &Store{
 		QueryLogs:   NewGormQueryLogRepo(db),
 		Blocklist:   NewBlocklistRepo(db),
