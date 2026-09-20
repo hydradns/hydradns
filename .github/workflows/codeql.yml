@@ -25,6 +25,13 @@ jobs:
             build-mode: none
     steps:
       - uses: actions/checkout@v4
+      # The runner's default Go is older than the version go.work requires,
+      # which makes the CodeQL Go autobuilder fail before it extracts anything.
+      - uses: actions/setup-go@v5
+        if: matrix.language == 'go'
+        with:
+          go-version-file: go.work
+          cache: false
       - uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
