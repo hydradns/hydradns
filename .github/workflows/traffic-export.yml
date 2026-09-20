@@ -1,0 +1,75 @@
+name: Traffic Export
+
+# GitHub's Traffic tab / REST API only retains a rolling 14-day window, so this workflow runs
+# on a schedule to append that week's numbers to CSV files that accumulate history
+# indefinitely, committed to a dedicated `traffic-data` branch (so `main` stays clean).
+#
+# Requires a repository secret named TRAFFIC_TOKEN: a fine-grained personal access token (or
+# GitHub App token) with repository "Administration" permission (read) on this repo. The
+# traffic endpoints this workflow calls require that permission, and the default GITHUB_TOKEN
+# cannot be granted it under any configuration -- "administration" is not one of the scopes
+# assignable to GITHUB_TOKEN via the `permissions:` block below or anywhere else. See
+# docs/internal/launch-kit/00-roshan-only-checklist.md ("Create the TRAFFIC_TOKEN secret") for
+# the exact click path to create and add one. Without it, this workflow fails fast with a clear
+# message instead of a confusing permissions error partway through.
+
+on:
+  schedule:
+    # Weekly, well inside the 14-day retention window even if a run is missed once.
+    - cron: "0 6 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  export-traffic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require TRAFFIC_TOKEN secret
+        run: |
+          if [ -z "${{ secrets.TRAFFIC_TOKEN }}" ]; then
+            echo "::error::TRAFFIC_TOKEN secret is not set. The GitHub traffic API needs a token with repository Administration (read) permission, which the default GITHUB_TOKEN cannot be granted. See docs/internal/launch-kit/00-roshan-only-checklist.md, 'Create the TRAFFIC_TOKEN secret', for how to create and add one."
+            exit 1
+          fi
+
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare traffic-data worktree
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin traffic-data >/dev/null 2>&1; then
+            git fetch origin traffic-data:traffic-data
+            git worktree add traffic-data-wt traffic-data
+          else
+            echo "No traffic-data branch yet -- creating it."
+            git worktree add --detach traffic-data-wt
+            git -C traffic-data-wt checkout --orphan traffic-data
+            git -C traffic-data-wt rm -rf . >/dev/null 2>&1 || true
+          fi
+
+      - name: Run export script
+        env:
+          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
+          REPO: ${{ github.repository }}
+          OUT_DIR: traffic-data-wt
+        run: bash scripts/export-traffic.sh
+
+      - name: Commit and push traffic data
+        working-directory: traffic-data-wt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -- *.csv
+          if git diff --cached --quiet; then
+            echo "No traffic changes to commit."
+            exit 0
+          fi
+          git commit -m "traffic: export $(date -u +%F)"
+          git push origin HEAD:traffic-data
