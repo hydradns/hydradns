@@ -148,6 +148,9 @@ The `hydra` CLI wraps the control plane API for terminal-based management.
 # Build the CLI
 cd apps/cli && go build -o hydra .
 
+# First boot: create the admin account and store the API token
+hydra setup
+
 # Check status
 hydra status
 
