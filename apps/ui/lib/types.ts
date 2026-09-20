@@ -36,7 +36,7 @@ export interface DnsMetrics {
   grade: "excellent" | "good" | "degraded" | "bad" | "unknown"
 }
 
-// Resolvers are read-only in the dashboard — the control plane has no
+// Resolvers are read-only in the dashboard: the control plane has no
 // create/update/delete route for /dns/resolvers (configured via
 // configs/config.yaml instead), so there's no Create/Update request type.
 export interface Resolver {
@@ -109,7 +109,7 @@ export interface CreatePolicyRequest {
 }
 
 // The Go handler's UpdatePolicyRequest (apps/core/cmd/controlplane/handlers/
-// policies.go) requires name, action, and domains on every PUT — there is no
+// policies.go) requires name, action, and domains on every PUT; there is no
 // partial-patch support server-side. `enabled` is the one field the backend
 // accepts on top of CreatePolicyRequest's shape.
 export type UpdatePolicyRequest = Pick<CreatePolicyRequest, "name" | "action" | "domains"> &
@@ -183,7 +183,7 @@ export interface BypassAttemptsData {
   attempts: BypassAttempt[]
 }
 
-// RBAC — Users
+// RBAC: users
 export type UserRole = "admin" | "operator" | "read_only"
 
 export interface User {
@@ -213,9 +213,9 @@ export interface UpdateUserRequest {
   enabled?: boolean
 }
 
-// RBAC — API tokens. Every authenticated user manages their own tokens via
+// RBAC: API tokens. Every authenticated user manages their own tokens via
 // the flat GET/POST /tokens and DELETE /tokens/:id (see
-// apps/core/cmd/controlplane/handlers/tokens.go's tokenDTO) — there is no
+// apps/core/cmd/controlplane/handlers/tokens.go's tokenDTO). There is no
 // per-user nesting and no rotate endpoint. Field names below mirror the Go
 // DTO exactly (`label`, not `name`; `revoked_at`, not a `revoked` boolean).
 export interface Token {
@@ -233,7 +233,7 @@ export interface CreateTokenRequest {
   expiry_days?: number
 }
 
-// The plaintext secret is only ever returned once, on create — there is no
+// The plaintext secret is only ever returned once, on create. There is no
 // rotate endpoint. Mirrors the Go handler's response envelope: `token` is
 // the one-time plaintext secret, `meta` is the stored token record.
 export interface TokenSecret {
@@ -241,7 +241,7 @@ export interface TokenSecret {
   meta: Token
 }
 
-// RBAC — Audit log
+// RBAC: audit log
 export interface AuditEvent {
   id: string
   actor: string
@@ -269,7 +269,7 @@ export interface AuditQuery {
 }
 
 // Settings (control-plane engine configuration). There is no GET/PATCH
-// /settings route on the control plane (see lib/api.ts) — this type only
+// /settings route on the control plane (see lib/api.ts). This type only
 // shapes the static, disabled preview rendered by
 // app/dashboard/settings/page.tsx until a real backend exists.
 export interface Settings {

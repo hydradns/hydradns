@@ -6,10 +6,10 @@ import { SidebarProvider } from "@/components/ui/sidebar"
 import * as api from "@/lib/api"
 import type { Policy, PolicyListData } from "@/lib/types"
 
-// H1 fix: the Edit/Create Policy drawer used to send `schedule` and
+// The Edit/Create Policy drawer used to send `schedule` and
 // `client_scope`, fields the backend's CreatePolicyRequest/
 // UpdatePolicyRequest (apps/core/cmd/controlplane/handlers/policies.go)
-// doesn't have at all — Gin's ShouldBindJSON silently drops them, so a user
+// doesn't have. Gin's ShouldBindJSON silently drops them, so a user
 // filling them in saw no error but nothing was ever saved. Both inputs and
 // both fields have been removed entirely; these tests assert the drawer no
 // longer offers them and that the request payload never includes them.

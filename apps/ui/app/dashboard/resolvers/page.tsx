@@ -16,7 +16,7 @@ import type { Resolver } from "@/lib/types"
 import { Info, Server } from "lucide-react"
 
 // Resolvers are read-only here: the control plane has no create/update/
-// delete route for /dns/resolvers (see lib/api.ts) — they're configured
+// delete route for /dns/resolvers (see lib/api.ts). They're configured
 // via configs/config.yaml's upstream_resolvers list, not the dashboard.
 export default function ResolversPage() {
   const [resolvers, setResolvers] = useState<Resolver[]>([])
@@ -64,8 +64,8 @@ export default function ResolversPage() {
           <Info className="h-4 w-4 mt-0.5 shrink-0 text-[#00D4AA]" />
           <p>
             Resolvers are configured in <code className="font-mono text-xs">configs/config.yaml</code>
-            {" "}(<code className="font-mono text-xs">dataplane.upstream_resolvers</code>) and restart-applied —
-            there&apos;s no add/edit/delete here yet.
+            {" "}(<code className="font-mono text-xs">dataplane.upstream_resolvers</code>) and restart-applied.
+            There&apos;s no add/edit/delete here yet.
           </p>
         </div>
 

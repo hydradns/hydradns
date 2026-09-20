@@ -27,7 +27,7 @@ export default function LoginPage() {
         router.replace("/setup")
       } else if (status === "unreachable") {
         setApiReachable(false)
-        setError("Cannot reach HydraDNS API — is the server running?")
+        setError("Cannot reach HydraDNS API. Is the server running?")
         setLoading(false)
       } else {
         // Demo mode always has setup pre-completed (see demoseed), but
@@ -35,10 +35,10 @@ export default function LoginPage() {
         // since POST /auth/setup is rejected outright by the server.
         if (demoMode) {
           setDemoMode(true)
-          // H7: dynamically imported so the demo password string is only
-          // ever fetched (as its own chunk) when the server has confirmed
-          // demo mode is on — it never ships in the login page's main
-          // bundle for a normal, non-demo self-hosted install.
+          // Dynamically imported so the demo password string is only ever
+          // fetched (as its own chunk) when the server has confirmed demo
+          // mode is on. It never ships in the login page's main bundle for
+          // a normal, non-demo self-hosted install.
           const { DEMO_PASSWORD } = await import("@/lib/demo-credentials")
           setPassword(DEMO_PASSWORD)
         }
@@ -168,7 +168,7 @@ export default function LoginPage() {
               </button>
               {demoMode && (
                 <p className="text-center text-xs text-slate-500">
-                  Demo credentials are pre-filled — just click Enter Demo.
+                  Demo credentials are pre-filled. Click Enter Demo to continue.
                 </p>
               )}
             </form>

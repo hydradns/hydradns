@@ -34,7 +34,7 @@ func TestToolRegistryClassification(t *testing.T) {
 		seen[t2.Name] = true
 		want, ok := wantClassification[t2.Name]
 		if !ok {
-			t.Errorf("tool %q is registered but has no expected classification in this test — add one", t2.Name)
+			t.Errorf("tool %q is registered but has no expected classification in this test; add one", t2.Name)
 			continue
 		}
 		if t2.ReadOnly != want {

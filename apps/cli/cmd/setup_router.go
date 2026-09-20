@@ -16,8 +16,8 @@ import (
 var timeNow = time.Now
 
 // known DoH provider IPs that we recommend blackholing at the firewall
-// alongside the DNS-port lockdown. List is intentionally short and
-// boring — the v4 anycast addresses every browser and OS uses by
+// alongside the DNS-port lockdown. The list is intentionally short and
+// boring: the v4 anycast addresses every browser and OS uses by
 // default. IPv6 equivalents are in the same templates.
 var dohProviderIPs = []routerIP{
 	{Owner: "Cloudflare", IP4: "1.1.1.1", IP6: "2606:4700:4700::1111"},

@@ -34,14 +34,14 @@ func New(baseURL, token string) *Client {
 // stripAuthorizationCrossHost is a Client.CheckRedirect policy. Go's
 // default redirect handling already drops Authorization/Cookie headers
 // when the redirect target's *hostname* differs from the original
-// request's — but it compares hostnames only (net/http
-// shouldCopyHeaderOnRedirect / isDomainOrSubdomain), not host:port, so a
+// request's, but it only compares hostnames (net/http
+// shouldCopyHeaderOnRedirect / isDomainOrSubdomain), not host:port. A
 // redirect to the same hostname on a different port still forwards the
-// bearer token. For an admin API token that's the more realistic local
-// attack (a compromised or spoofed service on another port of the same
-// box), so this compares the full host:port and strips Authorization on
-// any mismatch. It also preserves the standard 10-redirect cap since
-// setting CheckRedirect overrides Go's default one.
+// bearer token, and for an admin API token that's the more realistic
+// local attack: a compromised or spoofed service on another port of the
+// same box. This compares the full host:port instead and strips
+// Authorization on any mismatch. It also preserves the standard
+// 10-redirect cap, since setting CheckRedirect overrides Go's default.
 func stripAuthorizationCrossHost(req *http.Request, via []*http.Request) error {
 	if len(via) >= 10 {
 		return errors.New("stopped after 10 redirects")
@@ -54,7 +54,7 @@ func stripAuthorizationCrossHost(req *http.Request, via []*http.Request) error {
 
 // warnIfInsecure prints a one-line, stderr-only warning when baseURL is
 // plain http:// and the host is not loopback, RFC1918, ULA, or
-// link-local — i.e. it looks like a public address or a public-looking
+// link-local, meaning it looks like a public address or a public-looking
 // name. HydraDNS has no TLS story yet (see CLAUDE.md "Known Incomplete
 // Features"), and plain http:// on a LAN is the normal, expected way to
 // reach the box; this only fires for the case that actually leaks a
@@ -71,14 +71,14 @@ func warnIfInsecure(baseURL string) {
 		return
 	}
 	fmt.Fprintf(os.Stderr,
-		"warning: %s uses plain http:// to a non-local address (%s) — credentials will be sent in cleartext over the network\n",
+		"warning: %s uses plain http:// to a non-local address (%s); credentials will be sent in cleartext over the network\n",
 		baseURL, host)
 }
 
 // hostLooksPrivate reports whether host is loopback, RFC1918/ULA, or
-// link-local. Anything else — a public IP, or a hostname we have no way
-// to resolve without a network round trip — is treated as
-// public-looking so the warning fires rather than staying silent.
+// link-local. A public IP, or a hostname that would need a network
+// round trip to resolve, is treated as public-looking so the warning
+// fires rather than staying silent.
 func hostLooksPrivate(host string) bool {
 	if host == "localhost" {
 		return true
@@ -325,9 +325,9 @@ type LoginResponse struct {
 }
 
 // SetupBlocklistRequest mirrors setupBlocklistRequest on the server
-// (apps/core cmd/controlplane/handlers/auth.go). Not currently exposed
-// via CLI flags — the setup wizard in the dashboard covers blocklist
-// selection — but kept here so the wire contract is in one place.
+// (apps/core cmd/controlplane/handlers/auth.go). The setup wizard in
+// the dashboard covers blocklist selection, so this isn't exposed via
+// CLI flags, but it's kept here so the wire contract lives in one place.
 type SetupBlocklistRequest struct {
 	ID     string `json:"id,omitempty"`
 	Name   string `json:"name,omitempty"`

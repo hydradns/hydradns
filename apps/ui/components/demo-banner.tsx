@@ -6,12 +6,12 @@ import { getAuthStatus } from "@/lib/auth"
 
 // REPO_URL is the "install your own" link the banner points to. Kept as a
 // constant here (not read from an env var) since it never changes per
-// deployment — it always points at the upstream project, regardless of
+// deployment: it always points at the upstream project, regardless of
 // where a given demo instance is hosted.
 const REPO_URL = "https://github.com/hydradns/hydradns"
 
 // DemoBanner renders a slim, dismiss-free strip when the control plane
-// reports demo_mode: true on GET /api/v1/auth/status (unauthenticated —
+// reports demo_mode: true on GET /api/v1/auth/status (unauthenticated;
 // see lib/auth.ts getAuthStatus). Mounted once in the root layout so it
 // appears above every page (login, setup, dashboard) without needing to be
 // added per-route. Renders nothing while the check is in flight or when

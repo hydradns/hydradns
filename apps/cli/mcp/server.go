@@ -123,7 +123,7 @@ type CallToolParams struct {
 
 // defaultServerVersion is reported in serverInfo.version when the caller
 // (cmd/mcp.go, or a test using NewServerWithRole) doesn't supply one. It
-// intentionally does not hardcode a CLI version string — see NewServer.
+// intentionally does not hardcode a CLI version string; see NewServer.
 const defaultServerVersion = "dev"
 
 type Server struct {
@@ -159,8 +159,9 @@ func NewServerWithRole(client *api.Client, role Role) *Server {
 // toolSpec pairs a Tool definition with its read-only classification. This
 // is the single source of truth for a tool's identity: its registration
 // (name, description, schema) and whether it only reads state travel
-// together, so there is nowhere else — an annotation step, a role check —
-// that can independently guess at classification from the tool's name.
+// together, so there is nowhere else, such as an annotation step or a
+// role check, that can independently guess at classification from the
+// tool's name.
 //
 // classified is set only by roTool/mutTool: a toolSpec built any other way
 // (a bare struct literal) leaves it false, which
@@ -256,7 +257,7 @@ func toolRegistry() []toolSpec {
 			InputSchema{Type: "object"}),
 
 		// explain_anomaly and compare_to_last_month only read data (dashboard
-		// summary, metrics, query logs) — they must be classified read-only
+		// summary, metrics, query logs), so they must be classified read-only
 		// here even though their names don't start with get_/list_. That
 		// naming mismatch is exactly the bug this registry replaces: a
 		// prefix-based heuristic previously treated both as mutating, which
