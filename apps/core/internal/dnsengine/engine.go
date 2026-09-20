@@ -293,7 +293,15 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 	// internal/dnsengine/doh_bootstrap.go.
 	if IsDoHBootstrap(domainName) {
 		logger.Log.Infof("Blocked DoH bootstrap: %s", domainName)
-		e.logQuery(domainName, clientIP, "block", threatResult)
+		// Tag the row so GET /analytics/bypass can distinguish "client
+		// tried to evade filtering via encrypted DNS" from an ordinary
+		// blocklist/policy block. DetectionMethod is otherwise only set
+		// by the threat detector (entropy/DGA heuristics on allowed-but-
+		// suspicious domains); it is always empty on block rows today, so
+		// reusing it here does not collide with that meaning in practice.
+		bootstrapResult := threatResult
+		bootstrapResult.DetectionMethod = models.DetectionMethodDoHBootstrap
+		e.logQuery(domainName, clientIP, "block", bootstrapResult)
 		respondNXDomain(w, r)
 		success = true
 		return
@@ -354,10 +362,13 @@ func (e *Engine) logQuery(domain, clientIP, action string, tr threat.Result) {
 	}
 	// This is the single place every stored query-log row is built, so
 	// it's the one place anonymization needs to be applied: whatever
-	// reaches here is exactly what SaveBatch persists. When disabled
-	// (default), storedClientIP is clientIP unchanged — byte-for-byte
-	// today's behavior.
-	storedClientIP := clientIP
+	// reaches here is exactly what SaveBatch persists. clientIP is
+	// normally w.RemoteAddr().String() — always "host:port" for UDP/TCP —
+	// so the ephemeral port is stripped unconditionally, whether or not
+	// anonymization is enabled: a per-connection port breaks per-device
+	// filtering/display just as badly unhashed as it would hashed. When
+	// anonymization is enabled, the bare host is hashed on top.
+	storedClientIP := stripClientPort(clientIP)
 	if e.anonymizeClientIPs {
 		storedClientIP = anonymizeClientIP(clientIP)
 	}
