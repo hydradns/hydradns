@@ -247,6 +247,30 @@ type LoginResponse struct {
 	Token string `json:"token"`
 }
 
+// SetupBlocklistRequest mirrors setupBlocklistRequest on the server
+// (apps/core cmd/controlplane/handlers/auth.go). Not currently exposed
+// via CLI flags — the setup wizard in the dashboard covers blocklist
+// selection — but kept here so the wire contract is in one place.
+type SetupBlocklistRequest struct {
+	ID     string `json:"id,omitempty"`
+	Name   string `json:"name,omitempty"`
+	URL    string `json:"url,omitempty"`
+	Format string `json:"format,omitempty"`
+}
+
+// SetupRequest mirrors setupRequest on the server. Email is optional;
+// the server defaults to admin@hydradns.local when omitted.
+type SetupRequest struct {
+	Email      string                  `json:"email,omitempty"`
+	Password   string                  `json:"password"`
+	Blocklists []SetupBlocklistRequest `json:"blocklists,omitempty"`
+}
+
+type SetupResponse struct {
+	Token    string   `json:"token"`
+	Warnings []string `json:"warnings,omitempty"`
+}
+
 func (c *Client) GetAuthStatus() (*AuthStatus, error) {
 	data, err := c.do("GET", "/auth/status", nil)
 	if err != nil {
@@ -254,6 +278,18 @@ func (c *Client) GetAuthStatus() (*AuthStatus, error) {
 	}
 	var s AuthStatus
 	return &s, json.Unmarshal(data, &s)
+}
+
+// Setup calls POST /auth/setup to create the first admin user and mint
+// its long-lived token. Only succeeds if no users exist yet (the server
+// returns a 409 "setup already completed" error otherwise).
+func (c *Client) Setup(req SetupRequest) (*SetupResponse, error) {
+	data, err := c.do("POST", "/auth/setup", req)
+	if err != nil {
+		return nil, err
+	}
+	var r SetupResponse
+	return &r, json.Unmarshal(data, &r)
 }
 
 func (c *Client) Login(password string) (*LoginResponse, error) {

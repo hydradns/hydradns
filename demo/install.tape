@@ -44,9 +44,18 @@ Enter
 Sleep 3s
 
 # hydra block calls the control-plane API, which requires a bearer token.
-# First boot has no admin account yet, so mint one via the setup endpoint
+# First boot has no admin account yet, so mint one with `hydra setup`
 # (equivalent to the dashboard's first-run setup wizard) before blocking.
-Type "TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/setup -H 'Content-Type: application/json' -d '{\"password\":\"changeme12345\"}' | grep -o '\"token\":\"[^\"]*\"' | cut -d'\"' -f4) && export HYDRA_TOKEN=$TOKEN"
+# The password prompt disables terminal echo, so nothing typed below
+# appears in the recording — this is a real interactive TTY under vhs,
+# not a piped/non-interactive run.
+Type "./apps/cli/hydra setup"
+Enter
+Sleep 1s
+Type "changeme12345"
+Enter
+Sleep 500ms
+Type "changeme12345"
 Enter
 Sleep 2s
 
