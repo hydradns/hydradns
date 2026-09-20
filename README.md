@@ -1,6 +1,6 @@
 # HydraDNS
 
-**A self-hosted DNS firewall you can manage by talking to an AI agent.** Block ads, malware, and trackers at the DNS level like Pi-hole, rebuilt in Go with an API-first control plane and a built-in Model Context Protocol server, so Claude or any MCP agent can run your network for you.
+**A self-hosted DNS firewall in Go.** Blocks ads, malware and trackers network-wide, like Pi-hole. API-first control plane, a real dashboard, a CLI, and a built-in Model Context Protocol server so Claude or any MCP agent can manage policy for you.
 
 
 [![Go](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go)](https://go.dev)
