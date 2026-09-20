@@ -1,7 +1,7 @@
 # Cutting a Release
 
 Runbook for tagging the first (and every subsequent) HydraDNS release. As of
-this writing the repo has zero tags and zero GitHub Releases —
+this writing the repo has zero tags and zero GitHub Releases.
 `.github/workflows/release.yml` has never run. Read it end to end before
 tagging; it only triggers on `push: tags: v*` and cannot be dry-run.
 
@@ -12,7 +12,7 @@ anything itself.
 
 Two jobs, both gated on a `v*` tag push:
 
-**`build-and-push`** — builds and pushes `linux/amd64` + `linux/arm64` images
+**`build-and-push`**: builds and pushes `linux/amd64` + `linux/arm64` images
 via `docker/build-push-action@v6` (QEMU + Buildx), for three services:
 
 | Service | Build context | Image |
@@ -24,13 +24,13 @@ via `docker/build-push-action@v6` (QEMU + Buildx), for three services:
 `hydra-cli`'s image additionally gets a `VERSION` build-arg (`steps.meta.outputs.version`,
 e.g. `0.1.0` for a `v0.1.0` tag push) stamped into the binary via
 `-X github.com/hydradns/hydra-cli/cmd.Version=...`; `core` and `ui` don't take that arg. Its
-default command runs `hydra mcp` (stdio), for listing in the official MCP registry — see
+default command runs `hydra mcp` (stdio), for listing in the official MCP registry; see
 `docs/mcp.md`.
 
 Tags come from `docker/metadata-action@v5` with `type=semver,pattern={{version}}`,
 `type=semver,pattern={{major}}.{{minor}}`, and `type=sha`. For a `v0.1.0` tag
 push this produces, per image: `0.1.0`, `0.1`, `sha-<7-char-sha>`, **and
-`latest`** — `metadata-action`'s default `flavor: latest=auto` adds `latest`
+`latest`**. `metadata-action`'s default `flavor: latest=auto` adds `latest`
 for any `type=semver` rule, including pre-1.0 versions (confirmed against
 `docker/metadata-action`'s README; the "major version zero" caveat there only
 concerns the bare `{{major}}` pattern, e.g. tag `0`, which this workflow does
@@ -55,15 +55,15 @@ ghcr.io/hydradns/hydra-cli:latest
 so a plain `docker compose up -d` after this release tracks `latest` unless
 `HYDRA_VERSION` is pinned in `.env`.
 
-**`release-cli`** — cross-compiles the `hydra` CLI for
+**`release-cli`**: cross-compiles the `hydra` CLI for
 `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64` (`GOWORK=off`, so
 the workspace's `go 1.25.4` directive doesn't leak in; the build uses
 `apps/cli/go.mod`'s own `go 1.25.0`) and attaches the four binaries to a
 GitHub Release for the pushed tag via `softprops/action-gh-release@v2`. That
 action creates the release automatically if one doesn't already exist for the
-tag — you don't need to create it by hand first.
+tag; you don't need to create it by hand first.
 
-**`release-cli-checksums`** — runs after all four `release-cli` matrix legs
+**`release-cli-checksums`**: runs after all four `release-cli` matrix legs
 finish (`needs: release-cli`). It `gh release download`s the four
 `hydra-<goos>-<goarch>` binaries just uploaded, runs `sha256sum hydra-* >
 checksums.txt` over them, and `gh release upload --clobber`s that file back
@@ -71,7 +71,7 @@ onto the same release. This is required, not cosmetic: `hydra update`
 (`apps/cli/selfupdate`) refuses to install a binary it cannot verify against a
 published checksum, so a release with binaries but no `checksums.txt` makes
 `hydra update` fail for everyone on every platform. The feed it reads is
-`https://api.github.com/repos/hydradns/hydradns/releases/latest` — this repo,
+`https://api.github.com/repos/hydradns/hydradns/releases/latest`: this repo,
 not the old, now-archived `hydradns/hydra-cli` standalone repo.
 
 ### NEXT_PUBLIC_API_URL is baked, but the dashboard resolves the API at runtime
@@ -83,7 +83,7 @@ code (`apps/ui/lib/api-base.ts`) treats that specific baked value as a
 sentinel: unless the page itself is being viewed on localhost, it's ignored
 in favor of deriving the API host from the page's own URL (same protocol and
 hostname, port 8080). So the published `ghcr.io/hydradns/ui` image works
-correctly over a LAN IP with no rebuild — opening the dashboard at
+correctly over a LAN IP with no rebuild. Opening the dashboard at
 `http://192.168.1.53:3000` calls `http://192.168.1.53:8080` automatically.
 The corresponding control-plane CORS change is in
 `apps/core/cmd/controlplane/middlewares/cors.go`.
@@ -91,7 +91,7 @@ The corresponding control-plane CORS change is in
 `NEXT_PUBLIC_API_URL` is still needed, and still requires a rebuild
 (`docker compose build ui`), for two cases: a genuinely custom API address
 (e.g. a reverse proxy in front of the API), and a dashboard served over
-HTTPS — the derived API URL then defaults to `https://`, but the control
+HTTPS. The derived API URL then defaults to `https://`, but the control
 plane has no TLS of its own, so that setup needs a proxy in front of the API
 too. See `docs/pi-deployment.md` for both.
 
@@ -103,27 +103,27 @@ independently against the same SQLite file (they can start at the same time in t
 other instead of one failing with "database is locked."
 
 This release adds two new indexes: `dns_queries.action` and `blocklist_entries.source_id`. On
-a fresh install this is instant — the tables are empty. On an existing installation being
+a fresh install this is instant: the tables are empty. On an existing installation being
 upgraded to this version, `CREATE INDEX` on a large `dns_queries` or `blocklist_entries` table
 runs synchronously at startup and holds a write lock for the duration, which can take
 noticeably longer than a normal restart on slow storage (an SD card in particular). There is
-no separate migration command to run and nothing to configure — just expect the first start
+no separate migration command to run and nothing to configure. Just expect the first start
 after the upgrade to take longer than usual on a large, slow-storage install.
 
 ## Pre-flight checks (before tagging)
 
-Run these from a clean checkout of `main` — not this worktree, not a stale
+Run these from a clean checkout of `main`, not this worktree, not a stale
 clone:
 
-1. `git log --oneline -1` — confirm you're tagging the commit you think you
+1. `git log --oneline -1`: confirm you're tagging the commit you think you
    are, and that CI (`ci.yml`) is green on it.
-2. `git tag -l` — confirm no `v0.1.0` tag already exists locally or on the
+2. `git tag -l`: confirm no `v0.1.0` tag already exists locally or on the
    remote (`git ls-remote --tags origin`).
 3. Confirm `.github/workflows/release.yml` permissions are intact:
    `build-and-push` needs `packages: write`, `release-cli` and
    `release-cli-checksums` both need `contents: write` (the latter both
    downloads and uploads release assets). (All are already set at time of
-   writing — recheck if the workflow has changed.)
+   writing; recheck if the workflow has changed.)
 4. Confirm the GHCR org (`hydradns`) allows Actions to publish packages: this
    is controlled by the *organization's* Actions package-creation settings,
    not by anything in this repo. If the org has never published a package
@@ -142,7 +142,7 @@ clone:
    `## [Unreleased]` section above it, and add the new
    `[0.1.0]: https://github.com/hydradns/hydradns/releases/tag/v0.1.0`
    link reference at the bottom, keeping the existing `[Unreleased]` compare
-   link pointed at `main`. Commit this on `main` *before* tagging — the tag
+   link pointed at `main`. Commit this on `main` *before* tagging. The tag
    should point at a commit where the changelog already describes it.
 
 ## Cutting the tag
@@ -155,7 +155,7 @@ git push origin v0.1.0
 ```
 
 Do not use `git push --tags` (pushes every local tag, not just this one).
-Pushing the tag is what triggers `release.yml` — there is no separate
+Pushing the tag is what triggers `release.yml`. There is no separate
 "publish" step.
 
 ## Verifying the release
@@ -171,7 +171,7 @@ Pushing the tag is what triggers `release.yml` — there is no separate
    `gh release view v0.1.0` should list
    `hydra-linux-amd64`, `hydra-linux-arm64`, `hydra-darwin-amd64`,
    `hydra-darwin-arm64`, and **`checksums.txt`**. The last one is easy to miss
-   in a quick glance at the release page but is not optional — see the
+   in a quick glance at the release page but is not optional. See the
    `release-cli-checksums` note above.
 
 3. **Images exist on GHCR**:
@@ -183,7 +183,7 @@ Pushing the tag is what triggers `release.yml` — there is no separate
    Look for versions tagged `0.1.0`, `0.1`, `latest`, and a `sha-` tag.
 
 4. **Images are public.** New GHCR packages default to **private**, even
-   when pushed from a public repo's workflow — visibility is not inherited,
+   when pushed from a public repo's workflow. Visibility is not inherited,
    only access permissions are. Anonymous `docker pull` will 401/403 until
    you flip this manually, **once per package** (`hydra-cli` is a brand new
    package the first time this runs and needs the same flip as `core`/`ui`,
@@ -206,7 +206,7 @@ Pushing the tag is what triggers `release.yml` — there is no separate
    ```
    Both `linux/amd64` and `linux/arm64` should be listed for each. This only
    proves the manifest is multi-arch, not that the arm64 image actually
-   runs — see next step.
+   runs. See next step.
 
 6. **arm64 actually runs, on real arm64 hardware** (a Pi, not `--platform`
    emulation on an amd64 dev box, which can mask a broken arm64 build):
@@ -216,7 +216,7 @@ Pushing the tag is what triggers `release.yml` — there is no separate
    docker inspect ghcr.io/hydradns/core:0.1.0 --format '{{.Architecture}}'   # expect arm64
    docker run --rm ghcr.io/hydradns/core:0.1.0 /app/controlplane --help 2>&1 | head -5
    ```
-   Then actually run the stack there (next section) — a binary that starts
+   Then actually run the stack there (next section). A binary that starts
    isn't the same as a stack that answers DNS.
 
    Same idea for `hydra-cli`, plus its stdio contract (nothing but JSON-RPC on stdout):
@@ -230,7 +230,7 @@ Pushing the tag is what triggers `release.yml` — there is no separate
    ```
    Also worth a one-time check before the first MCP-registry publish attempt (see
    `docs/mcp.md` and the launch kit's `mcp-registry/publish-steps.md`): confirm the
-   registry's required ownership label made it into the pushed image —
+   registry's required ownership label made it into the pushed image:
    `docker inspect ghcr.io/hydradns/hydra-cli:0.1.0 --format '{{json .Config.Labels}}'`
    should include `"io.modelcontextprotocol.server.name":"io.github.hydradns/hydra-mcp"`.
 
@@ -243,16 +243,16 @@ Pushing the tag is what triggers `release.yml` — there is no separate
    dig @localhost doubleclick.net +short     # expect 0.0.0.0 (BLOCK_RESPONSE=zero)
    ```
    Then open `http://localhost:3000` and complete the setup wizard. Record
-   the wall-clock time to "dashboard loads and DNS blocks a domain" — this
+   the wall-clock time to "dashboard loads and DNS blocks a domain": this
    is the number that matters for the "~5 minute install" claim, not a
    guess. `docker compose up -d` should **pull**, not build, here (verify
    with `docker compose ps` / `docker images` showing pulled images, no
-   local build layers) — if it builds instead, `HYDRA_VERSION`/image tags
+   local build layers); if it builds instead, `HYDRA_VERSION`/image tags
    are wrong or the images aren't public yet.
 
 8. **`hydra update --check` sees the new release.** This is the actual proof
    that self-update works end to end, including the checksums asset from
-   `release-cli-checksums` — not just that the binaries exist. On a machine
+   `release-cli-checksums`, not just that the binaries exist. On a machine
    with an *older* `hydra` binary installed (built before this tag, or with
    `cmd.Version` stamped to something lower):
    ```bash
@@ -264,8 +264,8 @@ Pushing the tag is what triggers `release.yml` — there is no separate
    `is up to date` when it shouldn't, or errors, check in order: the release
    has all 5 assets (previous step), `DefaultFeedURL`
    (`apps/cli/selfupdate/update.go`) still points at
-   `api.github.com/repos/hydradns/hydradns/releases/latest`, and — for an
-   error mentioning checksums specifically — that `release-cli-checksums`
+   `api.github.com/repos/hydradns/hydradns/releases/latest`, and (for an
+   error mentioning checksums specifically) that `release-cli-checksums`
    actually ran and succeeded rather than being skipped. `--check` never
    downloads or installs anything either way, so it's safe to run against a
    real release before trusting a plain `hydra update`.
@@ -283,7 +283,7 @@ If the release is broken (bad image, wrong assets, tagged the wrong commit):
    enough and nothing has run.
 
 2. **Remove the bad image versions from GHCR** (tags are not automatically
-   cleaned up — a deleted release/tag does not delete the images already
+   cleaned up: a deleted release/tag does not delete the images already
    pushed):
    ```bash
    gh api /orgs/hydradns/packages/container/core/versions | jq '.[] | {id, tags: .metadata.container.tags}'
@@ -294,7 +294,7 @@ If the release is broken (bad image, wrong assets, tagged the wrong commit):
    new push depending on registry caching on client machines that already
    pulled.
    - **Do not** re-flip a package from public back to private as part of
-     rollback — GitHub doesn't allow it. If a bad image was already public,
+     rollback. GitHub doesn't allow it. If a bad image was already public,
      removing the version is the only lever.
 
 3. **Re-run pre-flight, fix the underlying issue, and re-tag** once the
