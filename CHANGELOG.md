@@ -117,6 +117,58 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from v0.1.0
   iCloud, the App Store, and iMessage for a first-time user on Apple devices. Removed; the
   seed now ships only `block-ads` and `block-malware` example policies, and a test asserts
   the shipped policy file never blocks a critical platform domain again.
+- The blocklist fetch pipeline is now single-flighted with a bounded retry: a source's
+  entries are fully replaced (not appended to) on every new snapshot, so a domain removed
+  upstream actually stops being blocked, and a URL edit takes effect once the next download
+  completes. Only the last 10 snapshot metadata rows are kept per source (oldest pruned
+  first); this cap is metadata only and does not affect which domains are blocked. If a
+  rebuild of the in-memory blocklist fails, it keeps its previous (still-enforced) contents
+  instead of going empty, and retries on the next `BLOCKLIST_POLL_INTERVAL` tick.
+- The per-IP rate limiter's eviction path could scan up to its full entry cap under one
+  global lock when the tracked-IP map was full and no sampled entry had expired, letting an
+  attacker with a large address pool (e.g. an IPv6 /64) hold that lock for an
+  O(maxEntries) scan on every request from a fresh IP. It now inspects a bounded sample (64
+  entries) and resets the whole map rather than continuing the scan.
+- `HYDRA_DEMO_MODE=true` now also refuses to start against a database that has query-log
+  rows but no users. Previously the "zero users" check alone would let it seed the demo user
+  over what is actually a pre-RBAC volume, or one whose migration hasn't finished, and the
+  periodic demo-data refresh loop would then delete that real history on its first tick.
+- `GET /analytics/logs` now caps `page * page_size` at 100,000 (400 if exceeded) and its row
+  count at the same figure, returning `total_capped: true` in the response when the count
+  was capped. Previously an arbitrarily large `page` forced a full linear OFFSET scan, and
+  the count for an unindexed filter (e.g. `suspicious`) was a full table scan on every page
+  load.
+- Policy `action` is now validated (`BLOCK`/`ALLOW`/`REDIRECT`, case-insensitive) on both
+  create and update, and `REDIRECT` requires a valid `redirect_ip` on both. Previously only
+  create checked this, so an update could silently turn a policy into a no-op with an
+  unrecognized action string.
+- `blocklist_entries.source_id` is now indexed. `DeleteSource` and the dashboard's
+  per-source domain count were doing an unindexed scan of the whole table.
+- SQLite's `busy_timeout` is now set to 30 seconds. The combined `core` container starts the
+  controlplane and dataplane processes together, and both run database migrations against
+  the same single-writer SQLite file on startup; without a busy timeout, one process's
+  schema migration could make the other's migration attempt fail outright with
+  `SQLITE_BUSY` instead of waiting for it to finish. See the upgrade note below.
+- The dataplane's blocklist signature poll loop now has its stop function wired into
+  shutdown instead of discarded, so `SIGINT`/`SIGTERM` stops that background goroutine
+  cleanly.
+- MCP tool read-only classification is now an explicit per-tool flag instead of guessed
+  from a `get_`/`list_` naming prefix. `explain_anomaly` and `compare_to_last_month` only
+  read data but don't match that prefix, so the old heuristic classified them as mutating,
+  blocking the `reporter` MCP role from calling them and marking them confirmation-required
+  for no reason.
+- `docker-compose.yml` only passed `HYDRA_CONFIG`/`HYDRA_DB`/`HYDRA_POLICIES`/`CORS_ORIGINS`/
+  `CORS_ALLOW_SAME_HOST` into the `core` container, so every other documented runtime setting
+  in `.env.example` (`BLOCK_RESPONSE`, `BLOCKLIST_UPDATE_INTERVAL`, `BLOCKLIST_POLL_INTERVAL`,
+  `QUERY_LOG_RETENTION_DAYS`, `QUERY_LOG_MAX_ROWS`, `QUERY_LOG_CLEANUP_INTERVAL`,
+  `HYDRA_ANONYMIZE_CLIENT_IPS`, `HYDRA_ANON_SECRET`, `TRUSTED_PROXIES`) had no effect no
+  matter what you put in `.env` against the shipped compose file. All nine are now forwarded,
+  each with a default matching the code's own default. `DNS_LISTEN_ADDR` is deliberately not
+  forwarded: the DNS port mapping in `docker-compose.yml` is fixed, so overriding the
+  dataplane's internal bind address alone would only break that mapping, not move it.
+  `HYDRA_DEMO_MODE` is also deliberately not forwarded here — demo mode has its own compose
+  file (`demo/docker-compose.demo.yml`); a stray value in this file must not be able to turn
+  a real install into a demo.
 
 ### Security
 - Per-IP rate limiting on `POST /auth/login` and `POST /auth/setup` (fixed window, 10
@@ -132,5 +184,49 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from v0.1.0
   who holds both the database and the secret file can brute-force the small IPv4 address
   space back to the original addresses. Previously this config key was parsed but never
   wired to anything, so enabling it had no effect at all.
+- `POST /auth/login` and `POST /auth/setup` now only count a failed (4xx) attempt against
+  the per-IP rate limit; a successful login and a 5xx (the server's own fault) no longer
+  consume budget. Previously every call counted identically, so a legitimate admin
+  re-authenticating from several devices behind one shared/NAT IP (an office, a coaching
+  centre, the demo's own reverse proxy) could lock themselves out purely by logging in
+  successfully. The limit is relaxed to 100 attempts / 5 minutes when
+  `HYDRA_DEMO_MODE=true`, since the demo password is fixed and publicly documented.
+- Boolean environment variables (`HYDRA_DEMO_MODE`, `CORS_ALLOW_SAME_HOST`) now go through
+  one shared parser: `true`/`1`/`yes`/`on` and `false`/`0`/`no`/`off`, case-insensitive and
+  whitespace-trimmed, on both sides. An unrecognized value now fails startup with an error
+  naming the variable and the offending value, instead of silently keeping the default —
+  previously a near-miss like `"1"`, `"yes"`, or a trailing space from a Docker env_file
+  line left `HYDRA_DEMO_MODE` silently off, and any value other than the literal `"false"`
+  left `CORS_ALLOW_SAME_HOST` silently on.
+- `CORS_ORIGINS` entries are now trimmed and validated (must be `*` or a bare
+  `http(s)://host` with no path) before reaching the CORS library, which otherwise panicked
+  at startup on the first malformed entry with no indication of which one or why. An
+  invalid entry now fails startup with a clear message naming `CORS_ORIGINS` and the
+  offending entry.
+- `CreateBlocklist` (and the setup wizard's optional blocklist bootstrap) now validate the
+  source URL scheme the same way `UpdateBlocklist` already did. Previously an operator-role
+  user could add a blocklist source pointing at an internal address (e.g. a cloud metadata
+  endpoint or a LAN admin page) through create or setup, just not through update.
+- `GET /analytics/logs`'s `client=` filter is now rejected outright (400) in demo mode: an
+  exact-match filter against the unmasked stored rows would otherwise let a public demo
+  visitor use the filter as an oracle to recover the octet masked in the response.
+- The anonymization secret generator now fails startup, rather than silently falling back
+  to a shared hardcoded key, if `crypto/rand` cannot produce entropy — that fallback would
+  have made every affected install share the same HMAC key, defeating anonymization for all
+  of them at once.
+- The CLI's token file (`~/.hydra/token`) is now written atomically (temp file, fsync,
+  rename) with its directory forced to `0700` and the file to `0600` on every write, and a
+  symlinked directory or token path is refused rather than followed.
+- The CLI now prints a one-line stderr warning when its configured API URL is plain
+  `http://` to a non-local address, since the login password and bearer token would
+  otherwise cross the network in cleartext with no indication.
+
+### Upgrade notes
+- This release adds two database indexes (`dns_queries.action`, `blocklist_entries.source_id`)
+  and a `busy_timeout` setting; both the controlplane and dataplane processes run migrations
+  at startup. On an existing install with a large `dns_queries` table (SD-card storage,
+  hundreds of thousands to ~1,000,000 rows), the first start after upgrading builds these
+  indexes and may take noticeably longer than a normal restart — this is expected and
+  one-time. See `docs/releasing.md` for details.
 
 [Unreleased]: https://github.com/hydradns/hydradns/commits/main

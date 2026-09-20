@@ -50,15 +50,23 @@ If something here changes, update this file in the same commit.
   *Workaround:* finish the setup wizard before exposing the box to an untrusted network (LAN
   or otherwise) — don't publish the control plane's port to the internet pre-setup.
 - **The login/setup rate limit is per-IP and in-memory.** `POST /auth/login` and
-  `POST /auth/setup` are throttled per client IP (10 attempts / 5 minutes by default,
-  shared across both endpoints). *Impact:* the counter lives in process memory, so it resets
-  on every restart, and it only ever sees one bucket per source IP — correctness in front of
-  a reverse proxy depends on `TRUSTED_PROXIES` being configured for that proxy, otherwise
-  every client behind it shares one bucket (or, if the proxy's own address isn't trusted,
-  the limiter can be bypassed entirely by spoofing `X-Forwarded-For`, per `TRUSTED_PROXIES`'
-  own default of trusting nothing). *Workaround:* set `TRUSTED_PROXIES` correctly if you're
-  behind a reverse proxy; don't rely on this limiter surviving a restart or coordinating
-  across multiple instances.
+  `POST /auth/setup` are throttled per client IP (10 attempts / 5 minutes by default, 100 / 5
+  minutes when `HYDRA_DEMO_MODE=true`, shared across both endpoints). Only failed attempts
+  count against the budget — a 4xx response (bad credentials, bad request body, setup already
+  complete) consumes budget; a successful login and a 5xx (the server's own fault) do not.
+  *Impact:* the counter lives in process memory, so it resets on every restart, and it only
+  ever sees one bucket per source IP — correctness in front of a reverse proxy depends on
+  `TRUSTED_PROXIES` being configured for that proxy, otherwise every client behind it shares
+  one bucket (or, if the proxy's own address isn't trusted, the limiter can be bypassed
+  entirely by spoofing `X-Forwarded-For`, per `TRUSTED_PROXIES`' own default of trusting
+  nothing). *Workaround:* set `TRUSTED_PROXIES` correctly if you're behind a reverse proxy;
+  don't rely on this limiter surviving a restart or coordinating across multiple instances.
+- **The blocklist fetcher follows HTTP redirects to any host, including private addresses.**
+  Blocklist source URLs are fetched with a plain `http.Client` and no redirect restriction, so
+  a source URL that redirects to an internal address (e.g. `http://169.254.169.254/...` or a
+  LAN-only host) is fetched like any other. *Impact:* this only matters if you add a blocklist
+  URL you don't control — the threat model assumes the operator adding sources is trusted.
+  *Workaround:* do not add blocklist source URLs from untrusted third parties.
 - **No MFA/TOTP or SSO.** Login is email + password only; roles (`admin`/`operator`/
   `read_only`) exist, but there's no second factor and no OIDC/SAML integration.
   *Workaround:* use a strong, unique password per account and rotate tokens periodically
@@ -78,11 +86,30 @@ If something here changes, update this file in the same commit.
   you changed, takes effect when the download of the new list completes; the previous list's
   entries are replaced at that point. *Impact:* seconds to a few minutes of delay for large
   lists on slow links.
+- **A blocklist source keeps the last 10 snapshot metadata rows.** Older snapshot metadata
+  (fetch time, size, checksum) is pruned; this is bookkeeping only and does not affect which
+  domains are currently blocked. *Impact:* you can't see fetch history older than the last 10
+  fetches for a given source. *Workaround:* none needed for normal use.
+- **If a blocklist rebuild fails, the in-memory list keeps its previous contents** rather than
+  going empty, and the dataplane retries on the next `BLOCKLIST_POLL_INTERVAL` tick.
+  *Impact:* a transient DB error does not open up traffic that should be blocked; you keep
+  enforcing the last-known-good list until the retry succeeds. *Workaround:* none needed;
+  check logs if rebuilds keep failing.
+
 ## Dashboard and operations
 
 - **Dashboard recent-activity widget shows the newest 100 queries only.** The dedicated Logs
   page pages and filters on the server; its domain filter is a prefix match, not a substring
   search. *Workaround:* use the Logs page for anything older than the newest 100 rows.
+- **`GET /analytics/logs` rejects requests that reach too far into the table.** `page *
+  page_size` above 100,000 returns HTTP 400, and the total-row count is capped at 100,000 too
+  (the response includes `total_capped: true` when the real count is higher than that). The
+  `client=` filter works with `HYDRA_ANONYMIZE_CLIENT_IPS` on (it hashes the filter value the
+  same way stored IPs are hashed) but is rejected outright in demo mode, since an exact-match
+  filter against unmasked storage would let a demo visitor use it to recover the IP octet
+  masked in responses. *Impact:* you cannot page arbitrarily deep into a very large query log,
+  and demo-mode visitors cannot filter by client. *Workaround:* narrow the search with
+  `domain`/`action`/`start`/`end` instead of paging deep.
 - **Settings page has no backend.** The dashboard has a Settings screen, but the control
   plane has no `/settings` endpoint — the page can't actually persist anything yet.
   *Impact:* toggles on that page don't do anything durable. *Workaround:* use `hydra engine`,
@@ -102,10 +129,12 @@ If something here changes, update this file in the same commit.
   same 443 origin — a runtime env var alone has no effect on an already-built image, since
   Next.js inlines this value at build time.
 - **Demo mode (`HYDRA_DEMO_MODE`) is for public demos only.** It refuses to start against a
-  database that already has real users, specifically so it can't be turned on accidentally
-  against a real deployment. *Impact:* none for a normal install — this is a guardrail, not a
-  general-purpose feature. *Workaround:* n/a; use it only with a fresh volume, as documented
-  in `demo/README.md`.
+  database that already has users other than the seeded demo account, and it also refuses to
+  start against a database that has query-log rows but no users at all (a pre-RBAC volume, or
+  one mid-migration), specifically so it can't be turned on accidentally against a real
+  deployment. *Impact:* none for a normal install — this is a guardrail, not a general-purpose
+  feature. *Workaround:* n/a; use it only with a fresh volume, as documented in
+  `demo/README.md`.
 - **No container self-update.** The `hydra` CLI binary can self-update (`hydra update`), but
   the `core`/`ui` Docker containers don't auto-pull new versions. *Workaround:* re-run
   `docker compose pull && docker compose up -d` (or your install script) manually.

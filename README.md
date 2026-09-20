@@ -351,6 +351,7 @@ Then give the device a static IP and point your router's DNS server to it. Full 
 | `BLOCKLIST_POLL_INTERVAL` | `5s` | How often the dataplane checks the DB for blocklist changes (add, toggle, delete, finished download) and rebuilds the in-memory blocklist; `0` disables |
 | `QUERY_LOG_RETENTION_DAYS` | `7` | Delete query logs older than N days; `0` disables |
 | `QUERY_LOG_MAX_ROWS` | `1000000` | Keep at most N newest query-log rows; `0` disables |
+| `QUERY_LOG_CLEANUP_INTERVAL` | `1h` | How often the query-log retention loop above runs |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Dashboard API URL override (build time). By default the dashboard uses the page's own hostname on port 8080 |
 | `NEXT_PUBLIC_SHOW_BYPASS_PANEL` | unset (hidden) | Build-time flag to show the DoH-bypass-attempts panel on the dashboard |
 
