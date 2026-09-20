@@ -32,10 +32,19 @@ import type {
   QueryLogPage,
 } from "./types"
 import { getApiBaseUrl } from "./api-base"
+import { toast } from "sonner"
 
 function apiUrl(path: string): string {
   return `${getApiBaseUrl()}/api/v1${path}`
 }
+
+// DEMO_MODE_ERROR is the exact error text the control plane's DemoGuard
+// middleware returns on every rejected mutating request (see
+// apps/core/cmd/controlplane/middlewares/demo.go). Matched here so the
+// toast below only fires for that specific rejection, not for every 403
+// (e.g. a read_only user's role-based "forbidden" still surfaces through
+// the normal thrown-Error / per-page inline-error path unchanged).
+const DEMO_MODE_ERROR = "demo mode: changes are disabled"
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const controller = new AbortController()
@@ -66,6 +75,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
     const json: ApiResponse<T> = await res.json()
     if (json.status === "error") {
+      // Single choke point for the demo-mode rejection: every write in the
+      // app funnels through this function, so this is the one place that
+      // needs to know about it (see lib/api.ts callers — none of them
+      // special-case demo mode themselves). The error still throws below
+      // so any page-level inline error handling keeps working unchanged;
+      // the toast just makes the "why" immediately visible.
+      if (res.status === 403 && json.error === DEMO_MODE_ERROR) {
+        toast.error("Read-only demo — changes are disabled. Install your own HydraDNS to try this for real.")
+      }
       throw new Error(json.error || "Unknown API error")
     }
     return json.data

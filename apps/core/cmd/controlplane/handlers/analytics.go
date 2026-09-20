@@ -74,11 +74,19 @@ func (h *APIHandler) GetAnalyticsSummary(c *gin.Context) {
 // queryLogEntryFromModel maps a stored row to its API shape. Shared by
 // GetAuditLogs (unpaginated recent feed) and GetQueryLogsPage (paginated +
 // filtered) so the two endpoints can never drift on field mapping.
-func queryLogEntryFromModel(q models.DNSQuery) QueryLogEntry {
+//
+// Method (not a free function) so it can consult h.DemoMode and redact
+// client_ip — see maskClientIP in common.go for why this is applied
+// unconditionally rather than trusting that demo data is always synthetic.
+func (h *APIHandler) queryLogEntryFromModel(q models.DNSQuery) QueryLogEntry {
+	clientIP := q.ClientIP
+	if h.DemoMode {
+		clientIP = maskClientIP(clientIP)
+	}
 	return QueryLogEntry{
 		ID:              q.ID,
 		Domain:          q.Domain,
-		ClientIP:        q.ClientIP,
+		ClientIP:        clientIP,
 		Action:          q.Action,
 		Timestamp:       q.Timestamp,
 		IsSuspicious:    q.IsSuspicious,
@@ -100,7 +108,7 @@ func (h *APIHandler) GetAuditLogs(c *gin.Context) {
 
 	entries := make([]QueryLogEntry, 0, len(queries))
 	for _, q := range queries {
-		entries = append(entries, queryLogEntryFromModel(q))
+		entries = append(entries, h.queryLogEntryFromModel(q))
 	}
 
 	c.JSON(http.StatusOK, ResponseQueryLogList{
@@ -198,7 +206,7 @@ func (h *APIHandler) GetQueryLogsPage(c *gin.Context) {
 
 	items := make([]QueryLogEntry, 0, len(rows))
 	for _, q := range rows {
-		items = append(items, queryLogEntryFromModel(q))
+		items = append(items, h.queryLogEntryFromModel(q))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -244,8 +252,12 @@ func (h *APIHandler) GetBypassAttempts(c *gin.Context) {
 
 	attempts := make([]BypassAttempt, 0, len(summary.Rows))
 	for _, r := range summary.Rows {
+		clientIP := r.ClientIP
+		if h.DemoMode {
+			clientIP = maskClientIP(clientIP)
+		}
 		attempts = append(attempts, BypassAttempt{
-			ClientIP: r.ClientIP,
+			ClientIP: clientIP,
 			// The dataplane cannot currently tell DoH from DoT from DoQ:
 			// all three bootstrap via a plain A/AAAA lookup of the
 			// provider's hostname (see internal/dnsengine/doh_bootstrap.go),

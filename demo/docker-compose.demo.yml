@@ -1,0 +1,131 @@
+# HydraDNS public demo stack.
+#
+# This is a STANDALONE compose file, not an overlay on top of the root
+# docker-compose.yml — the root file assumes a real, private DNS-firewall
+# install (it publishes port 53 and never sets HYDRA_DEMO_MODE). Run this
+# file by itself, from this directory:
+#
+#   cd demo
+#   cp .env.example .env   # then edit DEMO_PUBLIC_ORIGIN
+#   docker compose -f docker-compose.demo.yml up -d
+#
+# See demo/README.md for:
+#   - the full walkthrough (including the Caddy reverse-proxy layout and
+#     its exact Caddyfile — TLS is NOT configured here, on purpose: see
+#     the comments on the `ui` service below for why)
+#   - what demo mode blocks and how the fixed demo login works
+#   - how to reset the demo (wipe demo-core-data and restart)
+#   - abuse considerations (the relaxed login rate limit, why it's safe)
+#
+# Everything here follows the shipped stack (root docker-compose.yml) with
+# demo-specific changes called out in comments — diff the two if in doubt.
+
+services:
+  # ---------------------------------------------------------------------
+  # CORE (combined controlplane + dataplane — same image as production)
+  # ---------------------------------------------------------------------
+  core:
+    image: ghcr.io/hydradns/core:${HYDRA_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      # The only line that actually turns this into a demo. Everything
+      # else below is either unrelated to demo mode, or is a consequence
+      # of running it (CORS/TRUSTED_PROXIES for the public hostname).
+      #
+      # On startup this: (1) creates a fixed-password, read_only "demo"
+      # user if the DB is empty (refuses to start otherwise — see
+      # apps/core/cmd/controlplane/demoseed.EnsureDemoUser — so this must
+      # run against a fresh volume, never a real deployment's data);
+      # (2) seeds synthetic policies/blocklists/query-logs so the
+      # dashboard isn't empty; (3) installs middlewares.DemoGuard, which
+      # rejects every mutating HTTP request except POST /auth/login before
+      # auth even runs — this is the actual security boundary, not
+      # anything in the UI.
+      - HYDRA_DEMO_MODE=true
+      - HYDRA_CONFIG=/app/configs/config.yaml
+      - HYDRA_DB=/app/data/hydradns.db
+      - HYDRA_POLICIES=/app/configs/policies.json
+      # Required: the public hostname (with scheme) the demo is reached
+      # at, e.g. https://demo.example.com. A named host like this is NOT
+      # covered by the control plane's automatic same-host CORS allowance
+      # (that rule is deliberately restricted to IP literals and
+      # "localhost" to avoid DNS-rebinding — see middlewares/cors.go), so
+      # it must be listed explicitly here. Set it in demo/.env, do not
+      # hardcode it in this file.
+      - CORS_ORIGINS=${DEMO_PUBLIC_ORIGIN:?set DEMO_PUBLIC_ORIGIN in demo/.env, e.g. https://demo.example.com}
+      # If (and only if) you put a reverse proxy in front of this stack
+      # (see demo/README.md — you should, for TLS), tell the control
+      # plane to trust it for X-Forwarded-For so the per-IP login
+      # throttle and the (unreachable-to-the-demo-role, but redacted
+      # anyway) audit log see each real visitor's IP instead of bucketing
+      # every visitor under the proxy's one container/host IP. Set this to
+      # the proxy's container name/IP — NEVER leave it matching "all" or a
+      # broad CIDR a visitor could spoof from. Leave unset (default: trust
+      # nothing) if you are not running a reverse proxy.
+      - TRUSTED_PROXIES=${DEMO_TRUSTED_PROXY:-}
+    # No ports published for DNS on purpose, in this file or otherwise:
+    # the demo never accepts real DNS traffic — HYDRA_DEMO_MODE seeds
+    # synthetic query logs instead, and forwarding real queries through a
+    # public, unauthenticated resolver would be its own can of abuse
+    # worms. This is the same combined image the production stack runs
+    # (apps/core/docker/entrypoint.sh always starts the dataplane
+    # alongside the controlplane), so GET /dns/engine and GET /dns/metrics
+    # still answer normally from a live dataplane — there is just nothing
+    # real for it to resolve. This is the simplest and most honest option:
+    # no dataplane code changes, no special-casing for "demo has no
+    # dataplane" anywhere in the API handlers.
+    volumes:
+      # Everything the demo "knows" — the seeded data, the demo user, any
+      # attempted-then-rejected audit trail — lives in this one volume.
+      # See demo/README.md's Reset section for wiping it.
+      - demo-core-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    # A public demo is the part of this project most likely to be probed
+    # or hammered by strangers; keep it on a leash. Raise these if the
+    # container gets OOM-killed or CPU-throttled under real traffic.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    networks:
+      - hydra-demo-net
+
+  # ---------------------------------------------------------------------
+  # ADMIN UI (dashboard — same image as production)
+  # ---------------------------------------------------------------------
+  ui:
+    image: ghcr.io/hydradns/ui:${HYDRA_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      core:
+        condition: service_healthy
+    # No NEXT_PUBLIC_API_URL is set here. The published UI image already
+    # derives the control-plane URL at runtime from the page's own
+    # hostname/protocol at port 8080 (apps/ui/lib/api-base.ts) — so as
+    # long as your reverse proxy terminates TLS for BOTH the dashboard's
+    # own origin (443) AND that same hostname on port 8080 (proxying the
+    # latter to core:8080), this needs no build-time override. That is
+    # exactly the layout in demo/README.md's Caddyfile. Only set
+    # NEXT_PUBLIC_API_URL (and rebuild the image with it, since Next.js
+    # inlines it at build time) if you instead want to reach the API via a
+    # proxied *path* under the same origin/port as the dashboard — see the
+    # README's "path-based alternative" note for when you'd want that.
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - hydra-demo-net
+
+networks:
+  hydra-demo-net:
+    driver: bridge
+
+volumes:
+  demo-core-data:

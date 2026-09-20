@@ -166,6 +166,7 @@ expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/
 | `CORS_ALLOW_SAME_HOST` | `true` | Also allow an Origin whose hostname equals the request's Host hostname when that hostname is an IP literal or `localhost` (dashboard opened by LAN IP). Named hosts need a `CORS_ORIGINS` entry. Set `false` to disable |
 | `DNS_LISTEN_ADDR` | (from config, normally `0.0.0.0:1053`) | Override DNS listen address |
 | `BLOCKLIST_UPDATE_INTERVAL` | `6h` | How often blocklist sources are re-downloaded |
+| `HYDRA_DEMO_MODE` | `false` | Public read-only demo: a `DemoGuard` middleware rejects every mutation before auth, a `read_only` demo user and synthetic data are seeded (`cmd/controlplane/demoseed`), client IPs are masked in responses. Refuses to start on a database that has real users. See `demo/README.md` |
 | `BLOCKLIST_POLL_INTERVAL` | `5s` | How often the dataplane checks the DB for blocklist changes (add, toggle, delete, finished download) and rebuilds the in-memory set; `0` disables |
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
 | `HYDRA_TOKEN` | (none) | CLI/MCP bearer token; if unset the CLI also tries `~/.hydra/token` (`apps/cli/cmd/root.go`) |

@@ -18,6 +18,19 @@ const (
 	loginRateLimitAttempts = 10
 	loginRateLimitWindow   = 5 * time.Minute
 	loginRateLimitMaxIPs   = 10000
+
+	// demoLoginRateLimitAttempts relaxes the login budget when
+	// HYDRA_DEMO_MODE=true. The demo password is fixed and publicly
+	// documented (see demo/README.md), so throttling it tighter buys no
+	// confidentiality — the only remaining purpose of a limit here is
+	// abuse/log-spam protection, not secrecy. A public demo is commonly
+	// reached by many visitors behind one shared NAT/proxy IP (an office,
+	// a campus, or the demo's own reverse proxy if TRUSTED_PROXIES isn't
+	// configured for it — see demo/README.md), and 10 attempts/5min shared
+	// across all of them would routinely lock everyone out over one
+	// visitor's "Enter Demo" clicks. A higher ceiling keeps a bound in
+	// place while tolerating that.
+	demoLoginRateLimitAttempts = 100
 )
 
 // writeRoles names the roles permitted to mutate policies, blocklists,
@@ -29,7 +42,12 @@ var writeRoles = []string{models.RoleOperator}
 // open to any authenticated user (read_only included). Mutating routes
 // wrap the handler in middlewares.RequireRole so the role boundary lives
 // next to the route definition, not inside the handler.
-func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
+//
+// demoMode relaxes the login rate limit (see demoLoginRateLimitAttempts);
+// it does not change anything else about the route table. The actual
+// write-blocking boundary for a demo deployment is middlewares.DemoGuard,
+// installed in main.go ahead of this function being called.
+func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler, demoMode bool) {
 	api := r.Group("/api/v1")
 	r.GET("/health", apiHandler.HealthCheck)
 	r.GET("/", apiHandler.Root)
@@ -39,7 +57,11 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 		// they are the only endpoints an unauthenticated caller can hit
 		// repeatedly to brute-force a password. See middlewares.LoginThrottle
 		// for why this depends on main.go's r.SetTrustedProxies(nil).
-		loginLimiter := middlewares.NewRateLimiter(loginRateLimitAttempts, loginRateLimitWindow, loginRateLimitMaxIPs)
+		loginAttempts := loginRateLimitAttempts
+		if demoMode {
+			loginAttempts = demoLoginRateLimitAttempts
+		}
+		loginLimiter := middlewares.NewRateLimiter(loginAttempts, loginRateLimitWindow, loginRateLimitMaxIPs)
 		auth := api.Group("/auth")
 		{
 			auth.GET("/status", apiHandler.GetAuthStatus)

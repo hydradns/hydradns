@@ -29,7 +29,13 @@ func (h *APIHandler) GetAuthStatus(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data":   gin.H{"setup_complete": n > 0},
+		// demo_mode lets the UI (a single published image, no build-time
+		// flag) discover a public demo deployment from this one
+		// unauthenticated call: show the banner, prefill the demo
+		// credentials, and interpret a 403 with the demo-mode error text
+		// as "expected", without needing NEXT_PUBLIC_* wiring at build
+		// time. See middlewares.DemoGuard for the actual enforcement.
+		"data": gin.H{"setup_complete": n > 0, "demo_mode": h.DemoMode},
 	})
 }
 
