@@ -151,6 +151,83 @@ func (h *APIHandler) CreatePolicy(c *gin.Context) {
 	})
 }
 
+// UpdatePolicyRequest is deliberately distinct from CreatePolicyRequest:
+// it has no ID field at all (the path :id always wins — there is nowhere
+// for a body id to even bind to), but otherwise requires the same fields
+// create does, since the UI's Edit Policy drawer always sends the full
+// resource, not a partial patch (see apps/ui/app/dashboard/policies/page.tsx
+// handleSubmit — the same `payload` object is sent for both create and
+// edit; only the presence of `id` differs).
+type UpdatePolicyRequest struct {
+	Name        string   `json:"name" binding:"required"`
+	Description string   `json:"description"`
+	Category    string   `json:"category"`
+	Action      string   `json:"action" binding:"required"`
+	RedirectIP  string   `json:"redirect_ip"`
+	Domains     []string `json:"domains" binding:"required"`
+	Priority    int      `json:"priority"`
+	// Enabled is a pointer so an omitted field preserves the existing
+	// row's value instead of resetting it to false.
+	Enabled *bool `json:"enabled"`
+}
+
+// UpdatePolicy handles PUT /policies/:id (the Edit Policy drawer).
+//
+// Propagation: the dataplane polls PolicyRepository.List() into its
+// in-memory PolicySnapshot every 5s (see cmd/dataplane/main.go's
+// reloadPolicies ticker) — the exact same mechanism CreatePolicy and
+// DeletePolicy already rely on. An edit here needs no new propagation
+// path: the next poll (within 5s) picks up the row this handler wrote.
+func (h *APIHandler) UpdatePolicy(c *gin.Context) {
+	id := c.Param("id")
+
+	existing, err := h.Store.Policies.GetByID(id)
+	if err != nil || existing == nil {
+		errMsg := "policy not found"
+		c.JSON(http.StatusNotFound, ResponsePolicySingle{Status: "error", Error: &errMsg})
+		return
+	}
+	before := policyFromModel(*existing)
+
+	var req UpdatePolicyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errMsg := err.Error()
+		c.JSON(http.StatusBadRequest, ResponsePolicySingle{Status: "error", Error: &errMsg})
+		return
+	}
+
+	enabled := existing.Enabled
+	if req.Enabled != nil {
+		enabled = *req.Enabled
+	}
+	domainsJSON, _ := json.Marshal(req.Domains)
+
+	updated := *existing // preserves CreatedAt and any fields this DTO doesn't carry
+	updated.ID = id      // path wins, unconditionally
+	updated.Name = req.Name
+	updated.Description = req.Description
+	updated.Category = req.Category
+	updated.Action = req.Action
+	updated.RedirectIP = req.RedirectIP
+	updated.Domains = string(domainsJSON)
+	updated.Priority = req.Priority
+	updated.Enabled = enabled
+
+	if err := h.Store.Policies.Update(&updated); err != nil {
+		errMsg := "failed to update policy"
+		c.JSON(http.StatusInternalServerError, ResponsePolicySingle{Status: "error", Error: &errMsg})
+		return
+	}
+
+	out := policyFromModel(updated)
+	h.Audit.Record(c, "policy.update", "policy:"+id, before, out)
+
+	c.JSON(http.StatusOK, ResponsePolicySingle{
+		Status: "success",
+		Data:   out,
+	})
+}
+
 // DeletePolicy handles DELETE /policies/:id
 func (h *APIHandler) DeletePolicy(c *gin.Context) {
 	// Capture the pre-delete row for the audit trail. A miss here is

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -154,6 +155,120 @@ func (h *APIHandler) CreateBlocklist(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, ResponseBlocklistSingle{
+		Status: "success",
+		Data:   out,
+	})
+}
+
+// UpdateBlocklistRequest carries only the fields the UI's PATCH
+// /blocklists/:id can send (see apps/ui/lib/api.ts updateBlocklist and
+// toggleBlocklist). Every field is a pointer so an absent field leaves
+// the existing value untouched — this is a partial update, unlike
+// UpdatePolicyRequest, because the only caller wired up in the shipped
+// UI today (the enable/disable switch) sends a single field.
+type UpdateBlocklistRequest struct {
+	Name     *string `json:"name"`
+	URL      *string `json:"url"`
+	Format   *string `json:"format"`
+	Category *string `json:"category"`
+	Enabled  *bool   `json:"enabled"`
+}
+
+// UpdateBlocklist handles PATCH /blocklists/:id.
+//
+// Propagation: exactly the same mechanism CreateBlocklist already uses —
+// on a URL or format change, an immediate background fetch is kicked off
+// via BlocklistEngine.UpdateSource, but that only refreshes the DB
+// (BlocklistEntry rows); the dataplane's in-memory blocklist set
+// (memBlocklist, what the DNS hot path actually checks) is only rebuilt
+// by the periodic refreshBlocklists loop in cmd/dataplane/main.go, which
+// runs on BLOCKLIST_UPDATE_INTERVAL (default 6h) or at dataplane startup.
+// There is no faster poll for blocklists the way there is for policies
+// (5s DB poll) — this handler does not invent one; an edited source is
+// enforced by the DNS engine within the same bound a newly-created source
+// already is today.
+//
+// Ingested-entries semantics on a URL/format change: BlocklistEntry rows
+// are never deleted or replaced in place when a source's content changes
+// — SaveSnapshotWithEntries (used both by this refetch and by the normal
+// periodic refresh) only ever appends a new BlocklistSnapshot + its
+// entries for the source ID. So after editing a source's URL, entries
+// from the OLD url remain in the table alongside the new ones until the
+// source itself is deleted (which does cascade-delete all of its
+// snapshots/entries). This is not a new limitation introduced here: it is
+// the existing refresh semantics, identical to what happens today every
+// time the periodic 6h refresh re-fetches changed content at an
+// unchanged URL.
+func (h *APIHandler) UpdateBlocklist(c *gin.Context) {
+	id := c.Param("id")
+
+	src, err := h.Store.Blocklist.GetSource(id)
+	if err != nil || src == nil {
+		errMsg := "blocklist not found"
+		c.JSON(http.StatusNotFound, ResponseBlocklistSingle{Status: "error", Error: &errMsg})
+		return
+	}
+	beforeCount, _ := h.Store.Blocklist.CountEntriesBySource(src.ID)
+	before := blocklistFromSource(*src, beforeCount)
+
+	var req UpdateBlocklistRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errMsg := err.Error()
+		c.JSON(http.StatusBadRequest, ResponseBlocklistSingle{Status: "error", Error: &errMsg})
+		return
+	}
+
+	refetch := false
+	if req.Name != nil {
+		src.Name = *req.Name
+	}
+	if req.URL != nil && *req.URL != src.URL {
+		if !strings.HasPrefix(*req.URL, "http://") && !strings.HasPrefix(*req.URL, "https://") {
+			errMsg := "url must use http:// or https://"
+			c.JSON(http.StatusBadRequest, ResponseBlocklistSingle{Status: "error", Error: &errMsg})
+			return
+		}
+		src.URL = *req.URL
+		src.ETag = "" // the old ETag belongs to the old URL; force a fresh fetch
+		refetch = true
+	}
+	if req.Format != nil && *req.Format != src.Format {
+		src.Format = *req.Format
+		refetch = true
+	}
+	if req.Category != nil {
+		src.Category = *req.Category
+	}
+	if req.Enabled != nil {
+		src.Enabled = *req.Enabled
+	}
+	src.UpdatedAt = time.Now()
+
+	if err := h.Store.Blocklist.UpdateSourceFields(src); err != nil {
+		errMsg := "failed to update blocklist source"
+		c.JSON(http.StatusInternalServerError, ResponseBlocklistSingle{Status: "error", Error: &errMsg})
+		return
+	}
+
+	afterCount, _ := h.Store.Blocklist.CountEntriesBySource(src.ID)
+	out := blocklistFromSource(*src, afterCount)
+	h.Audit.Record(c, "blocklist.update", "blocklist:"+id, before, out)
+
+	// Same async-fetch pattern as CreateBlocklist: don't make the operator
+	// wait for the next periodic refresh to see a URL/format edit reflected
+	// in domains_count.
+	if refetch && h.BlocklistEngine != nil {
+		srcCopy := *src
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+			if err := h.BlocklistEngine.UpdateSource(ctx, srcCopy, ""); err != nil {
+				log.Printf("blocklist re-fetch after edit failed for %s: %v", srcCopy.ID, err)
+			}
+		}()
+	}
+
+	c.JSON(http.StatusOK, ResponseBlocklistSingle{
 		Status: "success",
 		Data:   out,
 	})

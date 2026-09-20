@@ -17,6 +17,12 @@ type BlocklistRepository interface {
 	ListSources() ([]models.BlocklistSource, error)
 	GetSource(id string) (*models.BlocklistSource, error)
 	CreateSource(src *models.BlocklistSource) error
+	// UpdateSourceFields persists an in-memory-edited BlocklistSource as a
+	// full row replace (like PolicyRepo.Update). Named distinctly from
+	// blocklist.Engine.UpdateSource (which fetches+parses+persists a
+	// snapshot) to avoid confusion where both are used side by side in
+	// the blocklists handler.
+	UpdateSourceFields(src *models.BlocklistSource) error
 	DeleteSource(id string) error
 	CountEntriesBySource(sourceID string) (int64, error)
 	CountEntriesGroupedBySource() (map[string]int64, error)
@@ -105,6 +111,16 @@ func (r *BlocklistRepo) GetSource(id string) (*models.BlocklistSource, error) {
 
 func (r *BlocklistRepo) CreateSource(src *models.BlocklistSource) error {
 	return r.db.Create(src).Error
+}
+
+// UpdateSourceFields does a full row save (not a partial GORM Updates()
+// map) so an explicit false/"" value — e.g. disabling a source — is
+// actually persisted. GORM's struct-based Updates() silently skips
+// zero-valued fields, which would make it impossible to ever turn
+// Enabled back to false; callers are expected to have merged their
+// partial request onto the existing row first (see handlers.UpdateBlocklist).
+func (r *BlocklistRepo) UpdateSourceFields(src *models.BlocklistSource) error {
+	return r.db.Save(src).Error
 }
 
 func (r *BlocklistRepo) DeleteSource(id string) error {
