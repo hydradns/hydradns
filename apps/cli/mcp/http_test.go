@@ -21,7 +21,7 @@ func newMockClient(t *testing.T) *api.Client {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/policies", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"status":"ok","data":{`+
+		io.WriteString(w, `{"status":"success","data":{`+
 			`"total_policies":1,"active_policies":1,"inactive_policies":0,`+
 			`"list":[{"id":"p1","name":"Block Ads","action":"BLOCK",`+
 			`"domains":["ads.example.com"],"priority":150,"enabled":true}]}}`)
@@ -52,7 +52,7 @@ func doRPC(t *testing.T, url, tok, body string) *http.Response {
 // The HTTP transport dispatches a JSON-RPC tool call and returns the result,
 // routed through the mocked api client.
 func TestHTTPTransportDispatchesToolCall(t *testing.T) {
-	s := NewServer(newMockClient(t))
+	s := NewServer(newMockClient(t), "test")
 	ts := httptest.NewServer(s.HTTPHandler(testBearer))
 	defer ts.Close()
 
@@ -80,7 +80,7 @@ func TestHTTPTransportDispatchesToolCall(t *testing.T) {
 
 // tools/list is dispatched over HTTP without needing the backend.
 func TestHTTPTransportListsTools(t *testing.T) {
-	s := NewServer(newMockClient(t))
+	s := NewServer(newMockClient(t), "test")
 	ts := httptest.NewServer(s.HTTPHandler(testBearer))
 	defer ts.Close()
 
@@ -98,7 +98,7 @@ func TestHTTPTransportListsTools(t *testing.T) {
 
 // Missing or wrong bearer token is rejected with 401 before any dispatch.
 func TestHTTPTransportRejectsBadToken(t *testing.T) {
-	s := NewServer(newMockClient(t))
+	s := NewServer(newMockClient(t), "test")
 	ts := httptest.NewServer(s.HTTPHandler(testBearer))
 	defer ts.Close()
 
@@ -124,7 +124,7 @@ func TestHTTPTransportRejectsBadToken(t *testing.T) {
 
 // RunHTTP refuses to start without a token.
 func TestRunHTTPRequiresToken(t *testing.T) {
-	s := NewServer(nil)
+	s := NewServer(nil, "test")
 	if err := s.RunHTTP("127.0.0.1:0", ""); err == nil {
 		t.Fatal("expected error when starting HTTP transport with empty token")
 	}
@@ -133,7 +133,7 @@ func TestRunHTTPRequiresToken(t *testing.T) {
 // The stdio path is unchanged: the shared handler dispatches an identical
 // request the same way over stdio streams.
 func TestStdioTransportUnchanged(t *testing.T) {
-	s := NewServer(newMockClient(t))
+	s := NewServer(newMockClient(t), "test")
 
 	in := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}` + "\n")
 	var out bytes.Buffer
@@ -148,7 +148,7 @@ func TestStdioTransportUnchanged(t *testing.T) {
 // Both transports route through the same handler, so a given request yields
 // the same JSON-RPC result regardless of transport.
 func TestTransportsShareHandler(t *testing.T) {
-	s := NewServer(newMockClient(t))
+	s := NewServer(newMockClient(t), "test")
 
 	req := Request{JSONRPC: "2.0", ID: 1, Method: "tools/call",
 		Params: json.RawMessage(`{"name":"list_policies"}`)}

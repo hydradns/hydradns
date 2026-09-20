@@ -90,6 +90,7 @@ jobs:
 
       - name: Build CLI
         working-directory: apps/cli
+        shell: bash
         env:
           GOWORK: "off"
           GOOS: ${{ matrix.goos }}
