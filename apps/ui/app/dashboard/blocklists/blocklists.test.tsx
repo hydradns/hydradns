@@ -4,32 +4,41 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import BlocklistsPage from "./page"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import * as api from "@/lib/api"
-import type { BlocklistListData, Category } from "@/lib/types"
+import type { Blocklist, BlocklistListData } from "@/lib/types"
 
+// H2 fix: the curated-categories feature (GET /blocklists/categories,
+// PATCH /blocklists/categories/:id) had no backend route and 404'd on every
+// page load. It's been removed from the UI entirely — no getCategories /
+// toggleCategory exports exist anymore, so they aren't mocked here.
 vi.mock("@/lib/api", () => ({
   getBlocklists: vi.fn(),
   createBlocklist: vi.fn(),
   deleteBlocklist: vi.fn(),
   toggleBlocklist: vi.fn(),
-  getCategories: vi.fn(),
-  toggleCategory: vi.fn(),
 }))
 
-const BLOCKLISTS: BlocklistListData = {
-  total_blocklists: 0,
-  total_domains: 0,
-  active_lists: [],
+const SOURCE: Blocklist = {
+  id: "steven-black",
+  name: "StevenBlack Hosts",
+  url: "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+  format: "hosts",
+  category: "",
+  domains_count: 150000,
+  enabled: true,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
 }
 
-const CATEGORIES: Category[] = [
-  { id: "malware", name: "Malware", description: "Known bad", enabled: false, domains_count: 1200 },
-]
+const BLOCKLISTS: BlocklistListData = {
+  total_blocklists: 1,
+  total_domains: 150000,
+  active_lists: [SOURCE],
+}
 
 describe("BlocklistsPage", () => {
   beforeEach(() => {
     vi.mocked(api.getBlocklists).mockResolvedValue(BLOCKLISTS)
-    vi.mocked(api.getCategories).mockResolvedValue(CATEGORIES)
-    vi.mocked(api.toggleCategory).mockResolvedValue(CATEGORIES[0])
+    vi.mocked(api.toggleBlocklist).mockResolvedValue({ ...SOURCE, enabled: false })
   })
 
   afterEach(() => {
@@ -37,18 +46,29 @@ describe("BlocklistsPage", () => {
     vi.clearAllMocks()
   })
 
-  it("toggles a curated category and calls the toggleCategory API", async () => {
+  it("renders blocklist sources and does not render a curated-categories section", async () => {
     render(
       <SidebarProvider>
         <BlocklistsPage />
       </SidebarProvider>,
     )
 
-    const toggle = await screen.findByRole("switch", { name: /toggle malware/i })
+    expect(await screen.findByText("StevenBlack Hosts")).toBeInTheDocument()
+    expect(screen.queryByText(/curated categories/i)).not.toBeInTheDocument()
+  })
+
+  it("toggles a blocklist source and calls the toggleBlocklist API", async () => {
+    render(
+      <SidebarProvider>
+        <BlocklistsPage />
+      </SidebarProvider>,
+    )
+
+    const toggle = await screen.findByRole("switch", { name: /toggle stevenblack hosts/i })
     fireEvent.click(toggle)
 
     await waitFor(() => {
-      expect(api.toggleCategory).toHaveBeenCalledWith("malware", true)
+      expect(api.toggleBlocklist).toHaveBeenCalledWith("steven-black", false)
     })
   })
 })

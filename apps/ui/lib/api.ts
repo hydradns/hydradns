@@ -4,13 +4,10 @@ import type {
   DnsEngineStatus,
   DnsMetrics,
   Resolver,
-  CreateResolverRequest,
-  UpdateResolverRequest,
   BlocklistListData,
   Blocklist,
   CreateBlocklistRequest,
   UpdateBlocklistRequest,
-  Category,
   PolicyListData,
   Policy,
   CreatePolicyRequest,
@@ -26,8 +23,6 @@ import type {
   TokenSecret,
   AuditListData,
   AuditQuery,
-  Settings,
-  UpdateSettingsRequest,
   QueryLogFilters,
   QueryLogPage,
 } from "./types"
@@ -39,12 +34,16 @@ function apiUrl(path: string): string {
 }
 
 // DEMO_MODE_ERROR is the exact error text the control plane's DemoGuard
-// middleware returns on every rejected mutating request (see
-// apps/core/cmd/controlplane/middlewares/demo.go). Matched here so the
-// toast below only fires for that specific rejection, not for every 403
-// (e.g. a read_only user's role-based "forbidden" still surfaces through
-// the normal thrown-Error / per-page inline-error path unchanged).
-const DEMO_MODE_ERROR = "demo mode: changes are disabled"
+// middleware returns on every rejected mutating request — see
+// apps/core/cmd/controlplane/middlewares/demo.go:57 (the Go string this
+// must match char-for-char; there's no shared constant across the two
+// languages, so a wording change on either side needs the other updated by
+// hand). Matched here so the toast below only fires for that specific
+// rejection, not for every 403 (e.g. a read_only user's role-based
+// "forbidden" still surfaces through the normal thrown-Error / per-page
+// inline-error path unchanged). Exported so tests can assert against it
+// directly instead of duplicating the literal.
+export const DEMO_MODE_ERROR = "demo mode: changes are disabled"
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const controller = new AbortController()
@@ -114,23 +113,11 @@ export const toggleDnsEngine = (enabled: boolean) =>
 export const getDnsMetrics = () =>
   request<DnsMetrics>("/dns/metrics")
 
+// Resolvers are read-only from the dashboard: the control plane has no
+// POST/PUT/DELETE route for /dns/resolvers (they're configured via
+// configs/config.yaml). See apps/ui/app/dashboard/resolvers/page.tsx.
 export const getResolvers = () =>
   request<Resolver[]>("/dns/resolvers")
-
-export const createResolver = (data: CreateResolverRequest) =>
-  request<Resolver>("/dns/resolvers", {
-    method: "POST",
-    body: JSON.stringify(data),
-  })
-
-export const updateResolver = (id: string, data: UpdateResolverRequest) =>
-  request<Resolver>(`/dns/resolvers/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  })
-
-export const deleteResolver = (id: string) =>
-  request<Record<string, unknown>>(`/dns/resolvers/${id}`, { method: "DELETE" })
 
 // Blocklists
 export const getBlocklists = () =>
@@ -159,16 +146,6 @@ export const toggleBlocklist = (id: string, enabled: boolean) =>
 
 export const deleteBlocklist = (id: string) =>
   request<Record<string, unknown>>(`/blocklists/${id}`, { method: "DELETE" })
-
-// Curated categories
-export const getCategories = () =>
-  request<Category[]>("/blocklists/categories")
-
-export const toggleCategory = (id: string, enabled: boolean) =>
-  request<Category>(`/blocklists/categories/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify({ enabled }),
-  })
 
 // Policies
 export const getPolicies = () =>
@@ -219,23 +196,22 @@ export const updateUser = (id: string, data: UpdateUserRequest) =>
 export const deleteUser = (id: string) =>
   request<Record<string, unknown>>(`/users/${id}`, { method: "DELETE" })
 
-// Per-user API tokens
-export const getUserTokens = (userId: string) =>
-  request<Token[]>(`/users/${userId}/tokens`)
+// API tokens. The control plane scopes these to the caller — GET/POST
+// /tokens and DELETE /tokens/:id all operate on "your own tokens" (see
+// apps/core/cmd/controlplane/routes/router.go's tokens group and
+// handlers/tokens.go). There is no nested /users/:id/tokens route and no
+// rotate endpoint; the UI is scoped to "my tokens" to match.
+export const getMyTokens = () =>
+  request<Token[]>("/tokens")
 
-export const createUserToken = (userId: string, data: CreateTokenRequest) =>
-  request<TokenSecret>(`/users/${userId}/tokens`, {
+export const createMyToken = (data: CreateTokenRequest) =>
+  request<TokenSecret>("/tokens", {
     method: "POST",
     body: JSON.stringify(data),
   })
 
-export const rotateUserToken = (userId: string, tokenId: string) =>
-  request<TokenSecret>(`/users/${userId}/tokens/${tokenId}/rotate`, {
-    method: "POST",
-  })
-
-export const revokeUserToken = (userId: string, tokenId: string) =>
-  request<Record<string, unknown>>(`/users/${userId}/tokens/${tokenId}`, {
+export const revokeMyToken = (tokenId: number) =>
+  request<Record<string, unknown>>(`/tokens/${tokenId}`, {
     method: "DELETE",
   })
 
@@ -250,15 +226,11 @@ export const getAuditEvents = (params: AuditQuery = {}) => {
   return request<AuditListData>(`/audit${qs ? `?${qs}` : ""}`)
 }
 
-// Settings
-export const getSettings = () =>
-  request<Settings>("/settings")
-
-export const updateSettings = (data: UpdateSettingsRequest) =>
-  request<Settings>("/settings", {
-    method: "PATCH",
-    body: JSON.stringify(data),
-  })
+// Note: there is no GET/PATCH /settings route on the control plane today
+// (apps/core/cmd/controlplane/routes/router.go has no /settings group), so
+// there are no settings API functions here. See
+// apps/ui/app/dashboard/settings/page.tsx, which renders the controls
+// disabled with a note instead of calling a route that doesn't exist.
 
 // Query Logs — server-side pagination + filtering via GET /analytics/logs.
 // Undefined/empty filter fields are omitted so the backend applies its defaults.

@@ -14,14 +14,14 @@ import {
   createUser,
   updateUser,
   deleteUser,
-  getUserTokens,
-  createUserToken,
-  rotateUserToken,
-  revokeUserToken,
+  getMyTokens,
+  createMyToken,
+  revokeMyToken,
   getAuditEvents,
   allowDomain,
   blockDomain,
   getQueryLogs,
+  DEMO_MODE_ERROR,
 } from "@/lib/api"
 import type { ApiResponse, BypassAttemptsData, DashboardSummary } from "@/lib/types"
 
@@ -198,51 +198,45 @@ describe("api RBAC methods", () => {
     expect(spy.mock.calls[0][1]?.method).toBe("DELETE")
   })
 
-  it("getUserTokens GETs the per-user token collection", async () => {
-    const tokens = [{ id: "t1", name: "ci", prefix: "hyd_", role: "operator", revoked: false }]
+  // H3 fix: tokens are scoped to the caller via the flat /tokens routes —
+  // there is no nested /users/:id/tokens route and no rotate endpoint (see
+  // apps/core/cmd/controlplane/handlers/tokens.go). Field names match the
+  // Go DTO exactly (`label`, not `name`; `expiry_days`, not `expires_in_days`).
+  it("getMyTokens GETs the flat /tokens collection", async () => {
+    const tokens = [{ id: 1, user_id: 1, label: "ci", created_at: "2026-01-01T00:00:00Z" }]
     const spy = fetchMock().mockResolvedValue(okResponse(tokens))
     vi.stubGlobal("fetch", spy)
 
-    const result = await getUserTokens("u2")
+    const result = await getMyTokens()
 
-    expect(spy.mock.calls[0][0]).toBe(`${BASE}/users/u2/tokens`)
+    expect(spy.mock.calls[0][0]).toBe(`${BASE}/tokens`)
     expect(result).toEqual(tokens)
   })
 
-  it("createUserToken POSTs the token request and returns the one-time secret", async () => {
-    const secret = { token: { id: "t2", name: "ci", prefix: "hyd_", role: "operator", revoked: false }, secret: "hyd_live_abc" }
-    const spy = fetchMock().mockResolvedValue(okResponse(secret))
+  it("createMyToken POSTs {label, expiry_days} and returns the one-time plaintext secret", async () => {
+    const response = {
+      token: "hydra_live_abc",
+      meta: { id: 2, user_id: 1, label: "ci", created_at: "2026-01-01T00:00:00Z" },
+    }
+    const spy = fetchMock().mockResolvedValue(okResponse(response))
     vi.stubGlobal("fetch", spy)
 
-    const result = await createUserToken("u2", { name: "ci", expires_in_days: 90 })
+    const result = await createMyToken({ label: "ci", expiry_days: 90 })
 
     const [url, init] = spy.mock.calls[0]
-    expect(url).toBe(`${BASE}/users/u2/tokens`)
+    expect(url).toBe(`${BASE}/tokens`)
     expect(init?.method).toBe("POST")
-    expect(JSON.parse(init?.body as string)).toEqual({ name: "ci", expires_in_days: 90 })
-    expect(result.secret).toBe("hyd_live_abc")
+    expect(JSON.parse(init?.body as string)).toEqual({ label: "ci", expiry_days: 90 })
+    expect(result.token).toBe("hydra_live_abc")
   })
 
-  it("rotateUserToken POSTs to the rotate sub-resource", async () => {
-    const spy = fetchMock().mockResolvedValue(
-      okResponse({ token: { id: "t2", name: "ci", prefix: "hyd_", role: "operator", revoked: false }, secret: "hyd_live_new" }),
-    )
-    vi.stubGlobal("fetch", spy)
-
-    const result = await rotateUserToken("u2", "t2")
-
-    expect(spy.mock.calls[0][0]).toBe(`${BASE}/users/u2/tokens/t2/rotate`)
-    expect(spy.mock.calls[0][1]?.method).toBe("POST")
-    expect(result.secret).toBe("hyd_live_new")
-  })
-
-  it("revokeUserToken DELETEs the specific token", async () => {
+  it("revokeMyToken DELETEs /tokens/:id (no rotate endpoint exists)", async () => {
     const spy = fetchMock().mockResolvedValue(okResponse({}))
     vi.stubGlobal("fetch", spy)
 
-    await revokeUserToken("u2", "t2")
+    await revokeMyToken(2)
 
-    expect(spy.mock.calls[0][0]).toBe(`${BASE}/users/u2/tokens/t2`)
+    expect(spy.mock.calls[0][0]).toBe(`${BASE}/tokens/2`)
     expect(spy.mock.calls[0][1]?.method).toBe("DELETE")
   })
 
@@ -359,14 +353,21 @@ describe("demo mode 403 handling", () => {
     toastErrorMock.mockClear()
   })
 
+  it("exports DEMO_MODE_ERROR matching the Go DemoGuard string exactly", () => {
+    // apps/core/cmd/controlplane/middlewares/demo.go:57 — kept as a single
+    // exported constant (LOW #2) rather than an inline literal so a future
+    // wording change on either side is a one-place diff to find.
+    expect(DEMO_MODE_ERROR).toBe("demo mode: changes are disabled")
+  })
+
   it("shows a friendly toast and still throws when the server returns the demo-mode 403", async () => {
     stubFetch<Record<string, never>>(
-      { status: "error", data: null as unknown as Record<string, never>, error: "demo mode: changes are disabled" },
+      { status: "error", data: null as unknown as Record<string, never>, error: DEMO_MODE_ERROR },
       403,
     )
 
     await expect(createUser({ username: "x", password: "y", role: "admin" })).rejects.toThrow(
-      "demo mode: changes are disabled",
+      DEMO_MODE_ERROR,
     )
     expect(toastErrorMock).toHaveBeenCalledTimes(1)
     expect(toastErrorMock.mock.calls[0][0]).toMatch(/read-only demo/i)

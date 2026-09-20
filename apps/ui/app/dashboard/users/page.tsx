@@ -17,14 +17,14 @@ import {
 } from "@/components/ui/drawer"
 import {
   getUsers, createUser, updateUser, deleteUser,
-  getUserTokens, createUserToken, rotateUserToken, revokeUserToken,
+  getMyTokens, createMyToken, revokeMyToken,
 } from "@/lib/api"
 import type {
   User, UserListData, UserRole, Token,
 } from "@/lib/types"
 import {
   Plus, Trash2, Users as UsersIcon, ShieldCheck, UserCog, KeyRound,
-  Copy, RotateCcw, Ban, Check,
+  Copy, Ban, Check,
 } from "lucide-react"
 
 const ROLES: { value: UserRole; label: string }[] = [
@@ -77,10 +77,13 @@ export default function UsersPage() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
-  // Token drawer
-  const [tokenUser, setTokenUser] = useState<User | null>(null)
+  // "My Tokens" drawer. The control plane scopes /tokens to the caller —
+  // there is no nested /users/:id/tokens route — so this manages the
+  // signed-in user's own tokens only, not any other account's (see
+  // lib/api.ts's getMyTokens/createMyToken/revokeMyToken).
+  const [tokensOpen, setTokensOpen] = useState(false)
   const [tokens, setTokens] = useState<Token[]>([])
-  const [tokenName, setTokenName] = useState("")
+  const [tokenLabel, setTokenLabel] = useState("")
   const [tokenExpiry, setTokenExpiry] = useState("90")
   const [tokenBusy, setTokenBusy] = useState(false)
   const [tokenError, setTokenError] = useState<string | null>(null)
@@ -93,15 +96,15 @@ export default function UsersPage() {
 
   useEffect(() => { fetchData() }, [])
 
-  const fetchTokens = (userId: string) => {
-    getUserTokens(userId)
+  const fetchTokens = () => {
+    getMyTokens()
       .then((t) => { setTokens(t); setTokenError(null) })
       .catch((e) => setTokenError(e.message))
   }
 
   useEffect(() => {
-    if (tokenUser) fetchTokens(tokenUser.id)
-  }, [tokenUser])
+    if (tokensOpen) fetchTokens()
+  }, [tokensOpen])
 
   const openCreate = () => {
     setFormUsername("")
@@ -166,30 +169,33 @@ export default function UsersPage() {
     }
   }
 
-  const openTokens = (user: User) => {
+  const openTokens = () => {
     setTokens([])
-    setTokenName("")
+    setTokenLabel("")
     setTokenExpiry("90")
     setTokenError(null)
     setRevealedSecret(null)
-    setTokenUser(user)
+    setTokensOpen(true)
   }
 
   const handleCreateToken = async () => {
-    if (!tokenUser || !tokenName) {
-      setTokenError("Token name is required")
+    if (!tokenLabel) {
+      setTokenError("Token label is required")
       return
     }
     setTokenBusy(true)
     setTokenError(null)
     try {
-      const res = await createUserToken(tokenUser.id, {
-        name: tokenName,
-        ...(tokenExpiry !== "never" ? { expires_in_days: parseInt(tokenExpiry) } : {}),
+      const res = await createMyToken({
+        label: tokenLabel,
+        ...(tokenExpiry !== "never" ? { expiry_days: parseInt(tokenExpiry) } : {}),
       })
-      setRevealedSecret(res.secret)
-      setTokenName("")
-      fetchTokens(tokenUser.id)
+      // The plaintext secret is only ever returned once, right here — it is
+      // held in component state for the reveal-and-copy UI below and is
+      // never written to localStorage or any other persistent store.
+      setRevealedSecret(res.token)
+      setTokenLabel("")
+      fetchTokens()
     } catch (e) {
       setTokenError(e instanceof Error ? e.message : "Failed to create token")
     } finally {
@@ -197,28 +203,12 @@ export default function UsersPage() {
     }
   }
 
-  const handleRotateToken = async (tokenId: string) => {
-    if (!tokenUser) return
+  const handleRevokeToken = async (tokenId: number) => {
     setTokenBusy(true)
     setTokenError(null)
     try {
-      const res = await rotateUserToken(tokenUser.id, tokenId)
-      setRevealedSecret(res.secret)
-      fetchTokens(tokenUser.id)
-    } catch (e) {
-      setTokenError(e instanceof Error ? e.message : "Failed to rotate token")
-    } finally {
-      setTokenBusy(false)
-    }
-  }
-
-  const handleRevokeToken = async (tokenId: string) => {
-    if (!tokenUser) return
-    setTokenBusy(true)
-    setTokenError(null)
-    try {
-      await revokeUserToken(tokenUser.id, tokenId)
-      fetchTokens(tokenUser.id)
+      await revokeMyToken(tokenId)
+      fetchTokens()
     } catch (e) {
       setTokenError(e instanceof Error ? e.message : "Failed to revoke token")
     } finally {
@@ -259,6 +249,15 @@ export default function UsersPage() {
             </Breadcrumb>
           </div>
         </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={openTokens}
+          className="gap-2"
+        >
+          <KeyRound className="h-4 w-4" />
+          My Tokens
+        </Button>
         <Button
           size="sm"
           onClick={openCreate}
@@ -365,14 +364,6 @@ export default function UsersPage() {
                 </div>
 
                 <div className="flex items-center gap-1 ml-auto">
-                  <button
-                    className="h-9 px-3 rounded-lg hover:bg-[#00D4AA]/10 hover:text-[#00D4AA] text-muted-foreground transition-colors flex items-center gap-1.5 text-xs font-semibold"
-                    onClick={() => openTokens(u)}
-                    title="Manage tokens"
-                  >
-                    <KeyRound className="h-4 w-4" />
-                    Tokens
-                  </button>
                   <button
                     className="w-9 h-9 rounded-lg hover:bg-[#0EA5E9]/10 hover:text-[#0EA5E9] text-muted-foreground transition-colors flex items-center justify-center"
                     onClick={() => openEdit(u)}
@@ -543,15 +534,21 @@ export default function UsersPage() {
         </DrawerContent>
       </Drawer>
 
-      {/* Token management drawer */}
-      <Drawer direction="right" open={!!tokenUser} onOpenChange={(open) => { if (!open) setTokenUser(null) }}>
+      {/* My Tokens drawer. Scoped to the signed-in user's own tokens — the
+          control plane has no route for one user to create tokens on
+          another user's behalf, so this is not per-account like the user
+          list above. */}
+      <Drawer direction="right" open={tokensOpen} onOpenChange={setTokensOpen}>
         <DrawerContent className="data-[vaul-drawer-direction=right]:sm:max-w-md">
           <DrawerHeader>
             <DrawerTitle className="font-headline text-lg flex items-center gap-2">
               <KeyRound className="h-4 w-4 text-[#00D4AA]" />
-              API Tokens — {tokenUser?.username}
+              My API Tokens
             </DrawerTitle>
-            <DrawerDescription>Tokens inherit this user&apos;s role. Secrets are shown only once.</DrawerDescription>
+            <DrawerDescription>
+              Tokens authenticate as you, with your current role. You can only manage your
+              own tokens here — secrets are shown once, at creation.
+            </DrawerDescription>
           </DrawerHeader>
           <div className="flex-1 overflow-y-auto px-4 space-y-5">
             {tokenError && (
@@ -583,12 +580,12 @@ export default function UsersPage() {
             <div className="rounded-lg border border-border bg-background p-4 space-y-4">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">New token</p>
               <div className="space-y-2">
-                <Label htmlFor="t-name" className={labelClass}>Name</Label>
+                <Label htmlFor="t-label" className={labelClass}>Label</Label>
                 <Input
-                  id="t-name"
+                  id="t-label"
                   placeholder="e.g. ci-pipeline"
-                  value={tokenName}
-                  onChange={(e) => setTokenName(e.target.value)}
+                  value={tokenLabel}
+                  onChange={(e) => setTokenLabel(e.target.value)}
                   className="bg-card border-border rounded-lg"
                 />
               </div>
@@ -621,39 +618,34 @@ export default function UsersPage() {
             <div className="space-y-2">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Existing tokens</p>
               {tokens.length > 0 ? (
-                tokens.map((t) => (
-                  <div key={t.id} className="rounded-lg border border-border bg-card p-3 flex items-center gap-3">
-                    <div className="flex-1 overflow-hidden">
-                      <div className="flex items-center gap-2">
-                        <span className="font-headline font-semibold text-sm truncate">{t.name}</span>
-                        {t.revoked && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-destructive/10 text-destructive uppercase">Revoked</span>
-                        )}
+                tokens.map((t) => {
+                  const revoked = Boolean(t.revoked_at)
+                  return (
+                    <div key={t.id} className="rounded-lg border border-border bg-card p-3 flex items-center gap-3">
+                      <div className="flex-1 overflow-hidden">
+                        <div className="flex items-center gap-2">
+                          <span className="font-headline font-semibold text-sm truncate">{t.label}</span>
+                          {revoked && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-destructive/10 text-destructive uppercase">Revoked</span>
+                          )}
+                        </div>
+                        <p className="font-mono text-[11px] text-muted-foreground mt-0.5 truncate">
+                          used {timeAgo(t.last_used_at ?? undefined)}
+                        </p>
                       </div>
-                      <p className="font-mono text-[11px] text-muted-foreground mt-0.5 truncate">
-                        {t.prefix}••• · used {timeAgo(t.last_used_at)}
-                      </p>
+                      <button
+                        onClick={() => handleRevokeToken(t.id)}
+                        disabled={tokenBusy || revoked}
+                        className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40"
+                        title="Revoke token"
+                      >
+                        <Ban className="h-4 w-4" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleRotateToken(t.id)}
-                      disabled={tokenBusy || t.revoked}
-                      className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-[#0EA5E9] hover:bg-[#0EA5E9]/10 transition-colors disabled:opacity-40"
-                      title="Rotate token"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleRevokeToken(t.id)}
-                      disabled={tokenBusy || t.revoked}
-                      className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40"
-                      title="Revoke token"
-                    >
-                      <Ban className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))
+                  )
+                })
               ) : (
-                <p className="text-sm text-muted-foreground px-1 py-4">No tokens for this user yet.</p>
+                <p className="text-sm text-muted-foreground px-1 py-4">You have no API tokens yet.</p>
               )}
             </div>
           </div>

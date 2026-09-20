@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Lock, ArrowRight, Loader2, AlertTriangle, Sparkles } from "lucide-react"
-import { login, setToken, getAuthStatus, getToken, DEMO_PASSWORD } from "@/lib/auth"
+import { login, setToken, getAuthStatus, getToken } from "@/lib/auth"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -22,7 +22,7 @@ export default function LoginPage() {
       return
     }
     // Check if setup is needed (and whether this is a public demo)
-    getAuthStatus().then(({ status, demoMode }) => {
+    getAuthStatus().then(async ({ status, demoMode }) => {
       if (status === "needs_setup" && !demoMode) {
         router.replace("/setup")
       } else if (status === "unreachable") {
@@ -35,6 +35,11 @@ export default function LoginPage() {
         // since POST /auth/setup is rejected outright by the server.
         if (demoMode) {
           setDemoMode(true)
+          // H7: dynamically imported so the demo password string is only
+          // ever fetched (as its own chunk) when the server has confirmed
+          // demo mode is on — it never ships in the login page's main
+          // bundle for a normal, non-demo self-hosted install.
+          const { DEMO_PASSWORD } = await import("@/lib/demo-credentials")
           setPassword(DEMO_PASSWORD)
         }
         setLoading(false)

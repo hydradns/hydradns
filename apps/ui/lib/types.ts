@@ -36,21 +36,15 @@ export interface DnsMetrics {
   grade: "excellent" | "good" | "degraded" | "bad" | "unknown"
 }
 
+// Resolvers are read-only in the dashboard — the control plane has no
+// create/update/delete route for /dns/resolvers (configured via
+// configs/config.yaml instead), so there's no Create/Update request type.
 export interface Resolver {
   id: string
   name: string
   address: string
   protocol: string
 }
-
-export interface CreateResolverRequest {
-  id: string
-  name: string
-  address: string
-  protocol: string
-}
-
-export type UpdateResolverRequest = Partial<Omit<CreateResolverRequest, "id">>
 
 // Blocklists
 export interface Blocklist {
@@ -83,15 +77,6 @@ export type UpdateBlocklistRequest = Partial<Omit<CreateBlocklistRequest, "id">>
   enabled?: boolean
 }
 
-// Curated categories (bundled threat/content groups the operator can toggle)
-export interface Category {
-  id: string
-  name: string
-  description: string
-  enabled: boolean
-  domains_count: number
-}
-
 // Policies
 export interface Policy {
   id: string
@@ -103,9 +88,6 @@ export interface Policy {
   domains: string[]
   priority: number
   enabled: boolean
-  // Optional scheduling + client scoping (backend CRUD adds these)
-  schedule?: string
-  client_scope?: string
 }
 
 export interface PolicyListData {
@@ -124,13 +106,16 @@ export interface CreatePolicyRequest {
   redirect_ip?: string
   domains: string[]
   priority?: number
-  schedule?: string
-  client_scope?: string
 }
 
-export type UpdatePolicyRequest = Partial<Omit<CreatePolicyRequest, "id">> & {
-  enabled?: boolean
-}
+// The Go handler's UpdatePolicyRequest (apps/core/cmd/controlplane/handlers/
+// policies.go) requires name, action, and domains on every PUT — there is no
+// partial-patch support server-side. `enabled` is the one field the backend
+// accepts on top of CreatePolicyRequest's shape.
+export type UpdatePolicyRequest = Pick<CreatePolicyRequest, "name" | "action" | "domains"> &
+  Partial<Omit<CreatePolicyRequest, "id" | "name" | "action" | "domains">> & {
+    enabled?: boolean
+  }
 
 // Query Logs
 export interface QueryLogEntry {
@@ -228,27 +213,32 @@ export interface UpdateUserRequest {
   enabled?: boolean
 }
 
-// RBAC — API tokens (scoped to a user)
+// RBAC — API tokens. Every authenticated user manages their own tokens via
+// the flat GET/POST /tokens and DELETE /tokens/:id (see
+// apps/core/cmd/controlplane/handlers/tokens.go's tokenDTO) — there is no
+// per-user nesting and no rotate endpoint. Field names below mirror the Go
+// DTO exactly (`label`, not `name`; `revoked_at`, not a `revoked` boolean).
 export interface Token {
-  id: string
-  name: string
-  prefix: string
-  role: UserRole
-  revoked: boolean
+  id: number
+  user_id: number
+  label: string
   created_at: string
-  last_used_at?: string
-  expires_at?: string
+  last_used_at?: string | null
+  revoked_at?: string | null
+  expires_at?: string | null
 }
 
 export interface CreateTokenRequest {
-  name: string
-  expires_in_days?: number
+  label: string
+  expiry_days?: number
 }
 
-// The plaintext secret is only ever returned once, on create/rotate.
+// The plaintext secret is only ever returned once, on create — there is no
+// rotate endpoint. Mirrors the Go handler's response envelope: `token` is
+// the one-time plaintext secret, `meta` is the stored token record.
 export interface TokenSecret {
-  token: Token
-  secret: string
+  token: string
+  meta: Token
 }
 
 // RBAC — Audit log
@@ -278,7 +268,10 @@ export interface AuditQuery {
   action?: string
 }
 
-// Settings (control-plane engine configuration)
+// Settings (control-plane engine configuration). There is no GET/PATCH
+// /settings route on the control plane (see lib/api.ts) — this type only
+// shapes the static, disabled preview rendered by
+// app/dashboard/settings/page.tsx until a real backend exists.
 export interface Settings {
   engine_enabled: boolean
   block_page_enabled: boolean
@@ -287,5 +280,3 @@ export interface Settings {
   upstream_timeout_ms: number
   log_retention_days: number
 }
-
-export type UpdateSettingsRequest = Partial<Settings>

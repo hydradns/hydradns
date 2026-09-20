@@ -1,6 +1,21 @@
 // Registers jest-dom matchers (toBeInTheDocument, toHaveClass, ...) on Vitest's
 // expect and runs after each test cleanup for React Testing Library.
 import "@testing-library/jest-dom/vitest"
+import { afterEach } from "vitest"
+
+// Global reset so a token (or anything else) written to storage by one test
+// can never leak into the next test file/describe block. Without this, a
+// test that calls localStorage.setItem and doesn't clean up after itself
+// silently poisons whatever runs next in the same file (see
+// lib/api.test.ts's former "attaches a bearer token from localStorage"
+// test, which relied on later blocks not asserting on Authorization
+// headers rather than on this being enforced).
+afterEach(() => {
+  if (typeof window !== "undefined") {
+    window.localStorage?.clear()
+    window.sessionStorage?.clear()
+  }
+})
 
 // jsdom lacks a few browser APIs that Radix UI / vaul rely on at mount time.
 // Provide minimal shims so component tests can render dialogs, drawers, and

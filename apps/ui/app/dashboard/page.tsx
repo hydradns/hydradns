@@ -164,7 +164,15 @@ export default function DashboardPage() {
     // gracefully so a missing endpoint never blanks the whole dashboard.
     getDnsMetrics().then(setMetrics).catch(() => {})
     getBlocklists().then(setBlocklists).catch(() => {})
-    getBypassAttempts().then(setBypass).catch(() => {})
+    // H8: only fetch bypass-attempt data (client IPs, targets, counts) when
+    // the panel that displays it is actually enabled. Otherwise this data
+    // would still be pulled into the browser (Network tab / React
+    // DevTools) even though the whole point of hiding the panel by default
+    // is that surfacing this limitation is an anti-feature for non-technical
+    // buyers — see the "Invisible Mitigation" product decision.
+    if (process.env.NEXT_PUBLIC_SHOW_BYPASS_PANEL === "true") {
+      getBypassAttempts().then(setBypass).catch(() => {})
+    }
   }
 
   useEffect(() => {

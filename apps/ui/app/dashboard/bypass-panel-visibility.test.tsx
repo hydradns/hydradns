@@ -100,6 +100,25 @@ describe("DashboardPage bypass panel visibility", () => {
     expect(screen.queryByText("Encrypted-DNS Bypass Attempts")).not.toBeInTheDocument()
   })
 
+  // H8: the fetch itself (not just the rendered panel) must be gated by the
+  // flag — otherwise bypass-attempt data (client IPs, targets, counts)
+  // still lands in the browser's Network tab / component state even when
+  // the panel is hidden, which is exactly what the "Invisible Mitigation"
+  // decision says not to do.
+  it("never calls GET /analytics/bypass when the flag is off", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SHOW_BYPASS_PANEL", undefined as unknown as string)
+    const fetchMock = installFetch()
+    renderPage()
+
+    await screen.findByText("Query Activity")
+    // Give any stray bypass fetch a chance to fire before asserting absence.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    const calledBypass = fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("/analytics/bypass"),
+    )
+    expect(calledBypass).toBe(false)
+  })
+
   it("shows the bypass panel when NEXT_PUBLIC_SHOW_BYPASS_PANEL=true", async () => {
     vi.stubEnv("NEXT_PUBLIC_SHOW_BYPASS_PANEL", "true")
     installFetch()
@@ -109,5 +128,18 @@ describe("DashboardPage bypass panel visibility", () => {
       await screen.findByLabelText("Encrypted-DNS bypass attempts"),
     ).toBeInTheDocument()
     expect(screen.getByText("Encrypted-DNS Bypass Attempts")).toBeInTheDocument()
+  })
+
+  it("calls GET /analytics/bypass when the flag is on", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SHOW_BYPASS_PANEL", "true")
+    const fetchMock = installFetch()
+    renderPage()
+
+    await waitFor(() => {
+      const calledBypass = fetchMock.mock.calls.some(([input]) =>
+        String(input).includes("/analytics/bypass"),
+      )
+      expect(calledBypass).toBe(true)
+    })
   })
 })

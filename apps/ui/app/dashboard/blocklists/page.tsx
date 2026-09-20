@@ -18,11 +18,10 @@ import {
 import { Switch } from "@/components/ui/switch"
 import {
   getBlocklists, createBlocklist, deleteBlocklist, toggleBlocklist,
-  getCategories, toggleCategory,
 } from "@/lib/api"
-import type { Blocklist, BlocklistListData, Category } from "@/lib/types"
+import type { Blocklist, BlocklistListData } from "@/lib/types"
 import {
-  Plus, Trash2, ShieldCheck, List, RefreshCw, Layers,
+  Plus, Trash2, ShieldCheck, List, RefreshCw,
 } from "lucide-react"
 
 function timeAgo(dateString: string): string {
@@ -40,7 +39,6 @@ function timeAgo(dateString: string): string {
 
 export default function BlocklistsPage() {
   const [data, setData] = useState<BlocklistListData | null>(null)
-  const [categories, setCategories] = useState<Category[]>([])
   const [showForm, setShowForm] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
@@ -56,7 +54,6 @@ export default function BlocklistsPage() {
 
   const fetchData = () => {
     getBlocklists().then((d) => { setData(d); setError(null) }).catch((e) => setError(e.message))
-    getCategories().then(setCategories).catch(() => {})
   }
 
   useEffect(() => { fetchData() }, [])
@@ -66,25 +63,6 @@ export default function BlocklistsPage() {
     try {
       await toggleBlocklist(bl.id, !bl.enabled)
       fetchData()
-    } finally {
-      setToggling(null)
-    }
-  }
-
-  const handleToggleCategory = async (cat: Category) => {
-    setToggling(cat.id)
-    // Optimistic flip so the switch feels instant.
-    setCategories((prev) =>
-      prev.map((c) => (c.id === cat.id ? { ...c, enabled: !c.enabled } : c)),
-    )
-    try {
-      await toggleCategory(cat.id, !cat.enabled)
-      fetchData()
-    } catch {
-      // Revert on failure.
-      setCategories((prev) =>
-        prev.map((c) => (c.id === cat.id ? { ...c, enabled: cat.enabled } : c)),
-      )
     } finally {
       setToggling(null)
     }
@@ -408,52 +386,6 @@ export default function BlocklistsPage() {
               <p className="text-muted-foreground text-sm mt-1 max-w-xs">
                 Add your first blocklist source to start filtering DNS traffic.
               </p>
-            </div>
-          )}
-        </div>
-
-        {/* Curated categories */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 px-1 mb-1">
-            <Layers className="h-4 w-4 text-[#00D4AA]" />
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-              Curated Categories
-            </h4>
-          </div>
-          {categories.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {categories.map((cat: Category) => (
-                <div
-                  key={cat.id}
-                  className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 hover:border-[#00D4AA]/20 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h5 className="font-headline font-semibold text-foreground truncate">
-                        {cat.name}
-                      </h5>
-                      <span className="text-[10px] text-muted-foreground font-mono shrink-0">
-                        {cat.domains_count.toLocaleString()} domains
-                      </span>
-                    </div>
-                    {cat.description && (
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {cat.description}
-                      </p>
-                    )}
-                  </div>
-                  <Switch
-                    checked={cat.enabled}
-                    disabled={toggling === cat.id}
-                    onCheckedChange={() => handleToggleCategory(cat)}
-                    aria-label={`Toggle ${cat.name}`}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="border border-dashed border-border rounded-xl p-6 text-center text-sm text-muted-foreground">
-              No curated categories available.
             </div>
           )}
         </div>
