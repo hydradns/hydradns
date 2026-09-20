@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 🔒 Report a security vulnerability
+  - name: Report a security vulnerability
     url: https://github.com/hydradns/hydradns/security/policy
     about: Please report security issues privately, not as a public issue.
-  - name: 💬 Questions and discussion
+  - name: Questions and discussion
     url: https://github.com/hydradns/hydradns/discussions
     about: Ask questions and discuss ideas with the community.
