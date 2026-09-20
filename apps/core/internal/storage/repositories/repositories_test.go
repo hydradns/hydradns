@@ -443,3 +443,234 @@ func TestBlocklistRepo_DeleteSourceCascades(t *testing.T) {
 		t.Errorf("expected 0 entries after cascade delete, got %d", count)
 	}
 }
+
+// GetAllEnabled must exclude entries whose source is disabled, even though
+// the rows are still in the DB — this is the bug behind "I turned the list
+// off and it still blocks". GetAll (unfiltered) deliberately keeps the old
+// behaviour for any other future caller.
+func TestBlocklistRepo_GetAllEnabled_ExcludesDisabledSources(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBlocklistRepo(db)
+
+	on := &models.BlocklistSource{ID: "on", Name: "On", URL: "http://x", Format: "hosts", Enabled: true, CreatedAt: time.Now()}
+	off := &models.BlocklistSource{ID: "off", Name: "Off", URL: "http://y", Format: "hosts", Enabled: false, CreatedAt: time.Now()}
+	if err := repo.CreateSource(on); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.CreateSource(off); err != nil {
+		t.Fatal(err)
+	}
+	db.Create(&models.BlocklistEntry{Domain: "enabled.com", SourceID: "on"})
+	db.Create(&models.BlocklistEntry{Domain: "disabled.com", SourceID: "off"})
+
+	domains, err := repo.GetAllEnabled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(domains) != 1 || domains[0] != "enabled.com" {
+		t.Fatalf("GetAllEnabled() = %v, want [enabled.com]", domains)
+	}
+
+	// Sanity: GetAll (unfiltered) still returns both — this is what makes
+	// the bug possible if the wrong method is wired into the DNS hot path.
+	all, err := repo.GetAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("GetAll() = %v, want both domains", all)
+	}
+}
+
+func TestBlocklistRepo_GetAllEnabled_Empty(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBlocklistRepo(db)
+
+	domains, err := repo.GetAllEnabled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(domains) != 0 {
+		t.Errorf("expected 0 domains, got %d", len(domains))
+	}
+}
+
+// --- Blocklist Signature ---
+
+func TestBlocklistRepo_Signature_StableWhenUnchanged(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBlocklistRepo(db)
+
+	src := &models.BlocklistSource{ID: "s1", Name: "S1", URL: "http://x", Format: "hosts", Enabled: true, CreatedAt: time.Now()}
+	if err := repo.CreateSource(src); err != nil {
+		t.Fatal(err)
+	}
+
+	sig1, err := repo.Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sig2, err := repo.Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sig1 != sig2 {
+		t.Errorf("Signature changed with no writes in between: %+v != %+v", sig1, sig2)
+	}
+}
+
+func TestBlocklistRepo_Signature_ChangesOnCreate(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBlocklistRepo(db)
+
+	before, err := repo.Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	src := &models.BlocklistSource{ID: "s1", Name: "S1", URL: "http://x", Format: "hosts", Enabled: true, CreatedAt: time.Now()}
+	if err := repo.CreateSource(src); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := repo.Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before == after {
+		t.Errorf("Signature did not change after CreateSource: %+v", after)
+	}
+	if after.SourceCount != before.SourceCount+1 {
+		t.Errorf("SourceCount = %d, want %d", after.SourceCount, before.SourceCount+1)
+	}
+}
+
+func TestBlocklistRepo_Signature_ChangesOnToggle(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBlocklistRepo(db)
+
+	src := &models.BlocklistSource{ID: "s1", Name: "S1", URL: "http://x", Format: "hosts", Enabled: true, CreatedAt: time.Now()}
+	if err := repo.CreateSource(src); err != nil {
+		t.Fatal(err)
+	}
+	before, err := repo.Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mirror what UpdateBlocklist does: mutate the in-memory struct and
+	// persist a full row save (UpdateSourceFields), including bumping
+	// UpdatedAt as the handler does.
+	time.Sleep(time.Millisecond)
+	src.Enabled = false
+	src.UpdatedAt = time.Now()
+	if err := repo.UpdateSourceFields(src); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := repo.Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before == after {
+		t.Errorf("Signature did not change after toggling enabled: %+v", after)
+	}
+	if after.EnabledSourceCount != before.EnabledSourceCount-1 {
+		t.Errorf("EnabledSourceCount = %d, want %d", after.EnabledSourceCount, before.EnabledSourceCount-1)
+	}
+	if after.MaxSourceUpdatedAt == before.MaxSourceUpdatedAt {
+		t.Errorf("MaxSourceUpdatedAt did not change: before=%q after=%q", before.MaxSourceUpdatedAt, after.MaxSourceUpdatedAt)
+	}
+}
+
+func TestBlocklistRepo_Signature_ChangesOnEdit(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBlocklistRepo(db)
+
+	src := &models.BlocklistSource{ID: "s1", Name: "S1", URL: "http://x", Format: "hosts", Enabled: true, CreatedAt: time.Now()}
+	if err := repo.CreateSource(src); err != nil {
+		t.Fatal(err)
+	}
+	before, err := repo.Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(time.Millisecond)
+	src.Name = "renamed"
+	src.UpdatedAt = time.Now()
+	if err := repo.UpdateSourceFields(src); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := repo.Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before == after {
+		t.Errorf("Signature did not change after editing name: %+v", after)
+	}
+}
+
+func TestBlocklistRepo_Signature_ChangesOnDelete(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBlocklistRepo(db)
+
+	src := &models.BlocklistSource{ID: "s1", Name: "S1", URL: "http://x", Format: "hosts", Enabled: true, CreatedAt: time.Now()}
+	if err := repo.CreateSource(src); err != nil {
+		t.Fatal(err)
+	}
+	before, err := repo.Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.DeleteSource("s1"); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := repo.Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before == after {
+		t.Errorf("Signature did not change after DeleteSource: %+v", after)
+	}
+	if after.SourceCount != before.SourceCount-1 {
+		t.Errorf("SourceCount = %d, want %d", after.SourceCount, before.SourceCount-1)
+	}
+}
+
+func TestBlocklistRepo_Signature_ChangesOnNewSnapshot(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBlocklistRepo(db)
+
+	src := &models.BlocklistSource{ID: "s1", Name: "S1", URL: "http://x", Format: "hosts", Enabled: true, CreatedAt: time.Now()}
+	if err := repo.CreateSource(src); err != nil {
+		t.Fatal(err)
+	}
+	before, err := repo.Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(time.Millisecond)
+	entries := []models.BlocklistEntry{{Domain: "a.com", SourceID: "s1"}}
+	if _, err := repo.SaveSnapshotWithEntries(*src, "hash1", entries); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := repo.Signature()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before == after {
+		t.Errorf("Signature did not change after a new snapshot: %+v", after)
+	}
+	if after.SnapshotCount != before.SnapshotCount+1 {
+		t.Errorf("SnapshotCount = %d, want %d", after.SnapshotCount, before.SnapshotCount+1)
+	}
+	if after.MaxSnapshotID <= before.MaxSnapshotID {
+		t.Errorf("MaxSnapshotID did not advance: before=%d after=%d", before.MaxSnapshotID, after.MaxSnapshotID)
+	}
+}
