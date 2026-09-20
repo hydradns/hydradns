@@ -1,4 +1,4 @@
-name: 📖 Documentation
+name: Documentation
 description: Suggest improvements or report issues with documentation
 title: "[Docs]: "
 labels: ["documentation", "triage"]
@@ -8,8 +8,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve our documentation! 📖
-        
+        Thanks for helping improve our documentation.
+
         Good documentation makes HydraDNS more accessible to everyone.
 
   - type: dropdown

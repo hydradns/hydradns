@@ -1,4 +1,4 @@
-name: ✨ Feature Request
+name: Feature Request
 description: Suggest a new feature or enhancement for HydraDNS
 title: "[Feature]: "
 labels: ["enhancement", "triage"]
@@ -8,8 +8,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for suggesting a new feature! ✨
-        
+        Thanks for suggesting a new feature.
+
         Please help us understand your use case and proposed solution.
 
   - type: textarea
