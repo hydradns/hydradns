@@ -1,4 +1,4 @@
-module github.com/hydradns/hydra-cli
+module github.com/hydradns/hydradns/apps/cli
 
 go 1.25.0
 

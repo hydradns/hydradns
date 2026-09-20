@@ -7,7 +7,7 @@ import (
 )
 
 // Version is the built-in version of the hydra CLI. It can be overridden at
-// build time with -ldflags "-X github.com/hydradns/hydra-cli/cmd.Version=vX.Y.Z".
+// build time with -ldflags "-X github.com/hydradns/hydradns/apps/cli/cmd.Version=vX.Y.Z".
 var Version = "1.0.0"
 
 var versionCmd = &cobra.Command{

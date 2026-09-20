@@ -4,9 +4,9 @@ package dataplane
 import (
 	"context"
 
-	"github.com/hydradns/hydra-core/internal/dnsengine"
-	pb "github.com/hydradns/hydra-core/internal/gen/proto/hydradns/v1"
-	"github.com/hydradns/hydra-core/internal/metrics"
+	"github.com/hydradns/hydradns/apps/core/internal/dnsengine"
+	pb "github.com/hydradns/hydradns/apps/core/internal/gen/proto/hydradns/v1"
+	"github.com/hydradns/hydradns/apps/core/internal/metrics"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 

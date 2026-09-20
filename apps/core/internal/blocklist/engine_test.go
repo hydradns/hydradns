@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hydradns/hydra-core/internal/storage/repositories"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/repositories"
 )
 
 // fakeRepo embeds the (nil) interface and overrides only the methods under

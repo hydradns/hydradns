@@ -23,7 +23,7 @@ COPY . .
 ENV GOWORK=off
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath \
-    -ldflags="-s -w -X github.com/hydradns/hydra-cli/cmd.Version=${VERSION}" \
+    -ldflags="-s -w -X github.com/hydradns/hydradns/apps/cli/cmd.Version=${VERSION}" \
     -o /bin/hydra .
 
 # Runtime

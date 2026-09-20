@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/glebarez/sqlite"
-	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )

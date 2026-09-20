@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hydradns/hydra-cli/api"
+	"github.com/hydradns/hydradns/apps/cli/api"
 )
 
 const testBearer = "s3cr3t-bearer-token"

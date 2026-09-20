@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hydradns/hydra-core/internal/blocklist/parser"
+	"github.com/hydradns/hydradns/apps/core/internal/blocklist/parser"
 )
 
 func TestCheckDialAddress(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hydradns/hydra-core/internal/config"
+	"github.com/hydradns/hydradns/apps/core/internal/config"
 )
 
 // buildCORSRouter wires CORS() into a minimal router the same way main.go
