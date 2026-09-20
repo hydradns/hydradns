@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydra-core/internal/storage/repositories"
 )
 
 type fakeQueryLog struct {
@@ -28,6 +29,13 @@ func (f *fakeQueryLog) ListRecent(limit int) ([]models.DNSQuery, error) { return
 func (f *fakeQueryLog) DeleteOlderThan(time.Time) (int64, error)        { return 0, nil }
 func (f *fakeQueryLog) EnforceRowCap(int64) (int64, error)              { return 0, nil }
 func (f *fakeQueryLog) Count() (int64, error)                           { return int64(f.count()), nil }
+func (f *fakeQueryLog) ListPage(repositories.QueryLogFilter) ([]models.DNSQuery, error) {
+	return nil, nil
+}
+func (f *fakeQueryLog) CountFiltered(repositories.QueryLogFilter) (int64, error) { return 0, nil }
+func (f *fakeQueryLog) BypassAttempts(time.Time, int) (repositories.BypassSummary, error) {
+	return repositories.BypassSummary{}, nil
+}
 func (f *fakeQueryLog) count() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -137,3 +145,10 @@ func (b *blockingQueryLog) ListRecent(int) ([]models.DNSQuery, error) { return n
 func (b *blockingQueryLog) DeleteOlderThan(time.Time) (int64, error)  { return 0, nil }
 func (b *blockingQueryLog) EnforceRowCap(int64) (int64, error)        { return 0, nil }
 func (b *blockingQueryLog) Count() (int64, error)                     { return 0, nil }
+func (b *blockingQueryLog) ListPage(repositories.QueryLogFilter) ([]models.DNSQuery, error) {
+	return nil, nil
+}
+func (b *blockingQueryLog) CountFiltered(repositories.QueryLogFilter) (int64, error) { return 0, nil }
+func (b *blockingQueryLog) BypassAttempts(time.Time, int) (repositories.BypassSummary, error) {
+	return repositories.BypassSummary{}, nil
+}

@@ -1,10 +1,23 @@
 package routes
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/hydradns/hydra-core/cmd/controlplane/handlers"
 	"github.com/hydradns/hydra-core/cmd/controlplane/middlewares"
 	"github.com/hydradns/hydra-core/internal/storage/models"
+)
+
+// loginRateLimit bounds POST /auth/login and /auth/setup: 10 attempts per
+// 5 minutes per client IP, shared across both endpoints (an attacker
+// hammering /setup counts against the same budget as one hammering
+// /login). maxTrackedIPs bounds the limiter's memory regardless of how
+// many distinct source IPs are seen.
+const (
+	loginRateLimitAttempts = 10
+	loginRateLimitWindow   = 5 * time.Minute
+	loginRateLimitMaxIPs   = 10000
 )
 
 // writeRoles names the roles permitted to mutate policies, blocklists,
@@ -21,12 +34,17 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 	r.GET("/health", apiHandler.HealthCheck)
 	r.GET("/", apiHandler.Root)
 	{
-		// Auth endpoints (unprotected — middleware exempts these paths)
+		// Auth endpoints (unprotected — middleware exempts these paths).
+		// /setup and /login are additionally throttled per client IP:
+		// they are the only endpoints an unauthenticated caller can hit
+		// repeatedly to brute-force a password. See middlewares.LoginThrottle
+		// for why this depends on main.go's r.SetTrustedProxies(nil).
+		loginLimiter := middlewares.NewRateLimiter(loginRateLimitAttempts, loginRateLimitWindow, loginRateLimitMaxIPs)
 		auth := api.Group("/auth")
 		{
 			auth.GET("/status", apiHandler.GetAuthStatus)
-			auth.POST("/setup", apiHandler.Setup)
-			auth.POST("/login", apiHandler.Login)
+			auth.POST("/setup", middlewares.LoginThrottle(loginLimiter), apiHandler.Setup)
+			auth.POST("/login", middlewares.LoginThrottle(loginLimiter), apiHandler.Login)
 		}
 
 		// Dashboard endpoints (read-only, open to all authenticated users)
@@ -54,6 +72,9 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 				middlewares.RequireRole(writeRoles...),
 				apiHandler.CreatePolicy)
 			policies.GET("/:id", apiHandler.GetPolicy)
+			policies.PUT("/:id",
+				middlewares.RequireRole(writeRoles...),
+				apiHandler.UpdatePolicy)
 			policies.DELETE("/:id",
 				middlewares.RequireRole(writeRoles...),
 				apiHandler.DeletePolicy)
@@ -67,6 +88,9 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 				middlewares.RequireRole(writeRoles...),
 				apiHandler.CreateBlocklist)
 			blocklists.GET("/:id", apiHandler.GetBlocklist)
+			blocklists.PATCH("/:id",
+				middlewares.RequireRole(writeRoles...),
+				apiHandler.UpdateBlocklist)
 			blocklists.DELETE("/:id",
 				middlewares.RequireRole(writeRoles...),
 				apiHandler.DeleteBlocklist)
@@ -77,6 +101,8 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 		{
 			analytics.GET("/summary", apiHandler.GetAnalyticsSummary)
 			analytics.GET("/audits", apiHandler.GetAuditLogs)
+			analytics.GET("/logs", apiHandler.GetQueryLogsPage)
+			analytics.GET("/bypass", apiHandler.GetBypassAttempts)
 		}
 
 		// Audit log: who did what to the control plane.
