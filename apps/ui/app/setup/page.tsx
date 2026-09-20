@@ -21,7 +21,7 @@ const BLOCKLIST_OPTIONS = [
     name: "StevenBlack Unified",
     url: "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
     format: "hosts",
-    description: "Ads + malware — most popular, 100K+ domains",
+    description: "Ads and malware. Most popular, 100K+ domains",
     defaultChecked: true,
   },
   {
@@ -29,7 +29,7 @@ const BLOCKLIST_OPTIONS = [
     name: "OISD Small",
     url: "https://small.oisd.nl/domainswild",
     format: "domains",
-    description: "Balanced blocking — minimal false positives",
+    description: "Balanced blocking, minimal false positives",
     defaultChecked: false,
   },
   {
@@ -37,7 +37,7 @@ const BLOCKLIST_OPTIONS = [
     name: "Hagezi Light",
     url: "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/hosts/light.txt",
     format: "hosts",
-    description: "Lightweight — fast, low resource usage",
+    description: "Lightweight, fast, low resource usage",
     defaultChecked: false,
   },
 ]
@@ -102,7 +102,7 @@ export default function SetupPage() {
       if (status === "complete") {
         router.replace("/login")
       } else if (status === "unreachable") {
-        setError("Cannot reach HydraDNS API — is the server running?")
+        setError("Cannot reach HydraDNS API. Is the server running?")
         setLoading(false)
       } else {
         setLoading(false)

@@ -85,8 +85,8 @@ describe("getApiBaseUrl (browser)", () => {
   })
 })
 
-// LOW #7 fix: HYDRA_API_INTERNAL_URL was undocumented, code-only, dead
-// (nothing server-side calls getApiBaseUrl — every caller is a "use client"
+// HYDRA_API_INTERNAL_URL was undocumented, code-only, and unused (nothing
+// server-side calls getApiBaseUrl; every caller is a "use client"
 // component's effect/handler). Removed rather than documented; this is now
 // just a boring, safe fallback in case a server component calls this
 // someday.

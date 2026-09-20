@@ -73,7 +73,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		return setupFriendlyErr(err)
 	}
 	if status.SetupComplete {
-		return fmt.Errorf("setup has already been completed on this instance — run `hydra login` instead (no password was sent)")
+		return fmt.Errorf("setup has already been completed on this instance; run `hydra login` instead (no password was sent)")
 	}
 
 	password, err := readSetupPassword()
@@ -81,7 +81,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if len(password) < minSetupPasswordLength {
-		return fmt.Errorf("password must be at least %d characters (server requirement — nothing was sent)", minSetupPasswordLength)
+		return fmt.Errorf("password must be at least %d characters (server requirement; nothing was sent)", minSetupPasswordLength)
 	}
 
 	resp, err := client.Setup(api.SetupRequest{
@@ -160,7 +160,7 @@ func setupFriendlyErr(err error) error {
 	case strings.Contains(msg, "invalid response"):
 		return fmt.Errorf("got a non-JSON response from %s: %w\n  is --api / HYDRA_API_URL pointing at the HydraDNS API (not the dashboard)?", apiURL, err)
 	case strings.Contains(msg, "setup already completed"):
-		return fmt.Errorf("setup was completed by another process just now — run `hydra login` instead")
+		return fmt.Errorf("setup was completed by another process just now; run `hydra login` instead")
 	default:
 		return err
 	}

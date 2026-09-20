@@ -7,7 +7,7 @@ import * as api from "@/lib/api"
 import type { Resolver } from "@/lib/types"
 
 // Resolvers are read-only in the dashboard (no create/update/delete route
-// on the control plane — see lib/api.ts), so only getResolvers is mocked.
+// on the control plane; see lib/api.ts), so only getResolvers is mocked.
 vi.mock("@/lib/api", () => ({
   getResolvers: vi.fn(),
 }))

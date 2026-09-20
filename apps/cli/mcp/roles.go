@@ -46,7 +46,7 @@ func resolveRole(raw string) Role {
 }
 
 // isReadOnly reports whether a tool only reads state, per its explicit
-// classification in toolRegistry() (see server.go) — not a name-prefix
+// classification in toolRegistry() (see server.go), not a name-prefix
 // guess. A name unregistered in toolRegistry() is treated as not read-only
 // (the safe default: subject to role restrictions) rather than granting it
 // access by accident.

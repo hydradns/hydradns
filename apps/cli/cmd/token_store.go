@@ -24,9 +24,9 @@ import (
 //   - The token is written to a same-directory temp file created with
 //     O_EXCL (so it can never be a followed symlink or a collision with
 //     another writer), fsynced, then renamed over the target. A failure
-//     anywhere in that sequence leaves the previous token file untouched
-//     — there is no window where the target is truncated but not yet
-//     rewritten.
+//     anywhere in that sequence leaves the previous token file
+//     untouched, so there is no window where the target is truncated
+//     but not yet rewritten.
 func saveToken(tok string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -73,7 +73,7 @@ func secureDir(dir string) error {
 }
 
 // refuseSymlink refuses to write through a symlinked path. A path that
-// does not exist yet is fine — that's the normal first-write case.
+// does not exist yet is fine, since that's the normal first-write case.
 func refuseSymlink(path string) error {
 	fi, err := os.Lstat(path)
 	if err != nil {

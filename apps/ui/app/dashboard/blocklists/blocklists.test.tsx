@@ -6,9 +6,9 @@ import { SidebarProvider } from "@/components/ui/sidebar"
 import * as api from "@/lib/api"
 import type { Blocklist, BlocklistListData } from "@/lib/types"
 
-// H2 fix: the curated-categories feature (GET /blocklists/categories,
+// The curated-categories feature (GET /blocklists/categories,
 // PATCH /blocklists/categories/:id) had no backend route and 404'd on every
-// page load. It's been removed from the UI entirely — no getCategories /
+// page load. It's been removed from the UI entirely: no getCategories /
 // toggleCategory exports exist anymore, so they aren't mocked here.
 vi.mock("@/lib/api", () => ({
   getBlocklists: vi.fn(),

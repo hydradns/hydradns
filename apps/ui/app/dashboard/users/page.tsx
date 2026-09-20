@@ -77,8 +77,8 @@ export default function UsersPage() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
-  // "My Tokens" drawer. The control plane scopes /tokens to the caller —
-  // there is no nested /users/:id/tokens route — so this manages the
+  // "My Tokens" drawer. The control plane scopes /tokens to the caller;
+  // there is no nested /users/:id/tokens route. So this manages the
   // signed-in user's own tokens only, not any other account's (see
   // lib/api.ts's getMyTokens/createMyToken/revokeMyToken).
   const [tokensOpen, setTokensOpen] = useState(false)
@@ -190,7 +190,7 @@ export default function UsersPage() {
         label: tokenLabel,
         ...(tokenExpiry !== "never" ? { expiry_days: parseInt(tokenExpiry) } : {}),
       })
-      // The plaintext secret is only ever returned once, right here — it is
+      // The plaintext secret is only ever returned once, right here. It is
       // held in component state for the reveal-and-copy UI below and is
       // never written to localStorage or any other persistent store.
       setRevealedSecret(res.token)
@@ -534,7 +534,7 @@ export default function UsersPage() {
         </DrawerContent>
       </Drawer>
 
-      {/* My Tokens drawer. Scoped to the signed-in user's own tokens — the
+      {/* My Tokens drawer. Scoped to the signed-in user's own tokens: the
           control plane has no route for one user to create tokens on
           another user's behalf, so this is not per-account like the user
           list above. */}
@@ -547,7 +547,7 @@ export default function UsersPage() {
             </DrawerTitle>
             <DrawerDescription>
               Tokens authenticate as you, with your current role. You can only manage your
-              own tokens here — secrets are shown once, at creation.
+              own tokens here. Secrets are shown once, at creation.
             </DrawerDescription>
           </DrawerHeader>
           <div className="flex-1 overflow-y-auto px-4 space-y-5">
@@ -561,7 +561,7 @@ export default function UsersPage() {
             {revealedSecret && (
               <div className="rounded-lg border border-[#00D4AA]/40 bg-[#00D4AA]/10 p-3 space-y-2">
                 <p className="text-[10px] font-bold text-[#00D4AA] uppercase tracking-widest">
-                  Copy this token now — it won&apos;t be shown again
+                  Copy this token now. It won&apos;t be shown again
                 </p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 font-mono text-xs break-all text-foreground">{revealedSecret}</code>
