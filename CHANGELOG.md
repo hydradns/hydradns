@@ -6,6 +6,8 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from v0.1.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-20
+
 ### Added
 - **Public demo mode** (`HYDRA_DEMO_MODE=true`): a `DemoGuard` middleware rejects every
   mutating request except login before auth even runs, a fixed-password read-only demo
@@ -241,4 +243,5 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from v0.1.0
   indexes and may take noticeably longer than a normal restart — this is expected and
   one-time. See `docs/releasing.md` for details.
 
-[Unreleased]: https://github.com/hydradns/hydradns/commits/main
+[Unreleased]: https://github.com/hydradns/hydradns/compare/v0.1.0...main
+[0.1.0]: https://github.com/hydradns/hydradns/releases/tag/v0.1.0
