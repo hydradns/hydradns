@@ -72,7 +72,7 @@ really being resolved — that's expected and correct).
 
 ```bash
 cd demo
-cp .env.example .env   # create this: see "Required .env values" below
+cp .env.example .env   # then edit DEMO_PUBLIC_ORIGIN — see "Required .env values" below
 docker compose -f docker-compose.demo.yml up -d
 ```
 
@@ -83,8 +83,8 @@ increasingly restrict things like clipboard/cookies on non-HTTPS origins).
 
 ### Required `.env` values
 
-`docker-compose.demo.yml` has no `.env.example` file checked in (the
-correct value is specific to your domain), so create `demo/.env` yourself:
+`demo/.env.example` ships with placeholder values only — the correct values
+are specific to your domain, so copy it and edit before starting the stack:
 
 ```bash
 # The public origin visitors will use, scheme included. Must match exactly
@@ -102,8 +102,9 @@ HYDRA_VERSION=latest
 ```
 
 If `DEMO_PUBLIC_ORIGIN` is unset, `docker compose up` fails fast with a
-clear error (`compose.yml` uses `${DEMO_PUBLIC_ORIGIN:?...}`) rather than
-starting with a CORS configuration that silently rejects the dashboard.
+clear error (`docker-compose.demo.yml` uses `${DEMO_PUBLIC_ORIGIN:?...}`)
+rather than starting with a CORS configuration that silently rejects the
+dashboard.
 
 ## TLS and the reverse proxy layout
 

@@ -324,6 +324,9 @@ Then give the device a static IP and point your router's DNS server to it. Full 
 - [Deployment Guide](docs/pi-deployment.md) — install on a Raspberry Pi or any always-on machine; static IP setup (Linux, macOS, Windows), per-router DNS configuration, troubleshooting
 - [Hardware Guide](docs/hardware-guide.md) — choosing a device to run HydraDNS on
 - [Known Limitations](docs/limitations.md) — what's not implemented yet, with impact and workarounds
+- [MCP Server Guide](docs/mcp.md) — the 14 tools, roles, and client configuration for the built-in MCP server
+- [Release Runbook](docs/releasing.md) — what `release.yml` publishes and how tags are cut
+- [Public Demo](demo/README.md) — hosting a read-only, public instance of the dashboard
 
 ---
 
@@ -336,12 +339,16 @@ Then give the device a static IP and point your router's DNS server to it. Full 
 | `HYDRA_POLICIES` | `/app/configs/policies.json` | Policy file path |
 | `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` (compose sets `http://localhost:3000`) | Comma-separated allowed CORS origins |
 | `CORS_ALLOW_SAME_HOST` | `true` | Also allow the dashboard when it is opened by the box's own IP address (Origin host equals the API host and is an IP or `localhost`). Named hosts need a `CORS_ORIGINS` entry |
+| `TRUSTED_PROXIES` | (empty) | Comma-separated CIDRs/IPs allowed to set `X-Forwarded-For` for client-IP purposes (login/setup throttle, audit log). Empty means no proxy is trusted, so the real socket address is always used |
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
 | `HYDRA_TOKEN` | (none; falls back to `~/.hydra/token`) | CLI/MCP bearer token |
 | `MCP_ROLE` | `admin` | Scopes MCP tool access: `admin`, `operator` (no `toggle_engine`), or `reporter` (read-only) |
-| `HYDRA_ANONYMIZE_CLIENT_IPS` | `false` | Hash client IPs before writing them to the query log instead of storing them as-is; off by default |
+| `HYDRA_DEMO_MODE` | `false` | Turns this instance into a public, read-only demo (rejects all mutations, seeds a fixed-password demo user and synthetic data, masks client IPs). See `demo/README.md` — not for a normal install |
+| `HYDRA_ANONYMIZE_CLIENT_IPS` | `false` | Hash (HMAC-SHA256) client IPs before writing them to the query log instead of storing them as-is; pseudonymisation, not anonymisation — off by default |
+| `HYDRA_ANON_SECRET` | (generated per-install) | HMAC key used only when `HYDRA_ANONYMIZE_CLIENT_IPS` is enabled |
 | `BLOCK_RESPONSE` | `zero` | Answer for blocked domains: `zero` (A `0.0.0.0`), `nxdomain`, or `refused` |
-| `BLOCKLIST_UPDATE_INTERVAL` | `6h` | Blocklist refresh interval |
+| `BLOCKLIST_UPDATE_INTERVAL` | `6h` | How often blocklist sources are re-downloaded from their URL |
+| `BLOCKLIST_POLL_INTERVAL` | `5s` | How often the dataplane checks the DB for blocklist changes (add, toggle, delete, finished download) and rebuilds the in-memory blocklist; `0` disables |
 | `QUERY_LOG_RETENTION_DAYS` | `7` | Delete query logs older than N days; `0` disables |
 | `QUERY_LOG_MAX_ROWS` | `1000000` | Keep at most N newest query-log rows; `0` disables |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Dashboard API URL override (build time). By default the dashboard uses the page's own hostname on port 8080 |

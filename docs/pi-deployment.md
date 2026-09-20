@@ -35,10 +35,17 @@ curl -fsSL https://raw.githubusercontent.com/hydradns/hydradns/main/scripts/inst
 This will:
 1. Clone the repository
 2. Disable `systemd-resolved` if it's blocking port 53
-3. Start all services — pulling the published `linux/arm64` images from GHCR
+3. Create `.env` from `.env.example` if you don't already have one, then
+   start all services — pulling the published `linux/arm64` images from GHCR
    if a release exists, or building from source locally as a fallback
    otherwise (see `docs/releasing.md`)
 4. Print your Pi's IP address and dashboard URL
+
+Note: this means the install-script path's `CORS_ORIGINS` default differs from a bare
+`git clone && docker compose up -d` with no `.env` at all — `.env.example` sets
+`http://localhost:3000,http://127.0.0.1:3000` (two origins), while `docker-compose.yml`'s own
+fallback (used only when no `.env` exists) is `http://localhost:3000`. Both are safe defaults;
+this is called out here so the difference doesn't look like a bug if you diff the two setups.
 
 ## First-Time Setup
 
@@ -305,7 +312,11 @@ CORS errors), it's one of these two remaining cases:
    derives an `https://` API URL to match its own page, but the control
    plane itself has no TLS. Point the dashboard at the proxy's HTTPS
    endpoint for the API too, via `NEXT_PUBLIC_API_URL`, or terminate TLS for
-   both dashboard and API behind the same proxy.
+   both dashboard and API behind the same proxy. If your proxy only
+   terminates TLS on port 443 (common for a single-port setup), see the
+   "runtime API-URL derivation assumes a two-port reverse proxy" entry in
+   [docs/limitations.md](limitations.md) — port 8080 is fixed unless you
+   rebuild the dashboard image with `NEXT_PUBLIC_API_URL` set at build time.
 
 ### Slow first startup
 
