@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -44,20 +43,10 @@ var loginCmd = &cobra.Command{
 			return err
 		}
 
-		// Save token to ~/.hydra/token
-		home, err := os.UserHomeDir()
+		// Save token to ~/.hydra/token (same helper `hydra setup` uses).
+		tokenPath, err := saveToken(resp.Token)
 		if err != nil {
-			return fmt.Errorf("cannot determine home directory: %w", err)
-		}
-
-		dir := filepath.Join(home, ".hydra")
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			return fmt.Errorf("failed to create %s: %w", dir, err)
-		}
-
-		tokenPath := filepath.Join(dir, "token")
-		if err := os.WriteFile(tokenPath, []byte(resp.Token+"\n"), 0600); err != nil {
-			return fmt.Errorf("failed to write token: %w", err)
+			return err
 		}
 
 		fmt.Printf("Logged in successfully. Token saved to %s\n", tokenPath)

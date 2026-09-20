@@ -35,7 +35,7 @@ HydraDNS is a DNS-layer security and privacy gateway built as a single monorepo 
 
 ### CLI (Go / Cobra) — `apps/cli/`
 - `go build -o hydra` — produces the `hydra` binary at the package root
-- `./hydra <command>` — `status`, `engine`, `block`, `unblock`, `blocklists`, `policies`, `metrics`, `logs`, `login`, `setup-router`, `mcp`, `update`, `version`
+- `./hydra <command>` — `status`, `engine`, `block`, `unblock`, `blocklists`, `policies`, `metrics`, `logs`, `setup`, `login`, `setup-router`, `mcp`, `update`, `version`
 - `./hydra mcp` — runs the MCP server: stdio JSON-RPC 2.0 by default, or `--http` for an HTTP transport (management traffic only, requires a bearer token via `--http-token`/`HYDRA_MCP_TOKEN`) for driving a fleet remotely. 14 tools registered in `apps/cli/mcp/server.go`: `get_status`, `toggle_engine`, `block_domain`, `unblock_domain`, `list_policies`, `list_blocklists`, `get_query_logs`, `get_metrics`, `create_policy`, `delete_policy`, `bulk_unblock`, `get_weekly_summary`, `explain_anomaly`, `compare_to_last_month`. Tool access is scoped by the `MCP_ROLE` env var (`admin` default, `operator` — can't `toggle_engine`, `reporter` — read-only `get_`/`list_` tools only); see `apps/cli/mcp/roles.go`.
 - `go test ./...` — Cobra command tests live next to the commands (e.g. `cmd/setup_router_test.go`)
 - API client lives in `apps/cli/api/client.go` and talks to the controlplane on `:8080`
