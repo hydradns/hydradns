@@ -79,3 +79,5 @@ jobs:
         run: docker build -t hydradns/core:test apps/core
       - name: Build dashboard
         run: docker build -t hydradns/ui:test apps/ui --build-arg NEXT_PUBLIC_API_URL=http://localhost:8080
+      - name: Build hydra-cli
+        run: docker build -t hydradns/hydra-cli:test apps/cli --build-arg VERSION=test

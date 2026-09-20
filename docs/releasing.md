@@ -13,12 +13,19 @@ anything itself.
 Two jobs, both gated on a `v*` tag push:
 
 **`build-and-push`** — builds and pushes `linux/amd64` + `linux/arm64` images
-via `docker/build-push-action@v6` (QEMU + Buildx), for two services:
+via `docker/build-push-action@v6` (QEMU + Buildx), for three services:
 
 | Service | Build context | Image |
 |---|---|---|
 | core | `apps/core` | `ghcr.io/hydradns/core` |
 | ui | `apps/ui` | `ghcr.io/hydradns/ui` |
+| hydra-cli | `apps/cli` | `ghcr.io/hydradns/hydra-cli` |
+
+`hydra-cli`'s image additionally gets a `VERSION` build-arg (`steps.meta.outputs.version`,
+e.g. `0.1.0` for a `v0.1.0` tag push) stamped into the binary via
+`-X github.com/hydradns/hydra-cli/cmd.Version=...`; `core` and `ui` don't take that arg. Its
+default command runs `hydra mcp` (stdio), for listing in the official MCP registry — see
+`docs/mcp.md`.
 
 Tags come from `docker/metadata-action@v5` with `type=semver,pattern={{version}}`,
 `type=semver,pattern={{major}}.{{minor}}`, and `type=sha`. For a `v0.1.0` tag
@@ -38,6 +45,10 @@ ghcr.io/hydradns/ui:0.1.0
 ghcr.io/hydradns/ui:0.1
 ghcr.io/hydradns/ui:sha-xxxxxxx
 ghcr.io/hydradns/ui:latest
+ghcr.io/hydradns/hydra-cli:0.1.0
+ghcr.io/hydradns/hydra-cli:0.1
+ghcr.io/hydradns/hydra-cli:sha-xxxxxxx
+ghcr.io/hydradns/hydra-cli:latest
 ```
 
 `docker-compose.yml` pulls `ghcr.io/hydradns/<service>:${HYDRA_VERSION:-latest}`,
@@ -91,11 +102,12 @@ clone:
    not by anything in this repo. If the org has never published a package
    before, check **Organization Settings → Actions → General → Workflow
    permissions**, and that package creation isn't blocked.
-5. Sanity-build both Dockerfiles locally if you have Docker available:
-   `docker build apps/core` and `docker build apps/ui` (add
-   `--build-arg NEXT_PUBLIC_API_URL=http://localhost:8080` for parity with
-   CI). This catches Dockerfile breakage before CI does, on a tag push you
-   can't easily retry cleanly (see Rollback below).
+5. Sanity-build all three Dockerfiles locally if you have Docker available:
+   `docker build apps/core`, `docker build apps/ui --build-arg
+   NEXT_PUBLIC_API_URL=http://localhost:8080` (for parity with CI), and
+   `docker build apps/cli --build-arg VERSION=test`. This catches Dockerfile
+   breakage before CI does, on a tag push you can't easily retry cleanly (see
+   Rollback below).
 6. Decide the version number. First release is `v0.1.0` (project has no
    prior tags, so this is not "0.0.x" or "1.0.0").
 7. Update `CHANGELOG.md`: rename the `## [Unreleased]` heading to
@@ -124,7 +136,7 @@ Pushing the tag is what triggers `release.yml` — there is no separate
 1. **Workflow ran and succeeded**:
    `gh run list --workflow=release.yml --limit 5`, then
    `gh run watch <run-id>` or check the Actions tab. Both jobs
-   (`build-and-push` matrix ×2, `release-cli` matrix ×4) must be green.
+   (`build-and-push` matrix ×3, `release-cli` matrix ×4) must be green.
 
 2. **GitHub Release exists with 4 assets**:
    `gh release view v0.1.0` should list
@@ -135,31 +147,35 @@ Pushing the tag is what triggers `release.yml` — there is no separate
    ```bash
    gh api /orgs/hydradns/packages/container/core/versions
    gh api /orgs/hydradns/packages/container/ui/versions
+   gh api /orgs/hydradns/packages/container/hydra-cli/versions
    ```
    Look for versions tagged `0.1.0`, `0.1`, `latest`, and a `sha-` tag.
 
 4. **Images are public.** New GHCR packages default to **private**, even
    when pushed from a public repo's workflow — visibility is not inherited,
    only access permissions are. Anonymous `docker pull` will 401/403 until
-   you flip this manually:
+   you flip this manually, **once per package** (`hydra-cli` is a brand new
+   package the first time this runs and needs the same flip as `core`/`ui`,
+   independently):
    - On GitHub: the `hydradns` org's **Packages** tab → click `core` (repeat
-     for `ui`) → **Package settings** (top right) → scroll to **Danger
-     Zone** → **Change visibility** → **Public** → type the package name to
-     confirm.
+     for `ui` and `hydra-cli`) → **Package settings** (top right) → scroll to
+     **Danger Zone** → **Change visibility** → **Public** → type the package
+     name to confirm.
    - **This is one-way**: GitHub will not let you make a public package
      private again. Don't flip it until you're actually ready to publish.
    - Verify anonymously from a machine with no `docker login` to ghcr.io:
-     `docker pull ghcr.io/hydradns/core:0.1.0` should succeed without
-     credentials once public.
+     `docker pull ghcr.io/hydradns/core:0.1.0` (and `.../ui:0.1.0`,
+     `.../hydra-cli:0.1.0`) should succeed without credentials once public.
 
 5. **Multi-arch manifest is real**, not just amd64 relabeled:
    ```bash
    docker buildx imagetools inspect ghcr.io/hydradns/core:0.1.0
    docker buildx imagetools inspect ghcr.io/hydradns/ui:0.1.0
+   docker buildx imagetools inspect ghcr.io/hydradns/hydra-cli:0.1.0
    ```
-   Both `linux/amd64` and `linux/arm64` should be listed. This only proves
-   the manifest is multi-arch, not that the arm64 image actually runs — see
-   next step.
+   Both `linux/amd64` and `linux/arm64` should be listed for each. This only
+   proves the manifest is multi-arch, not that the arm64 image actually
+   runs — see next step.
 
 6. **arm64 actually runs, on real arm64 hardware** (a Pi, not `--platform`
    emulation on an amd64 dev box, which can mask a broken arm64 build):
@@ -171,6 +187,21 @@ Pushing the tag is what triggers `release.yml` — there is no separate
    ```
    Then actually run the stack there (next section) — a binary that starts
    isn't the same as a stack that answers DNS.
+
+   Same idea for `hydra-cli`, plus its stdio contract (nothing but JSON-RPC on stdout):
+   ```bash
+   docker pull ghcr.io/hydradns/hydra-cli:0.1.0
+   docker inspect ghcr.io/hydradns/hydra-cli:0.1.0 --format '{{.Architecture}}'   # expect arm64
+   docker run --rm ghcr.io/hydradns/hydra-cli:0.1.0 version   # expect "hydra 0.1.0"
+   echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | \
+     docker run -i --rm -e HYDRA_API_URL=http://localhost:8080 -e HYDRA_TOKEN=x \
+       ghcr.io/hydradns/hydra-cli   # stdout: one JSON-RPC line, nothing else
+   ```
+   Also worth a one-time check before the first MCP-registry publish attempt (see
+   `docs/mcp.md` and the launch kit's `mcp-registry/publish-steps.md`): confirm the
+   registry's required ownership label made it into the pushed image —
+   `docker inspect ghcr.io/hydradns/hydra-cli:0.1.0 --format '{{json .Config.Labels}}'`
+   should include `"io.modelcontextprotocol.server.name":"io.github.hydradns/hydra-mcp"`.
 
 7. **The stranger test.** On a machine that has never touched this project
    (a fresh VM or a spare Pi), with a stopwatch running from the first
@@ -207,7 +238,7 @@ If the release is broken (bad image, wrong assets, tagged the wrong commit):
    gh api /orgs/hydradns/packages/container/core/versions | jq '.[] | {id, tags: .metadata.container.tags}'
    gh api -X DELETE /orgs/hydradns/packages/container/core/versions/<version-id>
    ```
-   Repeat for `ui`. Do this before re-tagging `v0.1.0`, or the old `latest`
+   Repeat for `ui` and `hydra-cli`. Do this before re-tagging `v0.1.0`, or the old `latest`
    / `0.1.0` tags may linger alongside (or be silently overwritten by) the
    new push depending on registry caching on client machines that already
    pulled.
