@@ -114,7 +114,9 @@ Someone lands on the GitHub repo or landing page and can go from zero to running
 
 ### Feature gaps
 - **Regex / wildcard policy evaluation** — still open (parsed but not enforced at query time)
-- **Policy + blocklist edit UI** — still open on the backend (create + delete only, no `PUT`/`PATCH` route)
+- **Policy editing** — done end-to-end: `PUT /policies/:id` exists and the dashboard's Edit
+  Policy drawer calls it. **Blocklist editing** — the backend route (`PATCH /blocklists/:id`)
+  exists, but the dashboard doesn't call it yet; add/enable/disable/delete are wired
 - **Query log pagination** — still open (hard-capped at 100 entries via `ListRecent(100)`, no paging)
 - **Settings page** — still open (UI page exists, no backend route)
 - **`/api/v1/dns/resolvers`** — reads real upstream resolvers from config now (no longer mock data), but is still read-only; wiring upstream editing is still open

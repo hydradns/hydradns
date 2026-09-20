@@ -145,6 +145,12 @@ Login without an `email` field falls back to "the one user" if exactly one exist
 - `POST /api/v1/auth/setup` — creates the first admin user, optionally configures blocklists; 409 once setup is complete
 - `POST /api/v1/auth/login` — validates credentials, returns a token
 
+Both `/auth/login` and `/auth/setup` are throttled per client IP (fixed window, 10 attempts
+/ 5 minutes by default, shared across the two endpoints), so the correctness of the throttle
+depends on `TRUSTED_PROXIES` being set correctly behind a reverse proxy (see the Configuration
+table below) — otherwise every request behind that proxy is bucketed under one IP. The
+counter is in-memory and resets on restart.
+
 Not implemented: per-user MFA/TOTP, SSO/OIDC/SAML, session timeout beyond the 90-day token
 expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/users` and
 `/api/v1/tokens`).
@@ -168,6 +174,7 @@ expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/
 | `BLOCKLIST_UPDATE_INTERVAL` | `6h` | How often blocklist sources are re-downloaded |
 | `HYDRA_DEMO_MODE` | `false` | Public read-only demo: a `DemoGuard` middleware rejects every mutation before auth, a `read_only` demo user and synthetic data are seeded (`cmd/controlplane/demoseed`), client IPs are masked in responses. Refuses to start on a database that has real users. See `demo/README.md` |
 | `BLOCKLIST_POLL_INTERVAL` | `5s` | How often the dataplane checks the DB for blocklist changes (add, toggle, delete, finished download) and rebuilds the in-memory set; `0` disables |
+| `TRUSTED_PROXIES` | (empty) | Comma-separated CIDRs/IPs allowed to set `X-Forwarded-For` for client-IP purposes (login/setup throttle, audit log). Empty means no proxy is trusted — `c.ClientIP()` always resolves to the real socket address (`cmd/controlplane/main.go`) |
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
 | `HYDRA_TOKEN` | (none) | CLI/MCP bearer token; if unset the CLI also tries `~/.hydra/token` (`apps/cli/cmd/root.go`) |
 | `HYDRA_MCP_TOKEN` | (none) | Bearer token required by `hydra mcp --http` (or use `--http-token`) |

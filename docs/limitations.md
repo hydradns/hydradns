@@ -34,6 +34,31 @@ If something here changes, update this file in the same commit.
   `HYDRA_ANONYMIZE_CLIENT_IPS=true` (or `dataplane.anonymization.enabled: true` in
   `config.yaml`) to hash client IPs with a per-install secret before they're written to the
   log; until then, restrict who has dashboard/API access.
+- **Client-IP "anonymization" is pseudonymisation, not anonymisation.** Turning on
+  `HYDRA_ANONYMIZE_CLIENT_IPS` hashes each client IP with HMAC-SHA256 and a per-install
+  secret before it's written to the query log — it does not remove the ability to identify a
+  device. *Impact:* IPv4 addresses are a small enough space (2^32) that anyone who obtains
+  both the database and the secret (`HYDRA_ANON_SECRET`, or the generated
+  `<data dir>/anon_secret` file) can brute-force every hash back to the original address in
+  practice. It stops casual inspection of the query log, not a determined attacker with both
+  artifacts. *Workaround:* protect the secret file/env var with the same care as the database
+  itself; don't treat this setting as true anonymisation for compliance purposes.
+- **First-boot setup is "first request wins" on the LAN.** `POST /api/v1/auth/setup` is open
+  (unauthenticated) until the first admin user is created, and it's reachable from anywhere
+  that can reach the control plane's port. *Impact:* if you expose the box to an untrusted
+  network before completing setup, whoever gets there first becomes the admin, not you.
+  *Workaround:* finish the setup wizard before exposing the box to an untrusted network (LAN
+  or otherwise) — don't publish the control plane's port to the internet pre-setup.
+- **The login/setup rate limit is per-IP and in-memory.** `POST /auth/login` and
+  `POST /auth/setup` are throttled per client IP (10 attempts / 5 minutes by default,
+  shared across both endpoints). *Impact:* the counter lives in process memory, so it resets
+  on every restart, and it only ever sees one bucket per source IP — correctness in front of
+  a reverse proxy depends on `TRUSTED_PROXIES` being configured for that proxy, otherwise
+  every client behind it shares one bucket (or, if the proxy's own address isn't trusted,
+  the limiter can be bypassed entirely by spoofing `X-Forwarded-For`, per `TRUSTED_PROXIES`'
+  own default of trusting nothing). *Workaround:* set `TRUSTED_PROXIES` correctly if you're
+  behind a reverse proxy; don't rely on this limiter surviving a restart or coordinating
+  across multiple instances.
 - **No MFA/TOTP or SSO.** Login is email + password only; roles (`admin`/`operator`/
   `read_only`) exist, but there's no second factor and no OIDC/SAML integration.
   *Workaround:* use a strong, unique password per account and rotate tokens periodically
@@ -67,6 +92,21 @@ If something here changes, update this file in the same commit.
 - **`/dns/resolvers` is read-only.** It reflects the resolvers in `config.yaml`; there's no
   API or UI to add/remove upstream resolvers. *Workaround:* edit `configs/config.yaml` and
   restart the dataplane.
+- **The dashboard's runtime API-URL derivation assumes a two-port reverse proxy.** With
+  `NEXT_PUBLIC_API_URL` left unset, the dashboard calls the control plane at the page's own
+  hostname on port 8080 (`apps/ui/lib/api-base.ts`). *Impact:* behind a reverse proxy that
+  only terminates TLS on 443 (a common single-port setup), the API is unreachable at 8080
+  over HTTPS and every dashboard API call fails, unless port 8080 is also exposed over HTTPS
+  on the same hostname. *Workaround:* either expose a second HTTPS site block on port 8080
+  proxying to the control plane (see `demo/README.md`'s Caddyfile for a worked example), or
+  rebuild the `ui` image with `NEXT_PUBLIC_API_URL` set to a path-based API URL under the
+  same 443 origin — a runtime env var alone has no effect on an already-built image, since
+  Next.js inlines this value at build time.
+- **Demo mode (`HYDRA_DEMO_MODE`) is for public demos only.** It refuses to start against a
+  database that already has real users, specifically so it can't be turned on accidentally
+  against a real deployment. *Impact:* none for a normal install — this is a guardrail, not a
+  general-purpose feature. *Workaround:* n/a; use it only with a fresh volume, as documented
+  in `demo/README.md`.
 - **No container self-update.** The `hydra` CLI binary can self-update (`hydra update`), but
   the `core`/`ui` Docker containers don't auto-pull new versions. *Workaround:* re-run
   `docker compose pull && docker compose up -d` (or your install script) manually.

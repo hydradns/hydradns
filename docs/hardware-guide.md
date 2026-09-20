@@ -1,19 +1,28 @@
 # HydraDNS — Hardware Guide
 
-**Last updated:** 2026-04-09
+**Last updated:** 2026-09-20
+
+**Performance numbers below are estimates, not benchmarks.** No ARM hardware has ever
+been tested — see [docs/limitations.md](limitations.md) for what has actually been
+measured (a development laptop under WSL2, not any device on this page). The hardware
+options and prices below are still valid recommendations; treat the "Why" column's
+throughput/RAM figures as sizing estimates pending a real Pi/Orange Pi benchmark, not as
+verified HydraDNS performance data.
 
 ---
 
 ## Minimum Requirements
 
-DNS filtering is extremely lightweight. Here's what HydraDNS actually needs:
+DNS filtering is a lightweight workload in general (a resolver spends most of its time
+waiting on network I/O, not CPU), but HydraDNS itself has not been measured on any of
+this hardware. Here's the sizing estimate, pending a real ARM benchmark:
 
 | Resource | Minimum | Recommended | Why |
 |:---------|:--------|:------------|:----|
-| CPU | 4x ARM Cortex-A53 @ 1.0 GHz | 4x A53 @ 1.5 GHz+ | A single A53 core handles 5,000+ DNS qps. SMB peak is ~100 qps. Massively overkill. |
-| RAM | 1 GB | 2 GB | Go runtime (~30MB) + 100K blocklist (~20MB) + SQLite (~15MB) + Docker (~100MB) + UI (~120MB) = ~320MB. 1GB is tight, 2GB comfortable. |
+| CPU | 4x ARM Cortex-A53 @ 1.0 GHz | 4x A53 @ 1.5 GHz+ | Not yet measured on this hardware. On a development laptop under WSL2 (22 cores), the engine has been load-tested up to roughly 9,500 qps with p50≈5ms/p99≈20ms (see docs/limitations.md) — a typical home/office network's peak load is a small fraction of that, so an A53-class core is expected to have comfortable headroom, but this is an expectation, not a measurement on ARM. |
+| RAM | 1 GB | 2 GB | Estimated (not measured on this hardware): Go runtime (~30MB) + 100K blocklist (~20MB) + SQLite (~15MB) + Docker (~100MB) + UI (~120MB) = ~320MB. 1GB is tight, 2GB comfortable. |
 | Storage | 8 GB | 16-32 GB | 180-day logs for 50 devices = ~3.6 GB. For 200 devices = ~18 GB. |
-| Ethernet | 100 Mbps | Gigabit | DNS traffic is tiny (~10 Mbps at 10K qps). GbE is for perception, not need. |
+| Ethernet | 100 Mbps | Gigabit | DNS traffic itself is small; GbE is recommended for headroom and future use, not because DNS filtering needs the bandwidth. |
 | WiFi | Optional | Nice to have | For setup/management. Not needed for DNS filtering. |
 | Power | 3W | 5W | Lower = cheaper PSU, less heat, more reliable. |
 
