@@ -7,6 +7,29 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from v0.1.0
 ## [Unreleased]
 
 ### Added
+- **Public demo mode** (`HYDRA_DEMO_MODE=true`): a `DemoGuard` middleware rejects every
+  mutating request except login before auth even runs, a fixed-password read-only demo
+  user and synthetic policies/blocklists/query-logs are seeded on startup (refreshed every
+  30 minutes so a long-running demo doesn't go stale), and client IPs are masked in every
+  response that carries one. Refuses to start against a database that already has real
+  users. Ships with a standalone `demo/docker-compose.demo.yml` stack and `demo/README.md`
+  covering the reverse-proxy/TLS layout and abuse considerations. Not for a normal
+  self-hosted install — only for hosting a public, clickable demo.
+- `hydra setup`: a first-boot CLI command that creates the admin account through the setup
+  endpoint and stores the token, the same way `hydra login` does (no-echo password prompt
+  or `--password-stdin`; there is deliberately no `--password` flag).
+- New API routes backing dashboard features that previously had no server-side
+  implementation: `GET /analytics/logs` (server-side paging and filtering for the Logs
+  page, page size capped at 200), `GET /analytics/bypass` (DoH/DoT bootstrap-detection
+  attempts), `PUT /policies/:id`, and `PATCH /blocklists/:id` — the latter two carry the
+  same validation, role checks, and audit events as create/delete.
+- A legacy-database upgrade path: on startup, if the new default database file
+  (`hydradns.db`) doesn't exist but a pre-rename `phantomdns.db` does, the control plane
+  opens that file instead of starting with an empty database. One-time upgrade fallback,
+  not the default path for new installs.
+- The DoH-bypass-attempts panel is now hidden on the dashboard by default; set
+  `NEXT_PUBLIC_SHOW_BYPASS_PANEL=true` at build time to show it (e.g. for technical/internal
+  deployments).
 - `apps/cli/Dockerfile` and a `hydra-cli` entry in `release.yml`'s multi-arch GHCR image
   matrix, alongside the existing `core` and `ui` images. Publishes
   `ghcr.io/hydradns/hydra-cli`, a small non-root image whose default command runs
@@ -76,5 +99,38 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from v0.1.0
   runtime API-URL derivation above), so that section now covers only the
   two cases that still need a manual step: a named host, and a dashboard
   served over HTTPS.
+- The in-memory blocklist used to be built from every stored entry with no check on the
+  source's enabled flag, so disabling a blocklist did not stop it from blocking. It's now
+  built from enabled sources only, and the dataplane polls a cheap signature of the
+  blocklist tables (`BLOCKLIST_POLL_INTERVAL`, default 5s; `0` disables) and rebuilds the
+  in-memory set when it changes, so add/toggle/delete/finished-download no longer wait for
+  the 6-hour `BLOCKLIST_UPDATE_INTERVAL` refresh cycle — the same ~5s propagation policy
+  edits already had.
+- Query-log rows were stored with the client's ephemeral port attached (`ip:port`) instead
+  of the bare IP; the client-IP filter and anonymization both now operate on the address
+  alone, and legacy rows with a port still match the filter precisely.
+- CLI release binaries built without the version stamped in, so every release reported the
+  hardcoded fallback `1.0.0` regardless of the actual tag — `hydra update` could never see a
+  release as newer than what was already installed. `release.yml` now passes the tag version
+  via `-X` at build time.
+- The default `apps/core/configs/policies.json` seed policy blocked `apple.com`, breaking
+  iCloud, the App Store, and iMessage for a first-time user on Apple devices. Removed; the
+  seed now ships only `block-ads` and `block-malware` example policies, and a test asserts
+  the shipped policy file never blocks a critical platform domain again.
+
+### Security
+- Per-IP rate limiting on `POST /auth/login` and `POST /auth/setup` (fixed window, 10
+  attempts / 5 minutes by default, shared across both endpoints), plus `TRUSTED_PROXIES`
+  (comma-separated CIDRs/IPs) so the control plane only honors `X-Forwarded-For` from a
+  reverse proxy you explicitly trust — otherwise `c.ClientIP()` always resolves to the real
+  socket address. This also makes the audit log's recorded client IP trustworthy; previously
+  Gin trusted every proxy by default, letting any caller spoof its own client IP.
+- Opt-in client-IP pseudonymisation: `HYDRA_ANONYMIZE_CLIENT_IPS` (default `false`) hashes
+  a client's IP with HMAC-SHA256 before it's written to the query log, using a per-install
+  secret generated on first boot and persisted next to the database
+  (`HYDRA_ANON_SECRET` overrides it). This is pseudonymisation, not anonymisation: anyone
+  who holds both the database and the secret file can brute-force the small IPv4 address
+  space back to the original addresses. Previously this config key was parsed but never
+  wired to anything, so enabling it had no effect at all.
 
 [Unreleased]: https://github.com/hydradns/hydradns/commits/main
