@@ -3,9 +3,13 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"time"
 )
 
@@ -16,11 +20,74 @@ type Client struct {
 }
 
 func New(baseURL, token string) *Client {
+	warnIfInsecure(baseURL)
 	return &Client{
 		BaseURL: baseURL,
 		Token:   token,
-		http:    &http.Client{Timeout: 10 * time.Second},
+		http: &http.Client{
+			Timeout:       10 * time.Second,
+			CheckRedirect: stripAuthorizationCrossHost,
+		},
 	}
+}
+
+// stripAuthorizationCrossHost is a Client.CheckRedirect policy. Go's
+// default redirect handling already drops Authorization/Cookie headers
+// when the redirect target's *hostname* differs from the original
+// request's — but it compares hostnames only (net/http
+// shouldCopyHeaderOnRedirect / isDomainOrSubdomain), not host:port, so a
+// redirect to the same hostname on a different port still forwards the
+// bearer token. For an admin API token that's the more realistic local
+// attack (a compromised or spoofed service on another port of the same
+// box), so this compares the full host:port and strips Authorization on
+// any mismatch. It also preserves the standard 10-redirect cap since
+// setting CheckRedirect overrides Go's default one.
+func stripAuthorizationCrossHost(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	if len(via) > 0 && req.URL.Host != via[0].URL.Host {
+		req.Header.Del("Authorization")
+	}
+	return nil
+}
+
+// warnIfInsecure prints a one-line, stderr-only warning when baseURL is
+// plain http:// and the host is not loopback, RFC1918, ULA, or
+// link-local — i.e. it looks like a public address or a public-looking
+// name. HydraDNS has no TLS story yet (see CLAUDE.md "Known Incomplete
+// Features"), and plain http:// on a LAN is the normal, expected way to
+// reach the box; this only fires for the case that actually leaks a
+// password or bearer token over the public internet in cleartext. It
+// never writes to stdout, so it is safe under `hydra mcp` stdio mode
+// where stdout is the JSON-RPC channel.
+func warnIfInsecure(baseURL string) {
+	u, err := url.Parse(baseURL)
+	if err != nil || u.Scheme != "http" {
+		return
+	}
+	host := u.Hostname()
+	if host == "" || hostLooksPrivate(host) {
+		return
+	}
+	fmt.Fprintf(os.Stderr,
+		"warning: %s uses plain http:// to a non-local address (%s) — credentials will be sent in cleartext over the network\n",
+		baseURL, host)
+}
+
+// hostLooksPrivate reports whether host is loopback, RFC1918/ULA, or
+// link-local. Anything else — a public IP, or a hostname we have no way
+// to resolve without a network round trip — is treated as
+// public-looking so the warning fires rather than staying silent.
+func hostLooksPrivate(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()
 }
 
 // API response envelope
@@ -59,10 +126,20 @@ func (c *Client) do(method, path string, body interface{}) (json.RawMessage, err
 	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
 		return nil, fmt.Errorf("invalid response: %w", err)
 	}
-	if r.Status == "error" {
+
+	// Check the HTTP status in addition to the envelope: a proxy or
+	// captive portal in front of the API can return a non-2xx status with
+	// a body that doesn't match our envelope at all (no "error" field),
+	// or a 2xx with valid-looking JSON that simply isn't ours (no
+	// "status":"success"). Relying on r.Status != "error" alone treated
+	// both of those as success.
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 || r.Status != "success" {
 		msg := "unknown error"
-		if r.Error != nil {
+		switch {
+		case r.Error != nil && *r.Error != "":
 			msg = *r.Error
+		case resp.StatusCode < 200 || resp.StatusCode >= 300:
+			msg = fmt.Sprintf("unexpected HTTP status %d", resp.StatusCode)
 		}
 		return nil, fmt.Errorf("API error: %s", msg)
 	}
@@ -289,7 +366,15 @@ func (c *Client) Setup(req SetupRequest) (*SetupResponse, error) {
 		return nil, err
 	}
 	var r SetupResponse
-	return &r, json.Unmarshal(data, &r)
+	if err := json.Unmarshal(data, &r); err != nil {
+		return nil, err
+	}
+	// A "success" envelope with no token is not success: never let the
+	// caller persist an empty token (see saveToken in cmd/token_store.go).
+	if r.Token == "" {
+		return nil, fmt.Errorf("server returned a success response with no token")
+	}
+	return &r, nil
 }
 
 func (c *Client) Login(password string) (*LoginResponse, error) {
@@ -298,7 +383,13 @@ func (c *Client) Login(password string) (*LoginResponse, error) {
 		return nil, err
 	}
 	var r LoginResponse
-	return &r, json.Unmarshal(data, &r)
+	if err := json.Unmarshal(data, &r); err != nil {
+		return nil, err
+	}
+	if r.Token == "" {
+		return nil, fmt.Errorf("server returned a success response with no token")
+	}
+	return &r, nil
 }
 
 func (c *Client) GetQueryLogs() ([]QueryLog, error) {
