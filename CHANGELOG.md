@@ -7,6 +7,19 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from v0.1.0
 ## [Unreleased]
 
 ### Added
+- `apps/cli/Dockerfile` and a `hydra-cli` entry in `release.yml`'s multi-arch GHCR image
+  matrix, alongside the existing `core` and `ui` images. Publishes
+  `ghcr.io/hydradns/hydra-cli`, a small non-root image whose default command runs
+  `hydra mcp` (stdio JSON-RPC), so the CLI's MCP server can be listed in the official MCP
+  registry (`registryType: "oci"`) and run as `docker run -i --rm -e HYDRA_API_URL -e
+  HYDRA_TOKEN ghcr.io/hydradns/hydra-cli` without a local Go toolchain. `ci.yml`'s Docker job
+  gained a matching build-only check on PRs. See `docs/mcp.md` for the full tool list, roles,
+  and exact container networking invocations per platform (Linux, Docker Desktop, this
+  project's own `docker-compose.yml`).
+- `docs/mcp.md`: public documentation for the `hydra mcp` server — the 14 tools, `MCP_ROLE`
+  permission scopes, security notes, and verified client configuration for Claude Desktop,
+  Claude Code, Cursor, VS Code, and the Gemini CLI, for both the local binary and the new
+  container image.
 - Blocklist parsers for the `domains` (one host per line) and `adblock`
   (EasyList `||domain^`) formats, alongside the existing `hosts` format.
 - `docs/releasing.md`: a release runbook for cutting tags (pre-flight checks,

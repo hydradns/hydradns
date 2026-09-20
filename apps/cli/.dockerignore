@@ -1,0 +1,12 @@
+# Keep the build context small and avoid leaking local build output or
+# credentials into image layers.
+.git
+.gitignore
+*.md
+hydra
+hydra-*
+*.token
+.env
+.env.*
+dist/
+bin/
