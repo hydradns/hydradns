@@ -42,17 +42,9 @@ Set `MCP_ROLE` before starting the server to restrict what an agent can do:
 - **`reporter`**: read-only tools only (see below). Any unrecognized `MCP_ROLE` value also
   safe-defaults to `reporter`, not to `admin`.
 
-A read-only tool is any tool named with a `get_` or `list_` prefix (`apps/cli/mcp/roles.go`,
-`isReadOnly`); this is a naming convention, not a runtime check of what the tool actually
-does. Two tools that only read and analyze data but are not named `get_`/`list_`,
-`explain_anomaly` and `compare_to_last_month`, fall on the mutating side of that check as a
-result: `reporter` role tokens cannot call them, and `tools/list` marks them
-`destructiveHint`/`confirmationRequired` even though neither one calls a mutating API endpoint
-(confirmed by reading `apps/cli/mcp/agent_tools.go:82` and `:163`; both only call
-`GetDashboardSummary`/`GetMetrics`/`GetQueryLogs`). If you hand a `reporter`-scoped token to an
-agent and it cannot run a trend comparison, this is why. Not a bug to work around here, it's a
-naming-convention gap in `apps/cli/mcp/roles.go`, out of scope for this change; worth a
-follow-up if it matters for your use case.
+Whether a tool is read-only is an explicit flag on each tool's registration (`apps/cli/mcp/server.go`, `toolRegistry()`), not a guess from its name. `explain_anomaly` and
+`compare_to_last_month` only read and analyze data, so they are read-only and a `reporter`
+token can call them. An unregistered tool name is treated as mutating.
 
 A denied call returns a structured JSON-RPC error (code `-32003`) rather than executing:
 
@@ -74,8 +66,8 @@ client should ask before running those.
 | `get_query_logs` | Get recent DNS query logs | read-only |
 | `get_metrics` | Get DNS query performance metrics including latency percentiles | read-only |
 | `get_weekly_summary` | Natural-language rollup of DNS security activity built from live stats, metrics, and query logs | read-only |
-| `explain_anomaly` | Inspect current DNS activity and describe anything unusual (error rate, latency, block-rate spikes, a client dominating traffic); optional baseline to compare against | read-only in practice, but annotated confirm-required (see Roles above) |
-| `compare_to_last_month` | Compare current traffic and block rate against a supplied baseline window and describe the change in plain language | read-only in practice, but annotated confirm-required (see Roles above) |
+| `explain_anomaly` | Inspect current DNS activity and describe anything unusual (error rate, latency, block-rate spikes, a client dominating traffic); optional baseline to compare against | read-only |
+| `compare_to_last_month` | Compare current traffic and block rate against a supplied baseline window and describe the change in plain language | read-only |
 | `toggle_engine` | Enable or disable the DNS engine | confirm, blocked for `operator` too, `admin` only |
 | `block_domain` | Block a domain by creating a block policy | confirm |
 | `create_policy` | Create a policy (BLOCK/ALLOW/REDIRECT) for multiple domains in one rule; prefer this over `block_domain` for more than one domain | confirm |
