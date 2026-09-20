@@ -222,17 +222,11 @@ type UpdateBlocklistRequest struct {
 // Enabled — reaches the DNS engine within about 5 seconds, not the full
 // BLOCKLIST_UPDATE_INTERVAL (default 6h) periodic refresh window.
 //
-// Ingested-entries semantics on a URL/format change: BlocklistEntry rows
-// are never deleted or replaced in place when a source's content changes
-// — SaveSnapshotWithEntries (used both by this refetch and by the normal
-// periodic refresh) only ever appends a new BlocklistSnapshot + its
-// entries for the source ID. So after editing a source's URL, entries
-// from the OLD url remain in the table alongside the new ones until the
-// source itself is deleted (which does cascade-delete all of its
-// snapshots/entries). This is not a new limitation introduced here: it is
-// the existing refresh semantics, identical to what happens today every
-// time the periodic 6h refresh re-fetches changed content at an
-// unchanged URL.
+// Ingested-entries semantics on a URL/format change: SaveSnapshotWithEntries
+// (used both by this refetch and by the periodic refresh) replaces the
+// source's entries inside one transaction when new content arrives. So
+// after editing a source's URL, the old URL's entries stay in place until
+// the download of the new URL completes, and are replaced at that point.
 func (h *APIHandler) UpdateBlocklist(c *gin.Context) {
 	id := c.Param("id")
 

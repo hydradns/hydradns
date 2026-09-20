@@ -6,6 +6,9 @@
 # Data
 /data/
 data/hydradns.db
+*.db
+*.db-shm
+*.db-wal
 data/hydradns.db-shm
 data/hydradns.db-wal
 tmp/
