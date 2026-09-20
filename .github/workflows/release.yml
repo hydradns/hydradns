@@ -101,3 +101,30 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: apps/cli/hydra-${{ matrix.goos }}-${{ matrix.goarch }}
+
+  release-cli-checksums:
+    name: Publish CLI checksums
+    needs: release-cli
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      # Re-runs of this job land here again for the same tag: --clobber on
+      # both download and upload makes every step below safe to repeat.
+      - name: Download CLI binaries from the release
+        run: |
+          rm -rf assets && mkdir -p assets
+          gh release download "${{ github.ref_name }}" --dir assets --pattern "hydra-*" --clobber
+
+      - name: Generate checksums.txt
+        working-directory: assets
+        run: |
+          sha256sum hydra-* > checksums.txt
+          cat checksums.txt
+
+      - name: Upload checksums.txt to the release
+        working-directory: assets
+        run: gh release upload "${{ github.ref_name }}" checksums.txt --clobber

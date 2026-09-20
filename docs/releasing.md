@@ -59,9 +59,20 @@ so a plain `docker compose up -d` after this release tracks `latest` unless
 `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64` (`GOWORK=off`, so
 the workspace's `go 1.25.4` directive doesn't leak in; the build uses
 `apps/cli/go.mod`'s own `go 1.25.0`) and attaches the four binaries to a
-GitHub Release for the pushed tag via `softprops/action-gh-release@v3`. That
+GitHub Release for the pushed tag via `softprops/action-gh-release@v2`. That
 action creates the release automatically if one doesn't already exist for the
 tag — you don't need to create it by hand first.
+
+**`release-cli-checksums`** — runs after all four `release-cli` matrix legs
+finish (`needs: release-cli`). It `gh release download`s the four
+`hydra-<goos>-<goarch>` binaries just uploaded, runs `sha256sum hydra-* >
+checksums.txt` over them, and `gh release upload --clobber`s that file back
+onto the same release. This is required, not cosmetic: `hydra update`
+(`apps/cli/selfupdate`) refuses to install a binary it cannot verify against a
+published checksum, so a release with binaries but no `checksums.txt` makes
+`hydra update` fail for everyone on every platform. The feed it reads is
+`https://api.github.com/repos/hydradns/hydradns/releases/latest` — this repo,
+not the old, now-archived `hydradns/hydra-cli` standalone repo.
 
 ### NEXT_PUBLIC_API_URL is baked, but the dashboard resolves the API at runtime
 
@@ -109,9 +120,10 @@ clone:
 2. `git tag -l` — confirm no `v0.1.0` tag already exists locally or on the
    remote (`git ls-remote --tags origin`).
 3. Confirm `.github/workflows/release.yml` permissions are intact:
-   `build-and-push` needs `packages: write`, `release-cli` needs
-   `contents: write`. (Both are already set at time of writing — recheck if
-   the workflow has changed.)
+   `build-and-push` needs `packages: write`, `release-cli` and
+   `release-cli-checksums` both need `contents: write` (the latter both
+   downloads and uploads release assets). (All are already set at time of
+   writing — recheck if the workflow has changed.)
 4. Confirm the GHCR org (`hydradns`) allows Actions to publish packages: this
    is controlled by the *organization's* Actions package-creation settings,
    not by anything in this repo. If the org has never published a package
@@ -150,13 +162,17 @@ Pushing the tag is what triggers `release.yml` — there is no separate
 
 1. **Workflow ran and succeeded**:
    `gh run list --workflow=release.yml --limit 5`, then
-   `gh run watch <run-id>` or check the Actions tab. Both jobs
-   (`build-and-push` matrix ×3, `release-cli` matrix ×4) must be green.
+   `gh run watch <run-id>` or check the Actions tab. All three jobs
+   (`build-and-push` matrix ×3, `release-cli` matrix ×4,
+   `release-cli-checksums` ×1) must be green. `release-cli-checksums` only
+   starts once every `release-cli` leg has finished.
 
-2. **GitHub Release exists with 4 assets**:
+2. **GitHub Release exists with 5 assets**:
    `gh release view v0.1.0` should list
    `hydra-linux-amd64`, `hydra-linux-arm64`, `hydra-darwin-amd64`,
-   `hydra-darwin-arm64`.
+   `hydra-darwin-arm64`, and **`checksums.txt`**. The last one is easy to miss
+   in a quick glance at the release page but is not optional — see the
+   `release-cli-checksums` note above.
 
 3. **Images exist on GHCR**:
    ```bash
@@ -233,6 +249,26 @@ Pushing the tag is what triggers `release.yml` — there is no separate
    with `docker compose ps` / `docker images` showing pulled images, no
    local build layers) — if it builds instead, `HYDRA_VERSION`/image tags
    are wrong or the images aren't public yet.
+
+8. **`hydra update --check` sees the new release.** This is the actual proof
+   that self-update works end to end, including the checksums asset from
+   `release-cli-checksums` — not just that the binaries exist. On a machine
+   with an *older* `hydra` binary installed (built before this tag, or with
+   `cmd.Version` stamped to something lower):
+   ```bash
+   hydra update --check
+   ```
+   Expect `Update available: <old> -> v0.1.0` followed by
+   `Run 'hydra update' to install. (--check: no changes made)` (see
+   `apps/cli/cmd/update.go`), and no files touched. If it instead reports
+   `is up to date` when it shouldn't, or errors, check in order: the release
+   has all 5 assets (previous step), `DefaultFeedURL`
+   (`apps/cli/selfupdate/update.go`) still points at
+   `api.github.com/repos/hydradns/hydradns/releases/latest`, and — for an
+   error mentioning checksums specifically — that `release-cli-checksums`
+   actually ran and succeeded rather than being skipped. `--check` never
+   downloads or installs anything either way, so it's safe to run against a
+   real release before trusting a plain `hydra update`.
 
 ## Rollback
 
