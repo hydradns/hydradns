@@ -7,10 +7,85 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
+	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydra-core/internal/storage/repositories"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 func init() {
 	gin.SetMode(gin.TestMode)
+}
+
+func openMiddlewareTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
+	})
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if err := db.AutoMigrate(&models.User{}, &models.Token{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	return db
+}
+
+// TestBuildMiddlewareChain_DemoGuardOnlyWhenEnabled proves demo mode's
+// guard is not merely inert when disabled — it is not installed on the
+// engine at all, so disabled behaviour is byte-for-byte what it was before
+// demo mode existed. Structural proof (Handlers count) plus a behavioral
+// check (an actual mutating request) so the test fails if either regresses.
+func TestBuildMiddlewareChain_DemoGuardOnlyWhenEnabled(t *testing.T) {
+	db := openMiddlewareTestDB(t)
+	users := repositories.NewUserRepo(db)
+	tokens := repositories.NewTokenRepo(db)
+	u, err := users.Create("admin@x.com", "hash", models.RoleAdmin)
+	if err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	token, _, err := tokens.CreateForUser(u.ID, "test", 0)
+	if err != nil {
+		t.Fatalf("seed token: %v", err)
+	}
+
+	rOff := gin.New()
+	buildMiddlewareChain(rOff, false, users, tokens)
+	offHandlerCount := len(rOff.Handlers)
+
+	rOn := gin.New()
+	buildMiddlewareChain(rOn, true, users, tokens)
+	onHandlerCount := len(rOn.Handlers)
+
+	if onHandlerCount != offHandlerCount+1 {
+		t.Errorf("expected demo mode to add exactly one middleware to the chain, got %d (off) vs %d (on)", offHandlerCount, onHandlerCount)
+	}
+
+	rOff.POST("/api/v1/policies", func(c *gin.Context) { c.Status(http.StatusCreated) })
+	rOn.POST("/api/v1/policies", func(c *gin.Context) { c.Status(http.StatusCreated) })
+
+	// Demo mode off: a normal admin-authenticated mutation succeeds exactly
+	// as it did before this feature existed.
+	rec := doAuthedPost(rOff, "/api/v1/policies", token)
+	if rec.Code != http.StatusCreated {
+		t.Errorf("demo mode off: admin POST got %d, want 201 (unchanged behaviour)", rec.Code)
+	}
+
+	// Demo mode on: the same admin-authenticated mutation is rejected by
+	// the guard before Auth even runs.
+	rec = doAuthedPost(rOn, "/api/v1/policies", token)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("demo mode on: admin POST got %d, want 403 (blocked ahead of auth)", rec.Code)
+	}
+}
+
+func doAuthedPost(r http.Handler, path, bearer string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, path, nil)
+	req.Header.Set("Authorization", "Bearer "+bearer)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	return rec
 }
 
 func doGet(r *gin.Engine, remoteAddr, xff string) *httptest.ResponseRecorder {

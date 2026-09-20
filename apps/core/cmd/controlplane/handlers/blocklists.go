@@ -178,15 +178,15 @@ type UpdateBlocklistRequest struct {
 //
 // Propagation: exactly the same mechanism CreateBlocklist already uses —
 // on a URL or format change, an immediate background fetch is kicked off
-// via BlocklistEngine.UpdateSource, but that only refreshes the DB
-// (BlocklistEntry rows); the dataplane's in-memory blocklist set
-// (memBlocklist, what the DNS hot path actually checks) is only rebuilt
-// by the periodic refreshBlocklists loop in cmd/dataplane/main.go, which
-// runs on BLOCKLIST_UPDATE_INTERVAL (default 6h) or at dataplane startup.
-// There is no faster poll for blocklists the way there is for policies
-// (5s DB poll) — this handler does not invent one; an edited source is
-// enforced by the DNS engine within the same bound a newly-created source
-// already is today.
+// via BlocklistEngine.UpdateSource, which refreshes the DB (BlocklistEntry
+// rows). Separately, the dataplane's in-memory blocklist set (what the DNS
+// hot path actually checks) is kept in sync by a lightweight signature
+// poll in cmd/dataplane (BlocklistSignature, default BLOCKLIST_POLL_INTERVAL=
+// 5s): it detects a source/entry change cheaply (without scanning
+// blocklist_entries) and rebuilds the in-memory set from enabled sources
+// only when the signature changes, so an edit here — including flipping
+// Enabled — reaches the DNS engine within about 5 seconds, not the full
+// BLOCKLIST_UPDATE_INTERVAL (default 6h) periodic refresh window.
 //
 // Ingested-entries semantics on a URL/format change: BlocklistEntry rows
 // are never deleted or replaced in place when a source's content changes

@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { Lock, ArrowRight, Loader2, AlertTriangle } from "lucide-react"
-import { login, setToken, checkSetupStatus, getToken } from "@/lib/auth"
+import { Lock, ArrowRight, Loader2, AlertTriangle, Sparkles } from "lucide-react"
+import { login, setToken, getAuthStatus, getToken, DEMO_PASSWORD } from "@/lib/auth"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [apiReachable, setApiReachable] = useState(true)
+  const [demoMode, setDemoMode] = useState(false)
 
   useEffect(() => {
     // If already logged in, go to dashboard
@@ -20,15 +21,22 @@ export default function LoginPage() {
       router.replace("/dashboard")
       return
     }
-    // Check if setup is needed
-    checkSetupStatus().then((status) => {
-      if (status === "needs_setup") {
+    // Check if setup is needed (and whether this is a public demo)
+    getAuthStatus().then(({ status, demoMode }) => {
+      if (status === "needs_setup" && !demoMode) {
         router.replace("/setup")
       } else if (status === "unreachable") {
         setApiReachable(false)
         setError("Cannot reach HydraDNS API — is the server running?")
         setLoading(false)
       } else {
+        // Demo mode always has setup pre-completed (see demoseed), but
+        // check defensively anyway: never route a demo visitor to /setup,
+        // since POST /auth/setup is rejected outright by the server.
+        if (demoMode) {
+          setDemoMode(true)
+          setPassword(DEMO_PASSWORD)
+        }
         setLoading(false)
       }
     })
@@ -141,6 +149,11 @@ export default function LoginPage() {
               >
                 {submitting ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
+                ) : demoMode ? (
+                  <>
+                    <Sparkles className="w-5 h-5" />
+                    <span>Enter Demo</span>
+                  </>
                 ) : (
                   <>
                     <span>Sign In</span>
@@ -148,6 +161,11 @@ export default function LoginPage() {
                   </>
                 )}
               </button>
+              {demoMode && (
+                <p className="text-center text-xs text-slate-500">
+                  Demo credentials are pre-filled — just click Enter Demo.
+                </p>
+              )}
             </form>
 
             {/* Internal Footer */}

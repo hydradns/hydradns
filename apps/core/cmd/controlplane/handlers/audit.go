@@ -27,13 +27,23 @@ type auditDTO struct {
 	CreatedAt  time.Time   `json:"created_at"`
 }
 
-func toAuditDTO(evt models.AuditEvent) auditDTO {
+// toAuditDTO is a method (not a free function) so it can consult
+// h.DemoMode and redact ClientIP. In practice GET /audit is gated to
+// operator+ (see routes/router.go) and demo mode only ever seeds a
+// read_only user, so this path is unreachable in a stock demo deployment
+// today — the redaction is applied anyway, defensively, so it stays
+// correct if that role gate ever changes. See maskClientIP in common.go.
+func (h *APIHandler) toAuditDTO(evt models.AuditEvent) auditDTO {
+	clientIP := evt.ClientIP
+	if h.DemoMode {
+		clientIP = maskClientIP(clientIP)
+	}
 	d := auditDTO{
 		ID:        evt.ID,
 		ActorID:   evt.ActorID,
 		Action:    evt.Action,
 		Target:    evt.Target,
-		ClientIP:  evt.ClientIP,
+		ClientIP:  clientIP,
 		UserAgent: evt.UserAgent,
 		CreatedAt: evt.CreatedAt,
 	}
@@ -91,7 +101,7 @@ func (h *APIHandler) ListAuditEvents(c *gin.Context) {
 
 	out := make([]auditDTO, 0, len(events))
 	for _, e := range events {
-		out = append(out, toAuditDTO(e))
+		out = append(out, h.toAuditDTO(e))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
