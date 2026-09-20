@@ -15,7 +15,7 @@ Two transports:
   management traffic only, never DNS query data.
 
 The `initialize` response's `serverInfo.version` reports the CLI's own version (the same
-string `hydra version` prints), not a hardcoded value — useful for confirming which build an
+string `hydra version` prints), not a hardcoded value. Useful for confirming which build an
 agent is actually talking to.
 
 ## Configuration

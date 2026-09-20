@@ -1,9 +1,9 @@
-# HydraDNS — Hardware Guide
+# HydraDNS Hardware Guide
 
 **Last updated:** 2026-09-20
 
 **Performance numbers below are estimates, not benchmarks.** No ARM hardware has ever
-been tested — see [docs/limitations.md](limitations.md) for what has actually been
+been tested. See [docs/limitations.md](limitations.md) for what has actually been
 measured (a development laptop under WSL2, not any device on this page). The hardware
 options and prices below are still valid recommendations; treat the "Why" column's
 throughput/RAM figures as sizing estimates pending a real Pi/Orange Pi benchmark, not as
@@ -19,7 +19,7 @@ this hardware. Here's the sizing estimate, pending a real ARM benchmark:
 
 | Resource | Minimum | Recommended | Why |
 |:---------|:--------|:------------|:----|
-| CPU | 4x ARM Cortex-A53 @ 1.0 GHz | 4x A53 @ 1.5 GHz+ | Not yet measured on this hardware. On a development laptop under WSL2 (22 cores), the engine has been load-tested up to roughly 9,500 qps with p50≈5ms/p99≈20ms (see docs/limitations.md) — a typical home/office network's peak load is a small fraction of that, so an A53-class core is expected to have comfortable headroom, but this is an expectation, not a measurement on ARM. |
+| CPU | 4x ARM Cortex-A53 @ 1.0 GHz | 4x A53 @ 1.5 GHz+ | Not yet measured on this hardware. On a development laptop under WSL2 (22 cores), the engine has been load-tested up to roughly 9,500 qps with p50≈5ms/p99≈20ms (see docs/limitations.md). A typical home/office network's peak load is a small fraction of that, so an A53-class core is expected to have comfortable headroom, but this is an expectation, not a measurement on ARM. |
 | RAM | 1 GB | 2 GB | Estimated (not measured on this hardware): Go runtime (~30MB) + 100K blocklist (~20MB) + SQLite (~15MB) + Docker (~100MB) + UI (~120MB) = ~320MB. 1GB is tight, 2GB comfortable. |
 | Storage | 8 GB | 16-32 GB | 180-day logs for 50 devices = ~3.6 GB. For 200 devices = ~18 GB. |
 | Ethernet | 100 Mbps | Gigabit | DNS traffic itself is small; GbE is recommended for headroom and future use, not because DNS filtering needs the bandwidth. |
@@ -35,7 +35,7 @@ this hardware. Here's the sizing estimate, pending a real ARM benchmark:
 | Board | CPU | RAM | Storage | Ethernet | WiFi | Price (INR) | Best For |
 |:------|:----|:----|:--------|:---------|:-----|:------------|:---------|
 | **Orange Pi Zero 3 (1GB)** | 4x A53 @ 1.5 GHz | 1 GB | microSD | 1x GbE | Yes | ~3,999 | Absolute cheapest Docker-capable device |
-| **NanoPi R2S** | 4x A53 @ 1.5 GHz | 1 GB | microSD | **2x GbE** | No | ~4,050 | Dual ethernet — natural inline device |
+| **NanoPi R2S** | 4x A53 @ 1.5 GHz | 1 GB | microSD | **2x GbE** | No | ~4,050 | Dual ethernet, natural inline device |
 | **Orange Pi Zero 3 (2GB)** | 4x A53 @ 1.5 GHz | 2 GB | microSD | 1x GbE | Yes | ~4,500-5,000 | **Best value. Recommended for bulk.** |
 | **Raspberry Pi 4 (2GB)** | 4x A72 @ 1.5 GHz | 2 GB | microSD | 1x GbE | Yes | ~4,500-5,200 | Best community support, easy dev |
 
@@ -94,7 +94,7 @@ At scale, hardware drops to 17% of year 1 revenue. By year 2 (renewal only), it'
 | **Sophos XGS 87** | Custom x86 dual-processor | ~55,000-90,000 INR | Massive overkill for DNS filtering |
 | **WiJungle** | Custom x86 | Not public | Indian-made, targets same market |
 
-**Key insight:** Firewalla at $319 (26,000 INR) is the closest product to HydraDNS. We deliver similar functionality at 5,400 INR hardware + 15,000 INR/year. That's a compelling price gap.
+Firewalla at $319 (26,000 INR) is the closest product to HydraDNS. We deliver similar functionality at 5,400 INR hardware + 15,000 INR/year.
 
 ---
 
@@ -128,13 +128,13 @@ Amortized over 1,000 units = 1,500-3,600 INR/unit. Over 5,000 units = 300-720 IN
 ### ODM Sources
 
 **SoM + Design:**
-- Boardcon (Shenzhen) — Rockchip/Allwinner SBC ODM
-- MYIR Tech — Allwinner SoM + custom carrier
-- Geniatech — RK3566 OSM modules
+- Boardcon (Shenzhen): Rockchip/Allwinner SBC ODM
+- MYIR Tech: Allwinner SoM + custom carrier
+- Geniatech: RK3566 OSM modules
 
 **Indian Assembly + PCB:**
-- LionCircuits (Bengaluru) — PCB + turnkey PCBA
-- Elpro Technologies (Bengaluru) — embedded computer manufacturer
+- LionCircuits (Bengaluru): PCB + turnkey PCBA
+- Elpro Technologies (Bengaluru): embedded computer manufacturer
 
 ### Recommended SoC
 
@@ -152,8 +152,8 @@ The biggest RAM consumer is the Next.js dashboard running in a Node.js container
 
 | Optimization | RAM Saved | Effort |
 |:-------------|:----------|:-------|
-| Export Next.js as static files, serve via nginx | ~100 MB | Medium — build static export, replace Node container with nginx |
-| Run Go services without Docker (native binary) | ~80 MB | Medium — use systemd instead of Docker |
+| Export Next.js as static files, serve via nginx | ~100 MB | Medium: build static export, replace Node container with nginx |
+| Run Go services without Docker (native binary) | ~80 MB | Medium: use systemd instead of Docker |
 | Both | ~180 MB | Brings total to ~150-200 MB. Runs on 512 MB devices. |
 
 For bulk deployment, building a lightweight Armbian image with native binaries (no Docker) is the path to running on the cheapest hardware.

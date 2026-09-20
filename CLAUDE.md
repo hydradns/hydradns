@@ -9,47 +9,47 @@ HydraDNS is a DNS-layer security and privacy gateway built as a single monorepo 
 ## Build & Run Commands
 
 ### Full Stack (root)
-- `make setup` — one-time local setup (.env)
-- `make start` — `docker compose up -d` (all services)
-- `make stop` — `docker compose down`
-- `make update` — `git pull --ff-only`
-- `make logs` / `make core-logs` / `make ui-logs` / `make scanner-logs` — tail logs
-- `make build-core` / `make build-ui` / `make build-scanner` — build individual services
-- `make restart-core` / `make restart-ui` / etc. — rebuild and restart a single service
+- `make setup` sets up the project locally for the first time (creates `.env`).
+- `make start` runs `docker compose up -d` to start all services.
+- `make stop` runs `docker compose down`.
+- `make update` runs `git pull --ff-only`.
+- `make logs`, `make core-logs`, `make ui-logs`, and `make scanner-logs` tail logs.
+- `make build-core`, `make build-ui`, and `make build-scanner` build individual services.
+- `make restart-core`, `make restart-ui`, etc. rebuild and restart a single service.
 
-### Core (Go DNS Engine) — `apps/core/`
-- `make build` — compile controlplane & dataplane binaries
-- `make test` — run all tests with coverage
-- `go test -v ./internal/dnsengine/...` — run a single package's tests
-- `make fmt` / `make vet` / `make lint` — code quality (uses golangci-lint)
-- `make proto-generate` — regenerate gRPC/protobuf code (requires buf)
-- `make proto-lint` — lint proto definitions
+### Core (Go DNS Engine): `apps/core/`
+- `make build` compiles the controlplane and dataplane binaries.
+- `make test` runs all tests with coverage.
+- `go test -v ./internal/dnsengine/...` runs a single package's tests.
+- `make fmt`, `make vet`, and `make lint` handle code quality (uses golangci-lint).
+- `make proto-generate` regenerates gRPC/protobuf code (requires buf).
+- `make proto-lint` lints proto definitions.
 
-### UI (Next.js Dashboard) — `apps/ui/`
-- `npm run dev` — dev server on port 3000
+### UI (Next.js Dashboard): `apps/ui/`
+- `npm run dev` starts the dev server on port 3000.
 - `npm run build` / `npm run lint`
 
 
-### Scanner (Go) — `apps/scanner/`
-- `make build` — compile scanner binary
+### Scanner (Go): `apps/scanner/`
+- `make build` compiles the scanner binary.
 
-### CLI (Go / Cobra) — `apps/cli/`
-- `go build -o hydra` — produces the `hydra` binary at the package root
-- `./hydra <command>` — `status`, `engine`, `block`, `unblock`, `blocklists`, `policies`, `metrics`, `logs`, `setup`, `login`, `setup-router`, `mcp`, `update`, `version`
-- `./hydra mcp` — runs the MCP server: stdio JSON-RPC 2.0 by default, or `--http` for an HTTP transport (management traffic only, requires a bearer token via `--http-token`/`HYDRA_MCP_TOKEN`) for driving a fleet remotely. 14 tools registered in `apps/cli/mcp/server.go`: `get_status`, `toggle_engine`, `block_domain`, `unblock_domain`, `list_policies`, `list_blocklists`, `get_query_logs`, `get_metrics`, `create_policy`, `delete_policy`, `bulk_unblock`, `get_weekly_summary`, `explain_anomaly`, `compare_to_last_month`. Tool access is scoped by the `MCP_ROLE` env var (`admin` default, `operator` — can't `toggle_engine`, `reporter` — read-only tools only, per each tool's explicit registration flag in `toolRegistry()`, not a `get_`/`list_` name guess — `explain_anomaly` and `compare_to_last_month` are read-only too); see `apps/cli/mcp/roles.go`.
-- `go test ./...` — Cobra command tests live next to the commands (e.g. `cmd/setup_router_test.go`)
+### CLI (Go / Cobra): `apps/cli/`
+- `go build -o hydra` produces the `hydra` binary at the package root.
+- `./hydra <command>` supports `status`, `engine`, `block`, `unblock`, `blocklists`, `policies`, `metrics`, `logs`, `setup`, `login`, `setup-router`, `mcp`, `update`, `version`.
+- `./hydra mcp` runs the MCP server. The default transport is stdio JSON-RPC 2.0; `--http` switches to an HTTP transport for driving a fleet remotely (management traffic only, requires a bearer token via `--http-token`/`HYDRA_MCP_TOKEN`). It registers 14 tools in `apps/cli/mcp/server.go`: `get_status`, `toggle_engine`, `block_domain`, `unblock_domain`, `list_policies`, `list_blocklists`, `get_query_logs`, `get_metrics`, `create_policy`, `delete_policy`, `bulk_unblock`, `get_weekly_summary`, `explain_anomaly`, `compare_to_last_month`. Tool access is scoped by the `MCP_ROLE` env var: `admin` (default, all tools), `operator` (all but `toggle_engine`), `reporter` (read-only tools only). Each tool carries an explicit read-only registration flag in `toolRegistry()`, not a `get_`/`list_` name guess, so `explain_anomaly` and `compare_to_last_month` count as read-only too. See `apps/cli/mcp/roles.go`.
+- `go test ./...` runs the Cobra command tests, which live next to the commands (e.g. `cmd/setup_router_test.go`).
 - API client lives in `apps/cli/api/client.go` and talks to the controlplane on `:8080`
 - The token file (`~/.hydra/token`) is written atomically (temp file, `fsync`, rename), file mode `0600` in a directory forced to `0700`, and a symlinked directory or token path is refused outright rather than followed (`apps/cli/cmd/token_store.go`).
-- `api.New()` prints a one-line stderr warning when the configured API URL is plain `http://` to a non-local (non-loopback/private/link-local) address — the login password and bearer token would otherwise cross the network in cleartext with no indication (`apps/cli/api/client.go`, `warnIfInsecure`).
+- `api.New()` prints a one-line stderr warning when the configured API URL is plain `http://` to a non-local (non-loopback/private/link-local) address. Otherwise the login password and bearer token would cross the network in cleartext with no indication (`apps/cli/api/client.go`, `warnIfInsecure`).
 - The MCP server's `initialize` response reports the CLI's own `Version` (the same value `hydra version` prints, ldflags-overridable) as `serverInfo.version`, not a hardcoded string (`apps/cli/mcp/server.go`, `apps/cli/cmd/mcp.go`).
 
 ## Architecture
 
 HydraDNS is a single monorepo (no Git submodules, no `.gitmodules`). Go services share
-a workspace via the root `go.work` (`apps/core`, `apps/cli`, `apps/scanner` — `apps/ui`
-is Next.js/npm and isn't part of the Go workspace). The marketing/landing site used to
-live here as `apps/landing`; it has moved out to the separate `hydradns/hydradns-landing`
-repo and no longer exists in this tree.
+a workspace via the root `go.work`, covering `apps/core`, `apps/cli`, and `apps/scanner`.
+`apps/ui` is Next.js/npm and isn't part of the Go workspace. The marketing/landing site
+used to live here as `apps/landing`. It has moved out to the separate
+`hydradns/hydradns-landing` repo and no longer exists in this tree.
 
 ```
 Root (orchestrator)
@@ -84,21 +84,22 @@ The control plane maintains **desired state** in SQLite (source of truth). The d
 ### DNS Query Pipeline (early exit)
 
 Every query first runs through the heuristic threat detector (`internal/threat`, entropy +
-DGA-pattern + length + subdomain-depth scoring), non-blocking and score-only — it never
-blocks a query by itself, it only tags the eventual query-log row `IsSuspicious`/`flagged`
-(`internal/dnsengine/engine.go`). There is no NXDOMAIN-burst or fast-flux heuristic, and
-there's no auto-block-by-threshold — flagged-but-allowed queries still resolve.
+DGA-pattern + length + subdomain-depth scoring). It is non-blocking and score-only: it
+never blocks a query by itself, only tags the eventual query-log row
+`IsSuspicious`/`flagged` (`internal/dnsengine/engine.go`). There is no NXDOMAIN-burst or
+fast-flux heuristic and no auto-block-by-threshold, so flagged-but-allowed queries still
+resolve.
 
 Then, in order, with early exit:
 
-0. **DoH/DoT bootstrap interception** — known DoH provider bootstrap hostnames (Cloudflare,
-   Google, Quad9, etc. — `internal/dnsengine/doh_bootstrap.go`) always get NXDOMAIN,
-   regardless of `BLOCK_RESPONSE`, so the browser falls back to system DNS. Invisible to the
-   dashboard, not user-editable.
-1. **Blocklist check** — in-memory membership test (`internal/blocklist/memory.go`, `MemoryChecker`: atomic `map[string]struct{}` of all blocked domains + parent-domain walk). Built from enabled sources only and rebuilt when the dataplane's blocklist signature poll sees a change (`BLOCKLIST_POLL_INTERVAL`, default 5s) or after a source refresh; the DNS hot path never hits the DB. If blocked → respond per `BLOCK_RESPONSE`. (Historical note: this check used to run a per-query SQL `COUNT`, which capped throughput at ~500 QPS — see `docs/internal/stress-test-plan.md` T1.)
-2. **Policy evaluation** — Bloom filter for fast O(1) negative lookup, then exact domain match against `PolicySnapshot` (atomic rebuild on change). Multiple matches resolved by priority, then lexicographic ID
-3. **Response cache** — TTL-respecting LRU (20k entries, `internal/dnsengine/cache.go`); only allowed queries are cached, never blocked/redirect responses
-4. **Upstream forward** — pool-per-resolver with failover across all configured upstreams (1.5s per-attempt timeout, 2 retries each)
+0. **DoH/DoT bootstrap interception.** Known DoH provider bootstrap hostnames (Cloudflare,
+   Google, Quad9, etc.; see `internal/dnsengine/doh_bootstrap.go`) always get NXDOMAIN,
+   regardless of `BLOCK_RESPONSE`, so the browser falls back to system DNS. This step is
+   invisible to the dashboard and not user-editable.
+1. **Blocklist check.** In-memory membership test (`internal/blocklist/memory.go`, `MemoryChecker`: atomic `map[string]struct{}` of all blocked domains, plus a parent-domain walk). Built from enabled sources only, and rebuilt when the dataplane's blocklist signature poll sees a change (`BLOCKLIST_POLL_INTERVAL`, default 5s) or after a source refresh. The DNS hot path never hits the DB. If blocked, it responds per `BLOCK_RESPONSE`. This check replaced a per-query SQL `COUNT`, which had capped throughput at ~500 QPS; see `docs/internal/stress-test-plan.md` T1.
+2. **Policy evaluation.** Bloom filter for fast O(1) negative lookup, then exact domain match against `PolicySnapshot` (atomic rebuild on change). Multiple matches are resolved by priority, then lexicographic ID.
+3. **Response cache.** TTL-respecting LRU (20k entries, `internal/dnsengine/cache.go`). Only allowed queries are cached, never blocked/redirect responses.
+4. **Upstream forward.** Pool-per-resolver with failover across all configured upstreams (1.5s per-attempt timeout, 2 retries each).
 
 Query logging and statistics are written off the hot path by a bounded batched writer (`internal/dnsengine/querylog_writer.go`): non-blocking enqueue, single drain goroutine, batched inserts. Drops (counted) when its 4096-deep queue is full so logging can never stall resolution or grow memory without bound.
 
@@ -108,15 +109,15 @@ Domain normalization: lowercase + strip trailing dot (e.g., `EXAMPLE.COM.` → `
 
 Sources are fetched with ETag support (304 skip), SHA256 checksum tracking, and atomic persistence (transaction wraps snapshot + entries + metadata). Three format parsers, keyed by the `format` field on `BlocklistSource` (`apps/core/internal/blocklist/parser/`): `hosts`, `adblock`, `domains`. Blocklists auto-refresh on a configurable interval (default 6h, env: `BLOCKLIST_UPDATE_INTERVAL`); creating a source via the API also triggers an immediate async fetch so `domains_count` doesn't sit at 0 waiting for the next cycle.
 
-The source URL must be `http://` or `https://` (`validateBlocklistURL`, `cmd/controlplane/handlers/blocklists.go`); enforced identically on create, update, and the setup wizard's optional blocklist bootstrap. Each new snapshot fully replaces a source's entries in one transaction (delete-then-insert, `SaveSnapshotWithEntries`) — a domain removed upstream stops being blocked after the next fetch, and editing a source's URL only takes effect once that next (immediately-triggered) download completes, not synchronously in the API response. Only the last 10 `BlocklistSnapshot` metadata rows are kept per source (`snapshotRetentionPerSource`, oldest pruned); this caps metadata only, never the live entries. If a dataplane rebuild of the in-memory set fails, it keeps its previous (still-enforced) contents and retries on the next `BLOCKLIST_POLL_INTERVAL` tick rather than going empty (`cmd/dataplane/blocklist_reload.go`).
+The source URL must be `http://` or `https://` (`validateBlocklistURL`, `cmd/controlplane/handlers/blocklists.go`), enforced identically on create, update, and the setup wizard's optional blocklist bootstrap. Each new snapshot fully replaces a source's entries in one transaction (delete-then-insert, `SaveSnapshotWithEntries`). A domain removed upstream stops being blocked after the next fetch, and editing a source's URL only takes effect once that next (immediately-triggered) download completes, not synchronously in the API response. Only the last 10 `BlocklistSnapshot` metadata rows are kept per source (`snapshotRetentionPerSource`, oldest pruned); this caps metadata only, never the live entries. If a dataplane rebuild of the in-memory set fails, it keeps its previous (still-enforced) contents and retries on the next `BLOCKLIST_POLL_INTERVAL` tick rather than going empty (`cmd/dataplane/blocklist_reload.go`).
 
-The fetcher (`internal/blocklist/fetcher/http_client.go`) is a plain `http.Client` with no `CheckRedirect` override, so it follows redirects to any `http(s)` host, including private/internal addresses — there is no SSRF protection. The threat model assumes whoever adds a blocklist source URL is trusted; see `docs/limitations.md`.
+The fetcher (`internal/blocklist/fetcher/http_client.go`) accepts only `http(s)` URLs, follows at most 5 redirects and caps a download at 128 MiB. Its dialer checks the address it is about to connect to on every hop and refuses loopback, link-local (including `169.254.169.254`), unspecified and multicast targets. Private LAN addresses are allowed on purpose, so the threat model still assumes whoever adds a blocklist source URL is trusted; see `docs/limitations.md`.
 
 ### Policy Format
 
 JSON file at `configs/policies.json`. Array of policies with `id`, `action` (BLOCK/ALLOW/REDIRECT), `domains`, optional `regexes`, `priority` (higher wins). Regexes are compiled/validated on load but **not yet evaluated at query time**. Wildcards also parsed but not evaluated.
 
-The API additionally validates `action` on both create and update (`validatePolicyAction`, `cmd/controlplane/handlers/policies.go`): it must be `BLOCK`, `ALLOW`, or `REDIRECT` (case-insensitive), and `REDIRECT` requires a non-empty, parseable `redirect_ip`. This closes what used to be a create-only check — an update used to accept any string and silently turn a policy into a no-op.
+The API additionally validates `action` on both create and update (`validatePolicyAction`, `cmd/controlplane/handlers/policies.go`): it must be `BLOCK`, `ALLOW`, or `REDIRECT` (case-insensitive), and `REDIRECT` requires a non-empty, parseable `redirect_ip`. This closes what used to be a create-only check. An update used to accept any string and silently turn a policy into a no-op.
 
 ### Authentication & RBAC
 
@@ -124,14 +125,14 @@ Multi-user, role-based. The old single-admin `AdminCredential` singleton has bee
 by a `User` model (`internal/storage/models/user.model.go`) with three roles:
 `admin`, `operator`, `read_only` (constants `RoleAdmin`/`RoleOperator`/`RoleReadOnly`).
 Auth is per-user bearer tokens (SHA-256 hashed at rest, plaintext shown once on creation),
-not a single shared API key — see `internal/storage/models/token.model.go` and
+not a single shared API key. See `internal/storage/models/token.model.go` and
 `cmd/controlplane/handlers/tokens.go`. Password hashed with bcrypt.
 
 **Role boundary:** `admin` bypasses every role check. Read endpoints are open to any
 authenticated user, including `read_only`. Mutating endpoints (`POST`/`DELETE` on
 `/dns/engine`, `/policies`, `/blocklists`) are wrapped in `middlewares.RequireRole(RoleOperator)`
 (`cmd/controlplane/middlewares/auth.go`), so `operator` is effectively "operator or admin"
-and `read_only` cannot write. `GET /audit` requires `operator` or above (read_only is denied —
+and `read_only` cannot write. `GET /audit` requires `operator` or above (read_only is denied;
 audit history is treated as sensitive). User management (`POST/DELETE /users`,
 `POST /users/:id/disable`) is admin-only; any user can `PATCH` their own email/password but
 not their own role. Every mutating handler writes an `AuditEvent` row via
@@ -150,18 +151,18 @@ Login without an `email` field falls back to "the one user" if exactly one exist
 (backward-compat with the pre-RBAC single-admin flow); it 401s otherwise.
 
 **Auth endpoints (unprotected):**
-- `GET /api/v1/auth/status` — returns `{setup_complete: bool}` (true once any `User` row exists)
-- `POST /api/v1/auth/setup` — creates the first admin user, optionally configures blocklists; 409 once setup is complete
-- `POST /api/v1/auth/login` — validates credentials, returns a token
+- `GET /api/v1/auth/status` returns `{setup_complete: bool}` (true once any `User` row exists).
+- `POST /api/v1/auth/setup` creates the first admin user, optionally configures blocklists; 409 once setup is complete.
+- `POST /api/v1/auth/login` validates credentials, returns a token.
 
 Both `/auth/login` and `/auth/setup` are throttled per client IP (fixed window, 10 attempts
 / 5 minutes by default, shared across the two endpoints; 100 attempts / 5 minutes when
-`HYDRA_DEMO_MODE=true`), so the correctness of the throttle depends on `TRUSTED_PROXIES`
-being set correctly behind a reverse proxy (see the Configuration table below) — otherwise
-every request behind that proxy is bucketed under one IP. Only a failed attempt (HTTP 4xx —
-bad credentials, a malformed request, setup-already-done) counts against the budget; a
-successful login/setup and a 5xx (the server's own fault) do not. The counter is in-memory
-and resets on restart.
+`HYDRA_DEMO_MODE=true`). The correctness of the throttle depends on `TRUSTED_PROXIES`
+being set correctly behind a reverse proxy (see the Configuration table below); otherwise
+every request behind that proxy is bucketed under one IP. Only a failed attempt counts
+against the budget (HTTP 4xx: bad credentials, a malformed request, setup-already-done).
+A successful login/setup and a 5xx (the server's own fault) do not count. The counter is
+in-memory and resets on restart.
 
 Not implemented: per-user MFA/TOTP, SSO/OIDC/SAML, session timeout beyond the 90-day token
 expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/users` and
@@ -169,7 +170,7 @@ expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/
 
 ## Configuration
 
-- **Config file**: `configs/config.yaml` — top-level `dataplane` and `controlplane` keys
+- **Config file**: `configs/config.yaml`, with top-level `dataplane` and `controlplane` keys
 - **DataPlane config**: `listen_addr` (UDP/TCP), `upstream_resolvers` (list with failover), `grpc_server` (port/addr), `blocklist_update_interval`
 - **Policy file**: `configs/policies.json` loaded from disk on dataplane startup
 - **Config loaded as package singleton**: `config.DefaultConfig` with env var overrides (`DNS_LISTEN_ADDR`, `BLOCKLIST_UPDATE_INTERVAL`)
@@ -178,21 +179,21 @@ expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/
 | Env Variable | Default | Description |
 |:-------------|:--------|:------------|
 | `HYDRA_CONFIG` | `/app/configs/config.yaml` | Path to config file (`internal/config/config.go`) |
-| `HYDRA_DB` | `/app/data/hydradns.db` (`db.DefaultDBPath`) | SQLite database path. Resolved via `db.ResolveDBPath` (`internal/storage/db/dbpath.go`), which falls back to a pre-rename `phantomdns.db` in the same directory if that's the only DB file an existing install has — a one-time upgrade path, not the default for new installs |
+| `HYDRA_DB` | `/app/data/hydradns.db` (`db.DefaultDBPath`) | SQLite database path. Resolved via `db.ResolveDBPath` (`internal/storage/db/dbpath.go`), which falls back to a pre-rename `phantomdns.db` in the same directory if that's the only DB file an existing install has. This is a one-time upgrade path, not the default for new installs |
 | `HYDRA_POLICIES` | `/app/configs/policies.json` | Policy file path (`cmd/dataplane/main.go`) |
 | `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated allowed CORS origins (`cmd/controlplane/middlewares/cors.go`). The shipped `docker-compose.yml` sets `http://localhost:3000`. `*` still works but logs a warning |
 | `CORS_ALLOW_SAME_HOST` | `true` | Also allow an Origin whose hostname equals the request's Host hostname when that hostname is an IP literal or `localhost` (dashboard opened by LAN IP). Named hosts need a `CORS_ORIGINS` entry. Set `false` to disable |
-| `DNS_LISTEN_ADDR` | (from config, normally `0.0.0.0:1053`) | Override DNS listen address. Not forwarded by `docker-compose.yml` on purpose — the host-facing DNS port mapping there is fixed at `53:1053/...`, so changing this alone inside the container would only break that mapping, not move it |
+| `DNS_LISTEN_ADDR` | (from config, normally `0.0.0.0:1053`) | Override DNS listen address. Not forwarded by `docker-compose.yml` on purpose. The host-facing DNS port mapping there is fixed at `53:1053/...`, so changing this alone inside the container would only break that mapping, not move it |
 | `BLOCKLIST_UPDATE_INTERVAL` | `6h` | How often blocklist sources are re-downloaded |
 | `HYDRA_DEMO_MODE` | `false` | Public read-only demo: a `DemoGuard` middleware rejects every mutation before auth, a `read_only` demo user and synthetic data are seeded (`cmd/controlplane/demoseed`), client IPs are masked in responses. Refuses to start on a database that has real users. See `demo/README.md` |
 | `BLOCKLIST_POLL_INTERVAL` | `5s` | How often the dataplane checks the DB for blocklist changes (add, toggle, delete, finished download) and rebuilds the in-memory set; `0` disables |
-| `TRUSTED_PROXIES` | (empty) | Comma-separated CIDRs/IPs allowed to set `X-Forwarded-For` for client-IP purposes (login/setup throttle, audit log). Empty means no proxy is trusted — `c.ClientIP()` always resolves to the real socket address (`cmd/controlplane/main.go`) |
+| `TRUSTED_PROXIES` | (empty) | Comma-separated CIDRs/IPs allowed to set `X-Forwarded-For` for client-IP purposes (login/setup throttle, audit log). Empty means no proxy is trusted. `c.ClientIP()` always resolves to the real socket address (`cmd/controlplane/main.go`) |
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
 | `HYDRA_TOKEN` | (none) | CLI/MCP bearer token; if unset the CLI also tries `~/.hydra/token` (`apps/cli/cmd/root.go`) |
 | `HYDRA_MCP_TOKEN` | (none) | Bearer token required by `hydra mcp --http` (or use `--http-token`) |
 | `MCP_ROLE` | `admin` | Scopes which MCP tools a caller may invoke: `admin` (all), `operator` (all but `toggle_engine`), `reporter` (tools flagged read-only in `toolRegistry()`, an explicit per-tool list, not a `get_`/`list_` name guess). Unrecognized values safe-default to `reporter` (`apps/cli/mcp/roles.go`) |
 | `HYDRA_UPDATE_URL` | (built-in release feed) | Override the release feed `hydra update` checks (`apps/cli/cmd/update.go`) |
-| `HYDRA_ANONYMIZE_CLIENT_IPS` | `false` | Opt-in: hash client IPs (HMAC-SHA256, truncated to 64 bits) before writing them to the query log, instead of storing them as-is. Off by default — per-device visibility in the query log is treated as a core feature (`internal/config/config.go`, `internal/dnsengine/anonymize.go`) |
+| `HYDRA_ANONYMIZE_CLIENT_IPS` | `false` | Opt-in: hash client IPs (HMAC-SHA256, truncated to 64 bits) before writing them to the query log, instead of storing them as-is. Off by default. Per-device visibility in the query log is treated as a core feature (`internal/config/config.go`, `internal/dnsengine/anonymize.go`) |
 | `HYDRA_ANON_SECRET` | (generated per-install) | HMAC key for `utils.AnonymizeIP`, only used when anonymization is enabled |
 | `BLOCK_RESPONSE` | `zero` | Engine response for blocked domains: `zero` (A 0.0.0.0), `nxdomain` (RcodeNameError), `refused` (RcodeRefused). `zero` is the safe default; `nxdomain` is faster on Windows browsers but should be A/B tested first |
 | `QUERY_LOG_RETENTION_DAYS` | `7` | Delete query logs older than N days; 0 disables |
@@ -206,7 +207,7 @@ The shipped `docker-compose.yml` forwards `BLOCK_RESPONSE`, `BLOCKLIST_UPDATE_IN
 `QUERY_LOG_CLEANUP_INTERVAL`, `HYDRA_ANONYMIZE_CLIENT_IPS`, `HYDRA_ANON_SECRET`, and
 `TRUSTED_PROXIES` from `.env` into the `core` container's environment, each defaulting to
 the code's own default when unset. `DNS_LISTEN_ADDR` is the one exception (see its row
-above). `HYDRA_DEMO_MODE` is deliberately never forwarded by this file — demo mode has its
+above). `HYDRA_DEMO_MODE` is deliberately never forwarded by this file. Demo mode has its
 own `demo/docker-compose.demo.yml`.
 
 Boolean env vars (`HYDRA_DEMO_MODE`, `CORS_ALLOW_SAME_HOST`, `HYDRA_ANONYMIZE_CLIENT_IPS`) all
@@ -231,16 +232,16 @@ authenticates via a Bearer header, never cookies) and logs a startup warning.
 Query-log IP note: client IP anonymization is implemented and wired into `Engine.logQuery`
 (`internal/dnsengine/engine.go`, `internal/dnsengine/anonymize.go`) but **off by default**.
 With `HYDRA_ANONYMIZE_CLIENT_IPS` unset (or `dataplane.anonymization.enabled: false`, the
-shipped default), client IP addresses are stored as-is in `dns_queries` — per-device activity
+shipped default), client IP addresses are stored as-is in `dns_queries`. Per-device activity
 is visible in the query log, which is treated as the correct default for a home/office DNS
-firewall. Enabling it hashes the IP (HMAC-SHA256 of the raw address, not a subnet mask —
+firewall. Enabling it hashes the IP (HMAC-SHA256 of the raw address, not a subnet mask;
 masking first would collapse every device on one LAN's /24 onto the same hash, see the
-comment on `utils.AnonymizeIP`) with a per-install secret so a device's own queries still
+comment on `utils.AnonymizeIP`) with a per-install secret, so a device's own queries still
 group together without exposing the raw address.
 
 ### Compose port mapping (important for demos)
 
-The dataplane listens on container port **1053**. The base compose maps it to host **:53**. Some operators add a gitignored `docker-compose.override.yml` to also expose **:5353** for WSL2/Windows hosts where :53 collides with `systemd-resolved` or the Windows DNS Client — that file is not part of this repo and isn't present in a fresh checkout. Smoke-test paths:
+The dataplane listens on container port **1053**. The base compose maps it to host **:53**. Some operators add a gitignored `docker-compose.override.yml` to also expose **:5353** for WSL2/Windows hosts where :53 collides with `systemd-resolved` or the Windows DNS Client. That file is not part of this repo and isn't present in a fresh checkout. Smoke-test paths:
 
 ```
 curl http://localhost:8080/health                               # controlplane
@@ -252,68 +253,68 @@ docker run --rm --network container:hydradns-core-1 alpine:3.20 sh -c 'apk add -
 
 ## SQLite Setup
 
-Pure-Go SQLite driver (`glebarez/sqlite`), WAL mode for concurrency, single-writer (`MaxOpenConns=1`). `busy_timeout` is set to 30 seconds via `PRAGMA busy_timeout=30000;` (`internal/storage/db/db.go`), so the controlplane and dataplane — which both call `db.InitDB`/`AutoMigrate` independently against the same file and can start at the same time in the combined `core` container — wait for each other instead of one failing with `SQLITE_BUSY`. GORM auto-migrates all models on startup, run by both processes (`internal/storage/db/db.go`): Policy, DNSQuery, DomainPolicy, Action, Category, Statistics, SystemState, BlocklistSource, BlocklistSnapshot, BlocklistEntry, AdminCredential (legacy, migration-only), User, Token, AuditEvent.
+Pure-Go SQLite driver (`glebarez/sqlite`), WAL mode for concurrency, single-writer (`MaxOpenConns=1`). `busy_timeout` is set to 30 seconds via `PRAGMA busy_timeout=30000;` (`internal/storage/db/db.go`). The controlplane and dataplane both call `db.InitDB`/`AutoMigrate` independently against the same file and can start at the same time in the combined `core` container, so this setting makes them wait for each other instead of one failing with `SQLITE_BUSY`. GORM auto-migrates all models on startup, run by both processes (`internal/storage/db/db.go`): Policy, DNSQuery, DomainPolicy, Action, Category, Statistics, SystemState, BlocklistSource, BlocklistSnapshot, BlocklistEntry, AdminCredential (legacy, migration-only), User, Token, AuditEvent.
 
-Two indexes — `dns_queries.action` and `blocklist_entries.source_id` — are new as of this branch (not present on `origin/main`). On a fresh install this is instant; on an existing large database, `CREATE INDEX` runs synchronously at startup and can make the first start after upgrading noticeably slower than a normal restart, especially on SD-card storage. See the Upgrade notes in `CHANGELOG.md` and `docs/releasing.md`.
+Two indexes, `dns_queries.action` and `blocklist_entries.source_id`, are new in v0.1.0. On a fresh install this is instant. On an existing large database, `CREATE INDEX` runs synchronously at startup and can make the first start after upgrading noticeably slower than a normal restart, especially on SD-card storage. See the Upgrade notes in `CHANGELOG.md` and `docs/releasing.md`.
 
 ### Query-log retention
 
 The `dns_queries` table is bounded by a background loop in the dataplane (`startQueryLogRetention`), runs once at startup then on `QUERY_LOG_CLEANUP_INTERVAL` (default 1h). Two limits, both via env:
-- `QUERY_LOG_RETENTION_DAYS` (default 7) — delete rows older than N days; 0 disables.
-- `QUERY_LOG_MAX_ROWS` (default 1,000,000) — keep at most N newest rows (SD-card insurance); 0 disables.
+- `QUERY_LOG_RETENTION_DAYS` (default 7) deletes rows older than N days; 0 disables.
+- `QUERY_LOG_MAX_ROWS` (default 1,000,000) keeps at most N newest rows (SD-card insurance); 0 disables.
 
-Note: SQLite `DELETE` reuses freed pages rather than shrinking the file, so the `.db` size settles at its high-water mark (bounded by retention) and does not auto-`VACUUM` — `VACUUM` is avoided deliberately because it locks the DB and would stall DNS. Compliance note: CERT-In wants 180-day retention; that conflicts with SD-card capacity at scale, so long-retention customers need a bigger disk or external log shipping (see `docs/internal/certifications-roadmap.md`).
+Note: SQLite `DELETE` reuses freed pages rather than shrinking the file, so the `.db` size settles at its high-water mark (bounded by retention) and does not auto-`VACUUM`. `VACUUM` is avoided deliberately because it locks the DB and would stall DNS. Compliance note: CERT-In wants 180-day retention; that conflicts with SD-card capacity at scale, so long-retention customers need a bigger disk or external log shipping (see `docs/internal/certifications-roadmap.md`).
 
 ## Known Incomplete Features
 
-Re-verified directly against this monorepo's code (no more pinned-submodule vs. upstream
-split — everything below is main, checked at the branch point in this worktree).
+Re-verified directly against this monorepo's code. There is no more pinned-submodule vs.
+upstream split; everything below is main, checked at the branch point in this worktree.
 
-- Regex/wildcard policy evaluation — still parsed and validated on load but not evaluated
+- Regex/wildcard policy evaluation. Still parsed and validated on load but not evaluated
   at query time; `Engine.Evaluate` only does exact + parent-domain matching
-  (`apps/core/internal/policy/engine.go`, see the `TODO: wildcard/regex` comment)
-- TLS on gRPC — still `grpc.WithInsecure() // TLS later` (`apps/core/internal/grpc/controlplane/client.go`)
-- TLS on dashboard — no HTTPS termination anywhere in compose or the Next.js server
-- Encrypted upstream/listener DNS (DoH/DoT) — upstream resolvers are plain UDP (`8.8.8.8:53`
-  style) and there is no DoH/DoT listener; the only DoH-related code is the *bootstrap
-  blocklist* that NXDOMAINs known DoH provider hostnames to keep clients on plain DNS
-  (`apps/core/internal/dnsengine/doh_bootstrap.go`) — that is bypass mitigation, not
-  encrypted DNS support
-- DNSSEC validation — not implemented anywhere in `internal/dnsengine`
-- Port 53 binding on bare metal — needs `CAP_NET_BIND_SERVICE` (Docker handles this via port mapping)
-- `/dns/resolvers` — reads real upstream resolvers from `config.DefaultConfig`, but is
-  read-only; no CRUD (`apps/core/cmd/controlplane/handlers/dns.go`, `ListResolvers`)
+  (`apps/core/internal/policy/engine.go`, see the `TODO: wildcard/regex` comment).
+- TLS on gRPC. Still `grpc.WithInsecure() // TLS later` (`apps/core/internal/grpc/controlplane/client.go`).
+- TLS on the dashboard. No HTTPS termination anywhere in compose or the Next.js server.
+- Encrypted upstream/listener DNS (DoH/DoT). Not implemented. Upstream resolvers are plain
+  UDP (`8.8.8.8:53` style) and there is no DoH/DoT listener. The only DoH-related code is
+  the *bootstrap blocklist* that NXDOMAINs known DoH provider hostnames to keep clients on
+  plain DNS (`apps/core/internal/dnsengine/doh_bootstrap.go`); that is bypass mitigation,
+  not encrypted DNS support.
+- DNSSEC validation. Not implemented anywhere in `internal/dnsengine`.
+- Port 53 binding on bare metal. Needs `CAP_NET_BIND_SERVICE` (Docker handles this via port mapping).
+- `/dns/resolvers`. Reads real upstream resolvers from `config.DefaultConfig`, but is
+  read-only; no CRUD (`apps/core/cmd/controlplane/handlers/dns.go`, `ListResolvers`).
 - Scanner only detects the system resolver via `/etc/resolv.conf` and runs a basic UDP resolution check
-- Blocklist rebuild cost — blocklist create/toggle/delete/URL edits are live within about 5s of
+- Blocklist rebuild still has a cost. Create/toggle/delete/URL edits go live within about 5s of
   the change (or of the new download finishing) via the signature poll
   (`cmd/dataplane/blocklist_reload.go`); each source's entries are replaced per snapshot
   (`SaveSnapshotWithEntries`). The rebuild is still a full read of all enabled entries and holds
   the dataplane's single SQLite connection (`MaxOpenConns=1`) while it runs, so query-log writes
-  queue behind it
-- Resolver CRUD — the dashboard client has create/update/delete calls for `/dns/resolvers` but
-  the control plane only serves `GET`; those calls 404
-- Dashboard recent-activity feed — `GetAnalyticsSummary` returns the newest 100 rows unpaginated;
-  the Logs page uses `GET /analytics/logs` with server-side paging and filters
-- Bypass attempts — `GET /analytics/bypass` reports every attempt as protocol `doh`; the dataplane
-  sees only the bootstrap hostname lookup and cannot tell DoH from DoT or DoQ
-- Settings page — dashboard page exists (`apps/ui/app/dashboard/settings/page.tsx`) and calls
+  queue behind it.
+- Resolver CRUD. The dashboard client has create/update/delete calls for `/dns/resolvers`, but
+  the control plane only serves `GET`; those calls 404.
+- Dashboard recent-activity feed. `GetAnalyticsSummary` returns the newest 100 rows unpaginated;
+  the Logs page uses `GET /analytics/logs` with server-side paging and filters.
+- Bypass attempts. `GET /analytics/bypass` reports every attempt as protocol `doh`; the dataplane
+  sees only the bootstrap hostname lookup and cannot tell DoH from DoT or DoQ.
+- Settings page. Exists in the dashboard (`apps/ui/app/dashboard/settings/page.tsx`) and calls
   `getSettings`/`updateSettings`, but there is no `/settings` route or handler anywhere on
-  the control plane — backend wiring is still absent
-- CORS origins — explicit allowlist plus an automatic same-host rule for IP literals and
-  `localhost`; a dashboard reached by a named host (`pi.local`, a reverse-proxy domain) needs
-  its origin added to `CORS_ORIGINS`
-- Container self-update — none for the `core`/`ui` containers; the CLI does have `hydra
-  update` self-update for the `hydra` binary itself (`apps/cli/cmd/update.go`)
-- Remote monitoring — no heartbeat/alert pipeline anywhere in `apps/core`
-- Query-log client IPs are stored raw by default — anonymization exists and works
-  (`HYDRA_ANONYMIZE_CLIENT_IPS`, see the Configuration table above) but is opt-in, off by
-  default
-- Per-user MFA/TOTP, SSO/OIDC/SAML — not implemented; RBAC (see Authentication above) covers
-  roles and per-user tokens only
-- CLI has no `hydra users`/`hydra tokens` commands — user/token management is dashboard- or
-  API-only today
+  the control plane. Backend wiring is still absent.
+- CORS origins. Explicit allowlist plus an automatic same-host rule for IP literals and
+  `localhost`. A dashboard reached by a named host (`pi.local`, a reverse-proxy domain) needs
+  its origin added to `CORS_ORIGINS`.
+- Container self-update. None for the `core`/`ui` containers; the CLI does have `hydra
+  update` self-update for the `hydra` binary itself (`apps/cli/cmd/update.go`).
+- Remote monitoring. No heartbeat/alert pipeline anywhere in `apps/core`.
+- Query-log client IPs are stored raw by default. Anonymization exists and works
+  (`HYDRA_ANONYMIZE_CLIENT_IPS`, see the Configuration table above), but is opt-in and off
+  by default.
+- Per-user MFA/TOTP, SSO/OIDC/SAML. Not implemented; RBAC (see Authentication above) covers
+  roles and per-user tokens only.
+- The CLI has no `hydra users`/`hydra tokens` commands. User/token management is dashboard- or
+  API-only today.
 
-The UI has a full API client (`lib/api.ts`, `lib/auth.ts`) — all dashboard pages poll the real API.
+The UI has a full API client (`lib/api.ts`, `lib/auth.ts`). All dashboard pages poll the real API.
 
 ## API Response Envelope
 
@@ -330,20 +331,20 @@ All control plane responses use a standard envelope:
 ## CI
 
 Two GitHub Actions workflows (`.github/workflows/`):
-- `ci.yml` — on push/PR to main, four jobs: `core` (Go vet + `go test -race` + build controlplane
+- `ci.yml` runs on push/PR to main, four jobs: `core` (Go vet + `go test -race` + build controlplane
   and dataplane binaries), `cli` (Go vet + test + build), `dashboard` (Next.js `npm run lint` +
   `npm test` + `npm run build`), `docker` (builds the `core` and `ui` Docker images, depends on
-  the other three)
-- `release.yml` — on tag push (`v*`): multi-arch (linux/amd64, linux/arm64) Docker images for
+  the other three).
+- `release.yml` runs on tag push (`v*`): multi-arch (linux/amd64, linux/arm64) Docker images for
   `core` and `ui` pushed to GHCR, plus a separate `release-cli` job that cross-compiles the
-  `hydra` binary for linux/darwin × amd64/arm64 and attaches them to the GitHub release
+  `hydra` binary for linux/darwin × amd64/arm64 and attaches them to the GitHub release.
 
 ## Known Live Bugs (caught in real stack)
 
 - Resolved: the dashboard's vitest suite (`apps/ui`) previously failed 28 of 47 tests, but
-  this was a Node-version artifact, not a product bug — Node 22+ defines global
+  this was a Node-version artifact, not a product bug. Node 22+ defines global
   `localStorage`/`sessionStorage` that shadow jsdom's under Vitest. Fixed in
-  `apps/ui/vitest.setup.ts`; the suite is 77/77 (14 files) as of this branch, and the
+  `apps/ui/vitest.setup.ts`; the suite is 77/77 (14 files), and the
   `dashboard` CI job now runs `npm test`.
 - The `statistics.id` UNIQUE-constraint bug and blocklist ingestion leaving `domains_count`
   at 0 are both fixed: query counting no longer collides (see `internal/storage/repositories`)
