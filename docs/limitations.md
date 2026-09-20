@@ -47,16 +47,18 @@ If something here changes, update this file in the same commit.
   a no-op. *Impact:* a policy that looks like it blocks `*.badsite.com` via regex won't
   actually block anything beyond exact domain matches. *Workaround:* list every domain you
   want blocked explicitly, or use a blocklist source instead of a regex policy.
-- **No inline edit for policies or blocklists.** The API supports create and delete only.
-  *Impact:* changing a policy's domains or a blocklist's URL means deleting and recreating
-  it. *Workaround:* delete + recreate; note this loses the item's ID and creation date.
+- **Blocklist changes are slow to take effect.** Policy edits apply within about 5 seconds,
+  but adding, editing, enabling or disabling a blocklist only reaches the DNS engine on the
+  next periodic refresh (`BLOCKLIST_UPDATE_INTERVAL`, default 6h). Changing a blocklist's URL
+  does not remove entries fetched from the old URL. *Impact:* a list you just disabled keeps
+  blocking for up to the refresh interval. *Workaround:* restart the `core` container, or
+  lower `BLOCKLIST_UPDATE_INTERVAL`.
 
 ## Dashboard and operations
 
-- **Query log is capped at 100 rows, no pagination.** The recent-queries view always shows
-  the newest 100 entries. *Impact:* you can't page back further in the UI. *Workaround:*
-  query the SQLite DB directly, or use the CLI/MCP `get_query_logs` tool with your own
-  filtering.
+- **Dashboard recent-activity widget shows the newest 100 queries only.** The dedicated Logs
+  page pages and filters on the server; its domain filter is a prefix match, not a substring
+  search. *Workaround:* use the Logs page for anything older than the newest 100 rows.
 - **Settings page has no backend.** The dashboard has a Settings screen, but the control
   plane has no `/settings` endpoint — the page can't actually persist anything yet.
   *Impact:* toggles on that page don't do anything durable. *Workaround:* use `hydra engine`,
