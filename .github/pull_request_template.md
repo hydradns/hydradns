@@ -1,29 +1,29 @@
 # Pull Request
 
-## 📝 Description
+## Description
 
 <!-- Provide a brief description of the changes in this PR -->
 
-## 🔗 Related Issues
+## Related Issues
 
 <!-- Link to related issues using keywords like "Fixes #123" or "Closes #456" -->
 - Fixes #
 - Related to #
 
-## 🧪 Type of Change
+## Type of Change
 
 <!-- Mark the relevant option with an "x" -->
 
-- [ ] 🐛 Bug fix (non-breaking change which fixes an issue)
-- [ ] ✨ New feature (non-breaking change which adds functionality)
-- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] 📖 Documentation update
-- [ ] 🔧 Refactoring (no functional changes)
-- [ ] ⚡ Performance improvement
-- [ ] 🧪 Test coverage improvement
-- [ ] 🏗️ Build/CI changes
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+- [ ] Refactoring (no functional changes)
+- [ ] Performance improvement
+- [ ] Test coverage improvement
+- [ ] Build/CI changes
 
-## 🔍 Changes Made
+## Changes Made
 
 <!-- Describe the changes you've made in detail -->
 
@@ -31,7 +31,7 @@
 - 
 - 
 
-## 🧪 Testing
+## Testing
 
 <!-- Describe the tests you ran to verify your changes -->
 
@@ -53,7 +53,7 @@
 2. 
 3. 
 
-## 📋 Checklist
+## Checklist
 
 <!-- Mark completed items with an "x" -->
 
@@ -74,15 +74,15 @@
 - [ ] My changes don't negatively impact performance
 - [ ] I have considered backwards compatibility
 
-## 🖼️ Screenshots (if applicable)
+## Screenshots (if applicable)
 
 <!-- Add screenshots to help explain your changes -->
 
-## 📚 Additional Notes
+## Additional Notes
 
 <!-- Add any other context or information that reviewers should know -->
 
-## 🏷️ For Maintainers
+## For Maintainers
 
 <!-- This section is for maintainer use -->
 

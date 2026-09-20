@@ -1,4 +1,4 @@
-name: 🐛 Bug Report
+name: Bug Report
 description: Report a bug or issue with HydraDNS
 title: "[Bug]: "
 labels: ["bug", "triage"]
@@ -8,8 +8,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to report a bug! 🐛 
-        
+        Thanks for taking the time to report a bug.
+
         Please fill out this form to help us understand and reproduce the issue.
 
   - type: input

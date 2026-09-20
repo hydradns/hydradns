@@ -1,4 +1,4 @@
-name: ❓ Question
+name: Question
 description: Ask a question about HydraDNS
 title: "[Question]: "
 labels: ["question", "triage"]
@@ -8,8 +8,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Have a question about HydraDNS? 🤔
-        
+        Have a question about HydraDNS?
+
         We're here to help! Please provide as much context as possible.
 
   - type: dropdown
