@@ -243,10 +243,11 @@ split — everything below is main, checked at the branch point in this worktree
 - `/dns/resolvers` — reads real upstream resolvers from `config.DefaultConfig`, but is
   read-only; no CRUD (`apps/core/cmd/controlplane/handlers/dns.go`, `ListResolvers`)
 - Scanner only detects the system resolver via `/etc/resolv.conf` and runs a basic UDP resolution check
-- Blocklist URL edits — policy edits and blocklist create/toggle/delete are live within about 5s
-  (policy poll; blocklist signature poll, `BLOCKLIST_POLL_INTERVAL`, `cmd/dataplane/blocklist_reload.go`),
-  but editing a blocklist URL does not purge entries fetched from the old URL. A long rebuild
-  read holds the dataplane's single SQLite connection (`MaxOpenConns=1`), so query-log writes
+- Blocklist rebuild cost — blocklist create/toggle/delete/URL edits are live within about 5s of
+  the change (or of the new download finishing) via the signature poll
+  (`cmd/dataplane/blocklist_reload.go`); each source's entries are replaced per snapshot
+  (`SaveSnapshotWithEntries`). The rebuild is still a full read of all enabled entries and holds
+  the dataplane's single SQLite connection (`MaxOpenConns=1`) while it runs, so query-log writes
   queue behind it
 - Resolver CRUD — the dashboard client has create/update/delete calls for `/dns/resolvers` but
   the control plane only serves `GET`; those calls 404
