@@ -13,7 +13,7 @@
 #     fails to resolve and Compose builds locally from `build:`, exactly like
 #     today. Contributors can still force a rebuild with `docker compose build`
 #     or `docker compose up -d --build`.
-# Do not add an explicit `pull_policy:` here — it would remove this fallback.
+# Do not add an explicit `pull_policy:` here; it would remove this fallback.
 services:
   # -------------------------------------------------------------------------
   # CORE (Combined controlplane + dataplane)
@@ -36,7 +36,7 @@ services:
       # checked first. On top of it, the API automatically allows a request
       # whose Origin hostname matches the Host header it was reached on
       # (ports ignored), as long as that hostname is an IP literal or
-      # "localhost" — this is what lets a dashboard opened at
+      # "localhost". This is what lets a dashboard opened at
       # http://192.168.1.53:3000 call the API at http://192.168.1.53:8080
       # with no config changes. Named hosts (pi.local, hydra.lan, a
       # reverse-proxy domain) are not covered by that automatic rule and
@@ -85,7 +85,7 @@ services:
         # override: a reverse proxy, or an API on a different host/port
         # than the dashboard. Next.js still inlines this value at build
         # time, so a runtime env var alone won't change it in an
-        # already-built image — set it here and rebuild.
+        # already-built image; set it here and rebuild.
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
     restart: unless-stopped
     ports:
@@ -99,7 +99,7 @@ services:
       - hydra-net
 
   # -------------------------------------------------------------------------
-  # SCANNER (Network Scanner Worker) — optional, not required for demo
+  # SCANNER (Network Scanner Worker), optional, not required for demo
   # Not part of the published release (no GHCR image, no CI job for it), so
   # this stays build-only. Uncomment to run it locally.
   # -------------------------------------------------------------------------

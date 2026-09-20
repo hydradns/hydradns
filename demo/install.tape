@@ -4,12 +4,12 @@
 #   - vhs, ttyd, ffmpeg (https://github.com/charmbracelet/vhs)  ->  vhs demo/install.tape
 #   - A clean host with git, Docker + Compose v2, and a Go toolchain matching
 #     apps/cli/go.mod (no tagged release exists yet, so the `hydra` CLI must
-#     be built locally — there is no prebuilt binary to download until
+#     be built locally; there is no prebuilt binary to download until
 #     v0.1.0 ships GitHub Release assets per .github/workflows/release.yml).
 #   - Port 53 free on the host (see README's "Port 53 already in use?" note).
 #   - Default docker-compose.yml env: no CORS_ORIGINS/BLOCK_RESPONSE override,
 #     so the dataplane answers blocked queries with A 0.0.0.0 (the "zero"
-#     default — see apps/core/internal/dnsengine/engine.go respondBlocked).
+#     default; see apps/core/internal/dnsengine/engine.go respondBlocked).
 #
 # Keep output under 2 MB or it will not load on mobile previews.
 
@@ -30,7 +30,7 @@ Enter
 Sleep 4s
 
 # doubleclick.net is blocked out of the box by the "block-ads" policy shipped
-# in apps/core/configs/policies.json — no setup wizard needed for this part.
+# in apps/core/configs/policies.json; no setup wizard needed for this part.
 Type "dig @localhost doubleclick.net +short"
 Enter
 Sleep 2s
@@ -47,7 +47,7 @@ Sleep 3s
 # First boot has no admin account yet, so mint one with `hydra setup`
 # (equivalent to the dashboard's first-run setup wizard) before blocking.
 # The password prompt disables terminal echo, so nothing typed below
-# appears in the recording — this is a real interactive TTY under vhs,
+# appears in the recording. This is a real interactive TTY under vhs,
 # not a piped/non-interactive run.
 Type "./apps/cli/hydra setup"
 Enter
