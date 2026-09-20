@@ -99,6 +99,109 @@ type policyResponse struct {
 	Data   Policy `json:"data"`
 }
 
+// --- M10: action must be validated against the real action set ---
+
+func TestCreatePolicy_InvalidActionIsBadRequest(t *testing.T) {
+	th := newPoliciesHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+
+	rec := th.do("POST", "/api/v1/policies", tok, gin.H{
+		"id": "p1", "name": "P1", "action": "DENY", "domains": []string{"a.com"},
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400 for an unrecognized action", rec.Code)
+	}
+	if _, err := th.store.Policies.GetByID("p1"); err == nil {
+		t.Error("expected no policy to be created for an invalid action")
+	}
+}
+
+func TestCreatePolicy_ActionIsCaseInsensitive(t *testing.T) {
+	th := newPoliciesHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+
+	rec := th.do("POST", "/api/v1/policies", tok, gin.H{
+		"id": "p1", "name": "P1", "action": "block", "domains": []string{"a.com"},
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("got %d, want 201 for lowercase action (engine matches case-insensitively)", rec.Code)
+	}
+}
+
+func TestCreatePolicy_RedirectRequiresRedirectIP(t *testing.T) {
+	th := newPoliciesHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+
+	rec := th.do("POST", "/api/v1/policies", tok, gin.H{
+		"id": "p1", "name": "P1", "action": "REDIRECT", "domains": []string{"a.com"},
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400 for REDIRECT with no redirect_ip", rec.Code)
+	}
+}
+
+func TestCreatePolicy_RedirectRequiresValidIP(t *testing.T) {
+	th := newPoliciesHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+
+	rec := th.do("POST", "/api/v1/policies", tok, gin.H{
+		"id": "p1", "name": "P1", "action": "REDIRECT", "redirect_ip": "not-an-ip", "domains": []string{"a.com"},
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400 for REDIRECT with an unparseable redirect_ip", rec.Code)
+	}
+}
+
+func TestCreatePolicy_RedirectWithValidIPSucceeds(t *testing.T) {
+	th := newPoliciesHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+
+	rec := th.do("POST", "/api/v1/policies", tok, gin.H{
+		"id": "p1", "name": "P1", "action": "REDIRECT", "redirect_ip": "192.168.1.1", "domains": []string{"a.com"},
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("got %d body=%s, want 201", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUpdatePolicy_InvalidActionIsBadRequest(t *testing.T) {
+	th := newPoliciesHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+
+	th.do("POST", "/api/v1/policies", tok, gin.H{
+		"id": "p1", "name": "P1", "action": "BLOCK", "domains": []string{"a.com"},
+	})
+
+	rec := th.do("PUT", "/api/v1/policies/p1", tok, gin.H{
+		"name": "P1", "action": "DENY", "domains": []string{"a.com"},
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400 for an unrecognized action", rec.Code)
+	}
+
+	// The policy must be unchanged — still BLOCK, not silently downgraded.
+	got, _ := th.store.Policies.GetByID("p1")
+	if got.Action != "BLOCK" {
+		t.Errorf("expected the stored action to remain BLOCK, got %q", got.Action)
+	}
+}
+
+func TestUpdatePolicy_RedirectRequiresRedirectIP(t *testing.T) {
+	th := newPoliciesHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+
+	th.do("POST", "/api/v1/policies", tok, gin.H{
+		"id": "p1", "name": "P1", "action": "BLOCK", "domains": []string{"a.com"},
+	})
+
+	rec := th.do("PUT", "/api/v1/policies/p1", tok, gin.H{
+		"name": "P1", "action": "REDIRECT", "domains": []string{"a.com"},
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400 for REDIRECT with no redirect_ip", rec.Code)
+	}
+}
+
 func TestUpdatePolicy_HappyPath(t *testing.T) {
 	th := newPoliciesHarness(t)
 	tok := th.seedUser(t, "op@x.com", models.RoleOperator)

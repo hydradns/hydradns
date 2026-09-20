@@ -4,6 +4,7 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -37,7 +38,16 @@ func main() {
 	// Default is off, and when off none of this file's demo-mode branches
 	// run — behaviour is byte-for-byte the same as before this feature
 	// existed.
-	demoMode := strings.EqualFold(os.Getenv("HYDRA_DEMO_MODE"), "true")
+	//
+	// Routed through config.MustParseBoolEnv (not a bespoke
+	// strings.EqualFold(..., "true")) so "1", "yes", "on", or a value with
+	// a stray trailing space from a Docker env_file line are all
+	// recognized instead of silently resolving to "off" — see H1 in the
+	// launch-prep review: that near-miss left a public demo's
+	// /auth/setup unauthenticated and open to the first visitor. An
+	// unrecognized value now fails fast (log.Fatalf naming the variable
+	// and value) rather than silently defaulting to off.
+	demoMode := config.MustParseBoolEnv("HYDRA_DEMO_MODE", false)
 	if demoMode {
 		// Refuses to proceed (fatal) if this looks like a real deployment's
 		// database rather than a fresh demo volume — see the doc comment
@@ -50,7 +60,7 @@ func main() {
 		}
 		stop := make(chan struct{})
 		defer close(stop)
-		go demoseed.StartRefreshLoop(repos, db.DB, demoRefreshInterval, stop)
+		go demoseed.StartRefreshLoop(db.DB, demoRefreshInterval, stop)
 	}
 
 	// Initialize grpc client
@@ -71,8 +81,20 @@ func main() {
 	// users don't wait up to 6 hours for the next dataplane refresh cycle.
 	blocklistEngine := blocklist.NewEngine(repos.Blocklist)
 
+	// Resolve the same anonymization secret the dataplane uses (same env
+	// var, same config value, same <dataDir>/anon_secret file — see
+	// config.ResolveAnonymizationSecret) so this process can hash a
+	// client=<ip> filter value the same way the dataplane hashed it before
+	// writing dns_queries.client_ip. Only resolved when anonymization is
+	// enabled; an empty AnonymizeSecret means "use the raw filter value
+	// unchanged" (see handlers.APIHandler.resolveClientIPFilter).
+	var anonymizeSecret string
+	if config.DefaultConfig.DataPlane.Anonymization.Enabled {
+		anonymizeSecret = config.ResolveAnonymizationSecret(config.DefaultConfig.DataPlane.Anonymization.Secret, filepath.Dir(dbPath))
+	}
+
 	// Initialize Gin router
-	apiHandler := handlers.NewAPIHandler(*repos, c, blocklistEngine, demoMode)
+	apiHandler := handlers.NewAPIHandler(*repos, c, blocklistEngine, demoMode, anonymizeSecret)
 	r := gin.Default()
 
 	// gin trusts every proxy by default, which means c.ClientIP() (used

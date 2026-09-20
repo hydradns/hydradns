@@ -2,11 +2,14 @@
 package middlewares
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hydradns/hydra-core/internal/config"
 )
 
 // buildCORSRouter wires CORS() into a minimal router the same way main.go
@@ -208,6 +211,160 @@ func TestCORS_NoOriginHeaderPassesThrough(t *testing.T) {
 	rec := corsRequest(r, http.MethodGet, "", "192.168.1.53:8080")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("got %d, want 200", rec.Code)
+	}
+}
+
+// --- H2: CORS_ORIGINS must not panic on human-typed whitespace/commas ---
+
+func TestCORS_TrimsWhitespaceAroundOrigins(t *testing.T) {
+	t.Setenv("CORS_ORIGINS", "http://a.lan:3000, http://b.lan:3000")
+	t.Setenv("CORS_ALLOW_SAME_HOST", "false")
+	r := buildCORSRouter()
+
+	rec := corsRequest(r, http.MethodGet, "http://b.lan:3000", "192.168.1.53:8080")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200 (leading space on the entry must be trimmed, not left to panic)", rec.Code)
+	}
+}
+
+func TestCORS_DropsTrailingEmptyEntry(t *testing.T) {
+	t.Setenv("CORS_ORIGINS", "http://a.lan:3000,")
+	t.Setenv("CORS_ALLOW_SAME_HOST", "false")
+	r := buildCORSRouter()
+
+	rec := corsRequest(r, http.MethodGet, "http://a.lan:3000", "192.168.1.53:8080")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200 (trailing comma must not panic or break the real entry)", rec.Code)
+	}
+}
+
+func TestCORS_LeadingWhitespaceOnlyEntry(t *testing.T) {
+	t.Setenv("CORS_ORIGINS", " http://a.lan:3000")
+	t.Setenv("CORS_ALLOW_SAME_HOST", "false")
+	r := buildCORSRouter()
+
+	rec := corsRequest(r, http.MethodGet, "http://a.lan:3000", "192.168.1.53:8080")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200", rec.Code)
+	}
+}
+
+func TestCORS_InvalidEntryCallsFatalfNamingVarAndEntry(t *testing.T) {
+	orig := corsFatalf
+	defer func() { corsFatalf = orig }()
+
+	var gotFormat string
+	var gotArgs []interface{}
+	called := false
+	corsFatalf = func(format string, args ...interface{}) {
+		called = true
+		gotFormat = format
+		gotArgs = args
+	}
+
+	t.Setenv("CORS_ORIGINS", "ftp://evil.example/list")
+	t.Setenv("CORS_ALLOW_SAME_HOST", "false")
+	_ = CORS() // must not panic
+
+	if !called {
+		t.Fatal("expected corsFatalf to be called for a non-http(s) entry instead of panicking")
+	}
+	msg := fmt.Sprintf(gotFormat, gotArgs...)
+	if !strings.Contains(msg, "CORS_ORIGINS") {
+		t.Errorf("expected the fatal message to name CORS_ORIGINS, got %q", msg)
+	}
+	if !strings.Contains(msg, "ftp://evil.example/list") {
+		t.Errorf("expected the fatal message to include the offending entry, got %q", msg)
+	}
+}
+
+func TestCORS_InvalidSchemelessEntryCallsFatalf(t *testing.T) {
+	orig := corsFatalf
+	defer func() { corsFatalf = orig }()
+	called := false
+	corsFatalf = func(format string, args ...interface{}) { called = true }
+
+	t.Setenv("CORS_ORIGINS", "a.lan:3000")
+	t.Setenv("CORS_ALLOW_SAME_HOST", "false")
+	_ = CORS()
+
+	if !called {
+		t.Fatal("expected corsFatalf to be called for a schemeless entry")
+	}
+}
+
+func TestCORS_ValidEntryDoesNotCallFatalf(t *testing.T) {
+	orig := corsFatalf
+	defer func() { corsFatalf = orig }()
+	corsFatalf = func(format string, args ...interface{}) {
+		t.Fatalf("corsFatalf must not be called for a valid CORS_ORIGINS value: "+format, args...)
+	}
+
+	t.Setenv("CORS_ORIGINS", "http://a.lan:3000, http://b.lan:3000")
+	t.Setenv("CORS_ALLOW_SAME_HOST", "false")
+	_ = CORS()
+}
+
+// --- L3: AllowCredentials must never be paired with a wildcard origin ---
+
+func TestCORS_WildcardDisablesAllowCredentials(t *testing.T) {
+	t.Setenv("CORS_ORIGINS", "*")
+	t.Setenv("CORS_ALLOW_SAME_HOST", "false")
+	r := buildCORSRouter()
+
+	rec := corsRequest(r, http.MethodGet, "http://anything.example", "192.168.1.53:8080")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "" {
+		t.Errorf("Access-Control-Allow-Credentials = %q, want unset when CORS_ORIGINS=*", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want *", got)
+	}
+}
+
+func TestCORS_ExplicitAllowlistStillSetsAllowCredentials(t *testing.T) {
+	t.Setenv("CORS_ORIGINS", "http://a.lan:3000")
+	t.Setenv("CORS_ALLOW_SAME_HOST", "false")
+	r := buildCORSRouter()
+
+	rec := corsRequest(r, http.MethodGet, "http://a.lan:3000", "192.168.1.53:8080")
+	if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
+		t.Errorf("Access-Control-Allow-Credentials = %q, want true for a non-wildcard allowlist", got)
+	}
+}
+
+// --- H1 (CORS_ALLOW_SAME_HOST slice): every falsy spelling must disable it,
+// not just the literal "false" ---
+
+func TestCORS_SameHostDisabledByOtherFalsySpellings(t *testing.T) {
+	for _, v := range []string{"0", "no", "off", "FALSE"} {
+		t.Run(v, func(t *testing.T) {
+			t.Setenv("CORS_ORIGINS", "")
+			t.Setenv("CORS_ALLOW_SAME_HOST", v)
+			r := buildCORSRouter()
+
+			rec := corsRequest(r, http.MethodGet, "http://192.168.1.53:3000", "192.168.1.53:8080")
+			if rec.Code != http.StatusForbidden {
+				t.Errorf("CORS_ALLOW_SAME_HOST=%q: got %d, want 403 (same-host rule disabled)", v, rec.Code)
+			}
+		})
+	}
+}
+
+func TestCORS_SameHostInvalidValueCallsConfigFatalFunc(t *testing.T) {
+	orig := config.FatalFunc
+	defer func() { config.FatalFunc = orig }()
+	called := false
+	config.FatalFunc = func(format string, args ...interface{}) { called = true }
+
+	t.Setenv("CORS_ORIGINS", "")
+	t.Setenv("CORS_ALLOW_SAME_HOST", "definitely-not-a-bool")
+	_ = CORS()
+
+	if !called {
+		t.Fatal("expected an unrecognized CORS_ALLOW_SAME_HOST value to call config.FatalFunc")
 	}
 }
 

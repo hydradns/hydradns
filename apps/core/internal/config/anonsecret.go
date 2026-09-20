@@ -60,11 +60,14 @@ func ResolveAnonymizationSecret(cfgValue, dataDir string) string {
 	if err != nil {
 		fallback, genErr := generateSecretHex()
 		if genErr != nil {
-			// crypto/rand failure is effectively fatal for anything else
-			// that needs randomness too; a fixed marker here at least
-			// avoids a panic on the hot path.
-			logger.Log.Errorf("anonymization: failed to generate a fallback secret: %v", genErr)
-			return "unavailable-anon-secret"
+			// crypto/rand is broken — every install would otherwise share
+			// the same hardcoded "unavailable-anon-secret" HMAC key,
+			// which defeats anonymization for all of them at once (L6 in
+			// the launch-prep review). crypto/rand failure is effectively
+			// fatal for anything else that needs randomness too, so fail
+			// closed here rather than silently handing out a known key.
+			FatalFunc("anonymization: failed to generate a secret (crypto/rand: %v) — refusing to start with HYDRA_ANONYMIZE_CLIENT_IPS enabled rather than use a shared fallback key", genErr)
+			return "" // unreachable when FatalFunc actually exits; keeps a test-overridden FatalFunc from continuing with a bogus secret
 		}
 		logger.Log.Warnf("anonymization: could not persist secret under %s (%v); using an in-memory secret for this run — hashed client IPs will change on every restart", dataDir, err)
 		return fallback

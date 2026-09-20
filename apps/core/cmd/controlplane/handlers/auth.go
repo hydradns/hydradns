@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -107,9 +106,11 @@ func (h *APIHandler) Setup(c *gin.Context) {
 	// Create blocklist sources if provided
 	var warnings []string
 	for _, bl := range req.Blocklists {
-		// Validate URL scheme to prevent SSRF
-		if !strings.HasPrefix(bl.URL, "http://") && !strings.HasPrefix(bl.URL, "https://") {
-			warnings = append(warnings, "skipped "+bl.Name+": URL must use http:// or https://")
+		// Same scheme check CreateBlocklist and UpdateBlocklist use (see
+		// validateBlocklistURL in blocklists.go) — one validator for every
+		// write path that accepts an operator-supplied blocklist URL.
+		if err := validateBlocklistURL(bl.URL); err != nil {
+			warnings = append(warnings, "skipped "+bl.Name+": "+err.Error())
 			continue
 		}
 		if bl.Format == "" {
