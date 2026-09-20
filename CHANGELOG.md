@@ -78,6 +78,15 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from v0.1.0
   proxy, or an API on a different host/port than the dashboard.
 
 ### Fixed
+- `hydra update` could never find an update once the CLI moved into this monorepo: its
+  release feed still pointed at `hydradns/hydra-cli`, an archived standalone repo that no
+  longer receives releases. It now points at `hydradns/hydradns`, where `release.yml`'s
+  `release-cli` job actually publishes the CLI binaries. Fixing the feed alone was not
+  enough, since `hydra update` also refuses to install a binary it cannot verify against a
+  published SHA-256 checksum, and `release.yml` built and attached the binaries without ever
+  publishing one, so every self-update would still have failed at the verification step. A
+  new `release-cli-checksums` job now runs after `release-cli`, downloads the tag's CLI
+  binaries, generates `checksums.txt`, and uploads it to the same release.
 - `docker-compose.yml` shipped `CORS_ORIGINS=*` for the `core` service,
   which — combined with the control plane's `AllowCredentials: true` —
   disabled CORS protection on the API entirely. Default is now
