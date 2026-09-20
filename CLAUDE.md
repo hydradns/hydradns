@@ -245,7 +245,7 @@ The dataplane listens on container port **1053**. The base compose maps it to ho
 ```
 curl http://localhost:8080/health                               # controlplane
 dig @127.0.0.1 -p 5353 example.com                              # host-side, WSL-safe
-docker exec hydradns-core-1 dig @127.0.0.1 -p 1053 example.com  # ground truth (always works)
+docker run --rm --network container:hydradns-core-1 alpine:3.20 sh -c 'apk add -q bind-tools && dig @127.0.0.1 -p 1053 example.com'  # ground truth; the core image ships no dig
 ```
 
 `BLOCK_RESPONSE` env var controls how the dataplane answers a blocked query: `zero` (default; A/AAAA → 0.0.0.0/::), `nxdomain`, or `refused`. See `respondBlocked` in `apps/core/internal/dnsengine/engine.go`.
