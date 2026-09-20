@@ -92,7 +92,7 @@ Then, in order, with early exit:
    Google, Quad9, etc. — `internal/dnsengine/doh_bootstrap.go`) always get NXDOMAIN,
    regardless of `BLOCK_RESPONSE`, so the browser falls back to system DNS. Invisible to the
    dashboard, not user-editable.
-1. **Blocklist check** — in-memory membership test (`internal/blocklist/memory.go`, `MemoryChecker`: atomic `map[string]struct{}` of all blocked domains + parent-domain walk). Reloaded on the 6h refresh; the DNS hot path never hits the DB. If blocked → respond per `BLOCK_RESPONSE`. (Historical note: this check used to run a per-query SQL `COUNT`, which capped throughput at ~500 QPS — see `docs/internal/stress-test-plan.md` T1.)
+1. **Blocklist check** — in-memory membership test (`internal/blocklist/memory.go`, `MemoryChecker`: atomic `map[string]struct{}` of all blocked domains + parent-domain walk). Built from enabled sources only and rebuilt when the dataplane's blocklist signature poll sees a change (`BLOCKLIST_POLL_INTERVAL`, default 5s) or after a source refresh; the DNS hot path never hits the DB. If blocked → respond per `BLOCK_RESPONSE`. (Historical note: this check used to run a per-query SQL `COUNT`, which capped throughput at ~500 QPS — see `docs/internal/stress-test-plan.md` T1.)
 2. **Policy evaluation** — Bloom filter for fast O(1) negative lookup, then exact domain match against `PolicySnapshot` (atomic rebuild on change). Multiple matches resolved by priority, then lexicographic ID
 3. **Response cache** — TTL-respecting LRU (20k entries, `internal/dnsengine/cache.go`); only allowed queries are cached, never blocked/redirect responses
 4. **Upstream forward** — pool-per-resolver with failover across all configured upstreams (1.5s per-attempt timeout, 2 retries each)
@@ -165,7 +165,8 @@ expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/
 | `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated allowed CORS origins (`cmd/controlplane/middlewares/cors.go`). The shipped `docker-compose.yml` sets `http://localhost:3000`. `*` still works but logs a warning |
 | `CORS_ALLOW_SAME_HOST` | `true` | Also allow an Origin whose hostname equals the request's Host hostname when that hostname is an IP literal or `localhost` (dashboard opened by LAN IP). Named hosts need a `CORS_ORIGINS` entry. Set `false` to disable |
 | `DNS_LISTEN_ADDR` | (from config, normally `0.0.0.0:1053`) | Override DNS listen address |
-| `BLOCKLIST_UPDATE_INTERVAL` | `6h` | Blocklist refresh interval |
+| `BLOCKLIST_UPDATE_INTERVAL` | `6h` | How often blocklist sources are re-downloaded |
+| `BLOCKLIST_POLL_INTERVAL` | `5s` | How often the dataplane checks the DB for blocklist changes (add, toggle, delete, finished download) and rebuilds the in-memory set; `0` disables |
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
 | `HYDRA_TOKEN` | (none) | CLI/MCP bearer token; if unset the CLI also tries `~/.hydra/token` (`apps/cli/cmd/root.go`) |
 | `HYDRA_MCP_TOKEN` | (none) | Bearer token required by `hydra mcp --http` (or use `--http-token`) |
@@ -234,11 +235,11 @@ split — everything below is main, checked at the branch point in this worktree
 - `/dns/resolvers` — reads real upstream resolvers from `config.DefaultConfig`, but is
   read-only; no CRUD (`apps/core/cmd/controlplane/handlers/dns.go`, `ListResolvers`)
 - Scanner only detects the system resolver via `/etc/resolv.conf` and runs a basic UDP resolution check
-- Blocklist changes reach the DNS hot path slowly — policy edits (`PUT /policies/:id`) are live
-  within 5s via the dataplane's policy poll, but blocklist create/edit/toggle
-  (`PATCH /blocklists/:id`) only rebuild the in-memory blocklist on the periodic refresh
-  (`BLOCKLIST_UPDATE_INTERVAL`, default 6h) or a dataplane restart. Editing a blocklist URL does
-  not purge entries fetched from the old URL
+- Blocklist URL edits — policy edits and blocklist create/toggle/delete are live within about 5s
+  (policy poll; blocklist signature poll, `BLOCKLIST_POLL_INTERVAL`, `cmd/dataplane/blocklist_reload.go`),
+  but editing a blocklist URL does not purge entries fetched from the old URL. A long rebuild
+  read holds the dataplane's single SQLite connection (`MaxOpenConns=1`), so query-log writes
+  queue behind it
 - Resolver CRUD — the dashboard client has create/update/delete calls for `/dns/resolvers` but
   the control plane only serves `GET`; those calls 404
 - Dashboard recent-activity feed — `GetAnalyticsSummary` returns the newest 100 rows unpaginated;
