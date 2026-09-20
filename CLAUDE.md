@@ -234,10 +234,17 @@ split — everything below is main, checked at the branch point in this worktree
 - `/dns/resolvers` — reads real upstream resolvers from `config.DefaultConfig`, but is
   read-only; no CRUD (`apps/core/cmd/controlplane/handlers/dns.go`, `ListResolvers`)
 - Scanner only detects the system resolver via `/etc/resolv.conf` and runs a basic UDP resolution check
-- Policy / blocklist edit — API supports create + delete only; no `PUT`/`PATCH` route exists
-  for either resource (`apps/core/cmd/controlplane/routes/router.go`)
-- Query log pagination — `GetAnalyticsSummary` hard-caps at 100 rows via `ListRecent(100)`
-  (`apps/core/cmd/controlplane/handlers/analytics.go`), no paging UI
+- Blocklist changes reach the DNS hot path slowly — policy edits (`PUT /policies/:id`) are live
+  within 5s via the dataplane's policy poll, but blocklist create/edit/toggle
+  (`PATCH /blocklists/:id`) only rebuild the in-memory blocklist on the periodic refresh
+  (`BLOCKLIST_UPDATE_INTERVAL`, default 6h) or a dataplane restart. Editing a blocklist URL does
+  not purge entries fetched from the old URL
+- Resolver CRUD — the dashboard client has create/update/delete calls for `/dns/resolvers` but
+  the control plane only serves `GET`; those calls 404
+- Dashboard recent-activity feed — `GetAnalyticsSummary` returns the newest 100 rows unpaginated;
+  the Logs page uses `GET /analytics/logs` with server-side paging and filters
+- Bypass attempts — `GET /analytics/bypass` reports every attempt as protocol `doh`; the dataplane
+  sees only the bootstrap hostname lookup and cannot tell DoH from DoT or DoQ
 - Settings page — dashboard page exists (`apps/ui/app/dashboard/settings/page.tsx`) and calls
   `getSettings`/`updateSettings`, but there is no `/settings` route or handler anywhere on
   the control plane — backend wiring is still absent
