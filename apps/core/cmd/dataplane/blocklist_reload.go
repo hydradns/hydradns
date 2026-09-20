@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hydradns/hydra-core/internal/blocklist"
-	"github.com/hydradns/hydra-core/internal/logger"
-	"github.com/hydradns/hydra-core/internal/storage/repositories"
+	"github.com/hydradns/hydradns/apps/core/internal/blocklist"
+	"github.com/hydradns/hydradns/apps/core/internal/logger"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/repositories"
 )
 
 // blocklistSource is the subset of *blocklist.Engine the reloader needs.

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hydradns/hydra-core/internal/blocklist"
-	"github.com/hydradns/hydra-core/internal/storage/models"
-	"github.com/hydradns/hydra-core/internal/storage/repositories"
+	"github.com/hydradns/hydradns/apps/core/internal/blocklist"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/models"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/repositories"
 )
 
 // fakeBlocklistRepo is a minimal repositories.BlocklistRepository stub for

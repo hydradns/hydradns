@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hydradns/hydra-core/internal/logger"
-	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydradns/apps/core/internal/logger"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/models"
 	"gorm.io/gorm"
 )
 

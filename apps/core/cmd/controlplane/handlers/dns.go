@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hydradns/hydra-core/internal/config"
+	"github.com/hydradns/hydradns/apps/core/internal/config"
 )
 
 // DnsEngineStatusData represents DNS engine status

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hydradns/scanner/internal/checks"
-	"github.com/hydradns/scanner/internal/detection"
+	"github.com/hydradns/hydradns/apps/scanner/internal/checks"
+	"github.com/hydradns/hydradns/apps/scanner/internal/detection"
 )
 
 type ScannerResult struct {

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/hydradns/hydra-core/internal/blocklist/parser"
+	"github.com/hydradns/hydradns/apps/core/internal/blocklist/parser"
 )
 
 // maxBlocklistBytes caps a single blocklist download. The largest public

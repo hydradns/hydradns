@@ -11,6 +11,12 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from v0.1.0
   `golang:1.25-alpine`.
 - Dependency updates: `miekg/dns` 1.1.73, `gin` 1.12.0, `gorm` 1.31.2, `logrus` 1.10.2; dashboard
   `@radix-ui/react-tabs` 1.1.21, `react-popover` 1.1.23, `react-tooltip` 1.2.16, `@testing-library/jest-dom` 7.0.1.
+- The three Go modules now declare paths under this repository: `github.com/hydradns/hydradns/apps/core`,
+  `github.com/hydradns/hydradns/apps/cli` and `github.com/hydradns/hydradns/apps/scanner` (they used the
+  archived per-service repository paths). `go install github.com/hydradns/hydradns/apps/cli@latest`
+  works once a release is tagged after this change, and pkg.go.dev can index the modules. Docker
+  users are unaffected. Installing a specific version with `go install` needs a tag prefixed with
+  the module directory, for example `apps/cli/v0.2.0`; see `docs/releasing.md`.
 
 ## [0.1.0] - 2026-09-20
 

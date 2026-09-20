@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/models"
 	"gorm.io/gorm"
 )
 

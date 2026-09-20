@@ -11,16 +11,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hydradns/hydra-core/internal/blocklist"
-	"github.com/hydradns/hydra-core/internal/config"
-	"github.com/hydradns/hydra-core/internal/dnsengine"
-	dataplanegrpc "github.com/hydradns/hydra-core/internal/grpc/dataplane"
-	"github.com/hydradns/hydra-core/internal/logger"
-	"github.com/hydradns/hydra-core/internal/policy"
-	"github.com/hydradns/hydra-core/internal/storage/db"
-	"github.com/hydradns/hydra-core/internal/storage/models"
-	"github.com/hydradns/hydra-core/internal/storage/repositories"
-	"github.com/hydradns/hydra-core/internal/utils"
+	"github.com/hydradns/hydradns/apps/core/internal/blocklist"
+	"github.com/hydradns/hydradns/apps/core/internal/config"
+	"github.com/hydradns/hydradns/apps/core/internal/dnsengine"
+	dataplanegrpc "github.com/hydradns/hydradns/apps/core/internal/grpc/dataplane"
+	"github.com/hydradns/hydradns/apps/core/internal/logger"
+	"github.com/hydradns/hydradns/apps/core/internal/policy"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/db"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/models"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/repositories"
+	"github.com/hydradns/hydradns/apps/core/internal/utils"
 )
 
 func main() {

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hydradns/hydra-core/internal/logger"
+	"github.com/hydradns/hydradns/apps/core/internal/logger"
 	"github.com/miekg/dns"
 )
 

@@ -4,8 +4,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/hydradns/hydra-core/internal/metrics"
-	"github.com/hydradns/hydra-core/internal/policy"
+	"github.com/hydradns/hydradns/apps/core/internal/metrics"
+	"github.com/hydradns/hydradns/apps/core/internal/policy"
 	"github.com/miekg/dns"
 )
 

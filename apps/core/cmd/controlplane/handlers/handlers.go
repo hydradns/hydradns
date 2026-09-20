@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"github.com/hydradns/hydra-core/cmd/controlplane/audit"
-	"github.com/hydradns/hydra-core/internal/blocklist"
-	client "github.com/hydradns/hydra-core/internal/grpc/controlplane"
-	"github.com/hydradns/hydra-core/internal/storage/repositories"
+	"github.com/hydradns/hydradns/apps/core/cmd/controlplane/audit"
+	"github.com/hydradns/hydradns/apps/core/internal/blocklist"
+	client "github.com/hydradns/hydradns/apps/core/internal/grpc/controlplane"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/repositories"
 )
 
 // APIHandler contains dependencies for API endpoints

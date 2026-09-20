@@ -4,9 +4,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hydradns/hydra-core/cmd/controlplane/handlers"
-	"github.com/hydradns/hydra-core/cmd/controlplane/middlewares"
-	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydradns/apps/core/cmd/controlplane/handlers"
+	"github.com/hydradns/hydradns/apps/core/cmd/controlplane/middlewares"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/models"
 )
 
 // loginRateLimit bounds POST /auth/login and /auth/setup: 10 attempts per

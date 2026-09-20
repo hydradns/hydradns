@@ -1,4 +1,4 @@
-module github.com/hydradns/scanner
+module github.com/hydradns/hydradns/apps/scanner
 
 go 1.25.4
 

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/hydradns/scanner/internal/scanner"
 	"github.com/gin-gonic/gin"
+	"github.com/hydradns/hydradns/apps/scanner/internal/scanner"
 )
 
 func main() {
