@@ -1,5 +1,5 @@
 # Combined controlplane + dataplane Dockerfile (multi-arch)
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 ARG TARGETARCH
 ARG TARGETOS=linux
 WORKDIR /app
