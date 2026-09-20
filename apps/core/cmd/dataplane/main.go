@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/hydradns/hydra-core/internal/blocklist"
@@ -65,11 +67,21 @@ func main() {
 	memBlocklist := blocklist.NewMemoryChecker()
 	blReloader := newBlocklistReloader(blEngine, memBlocklist)
 
+	// BLOCKLIST_POLL_INTERVAL is resolved up front: it drives both the fast
+	// signature-poll loop below and the initial load's retry cadence.
+	blocklistPollInterval := envDuration("BLOCKLIST_POLL_INTERVAL", 5*time.Second)
+
 	// Initial load in background so DNS starts immediately. This is a
 	// cheap DB-only signature check + rebuild (no network fetch), so it
 	// completes fast even if refreshSources' first pass (below) is still
 	// fetching remote sources.
-	go blReloader.Poll()
+	//
+	// C1 fix: runInitialBlocklistLoad retries until it actually succeeds,
+	// rather than a single fire-and-forget Poll() call — a single transient
+	// DB error here (e.g. "database is locked" while the control plane's
+	// AutoMigrate runs concurrently against the same SQLite file) used to
+	// leave the in-memory blocklist empty for the life of the process.
+	go runInitialBlocklistLoad(blReloader, blocklistPollInterval)
 
 	// Periodic re-fetch of each enabled source's remote content.
 	interval, err := time.ParseDuration(config.DefaultConfig.DataPlane.BlocklistUpdateInterval)
@@ -96,12 +108,27 @@ func main() {
 	// refreshSources loop above. BLOCKLIST_POLL_INTERVAL, default 5s; 0
 	// disables it (propagation then only happens via the initial load and
 	// refreshSources passes above — the pre-existing ~6h/restart bound).
-	blocklistPollInterval := envDuration("BLOCKLIST_POLL_INTERVAL", 5*time.Second)
+	var stopBlocklistPoll func()
 	if blocklistPollInterval > 0 {
-		startBlocklistPoll(blReloader, blocklistPollInterval)
+		stopBlocklistPoll = startBlocklistPoll(blReloader, blocklistPollInterval)
 	} else {
 		logger.Log.Info("blocklist signature poll disabled (BLOCKLIST_POLL_INTERVAL=0); blocklist changes only propagate via BLOCKLIST_UPDATE_INTERVAL or restart")
+		stopBlocklistPoll = func() {}
 	}
+
+	// Wire the blocklist poll loop's stop func into shutdown (previously
+	// discarded — see L4 in the review) rather than leaking the background
+	// goroutine's handle. There's no broader graceful-shutdown sequence in
+	// this binary today (srv.Run() below blocks for the process lifetime),
+	// so this only stops the poll loop cleanly on SIGINT/SIGTERM before the
+	// process exits; it does not attempt to drain in-flight DNS queries.
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+		<-sigCh
+		logger.Log.Info("shutdown signal received: stopping blocklist poll loop")
+		stopBlocklistPoll()
+	}()
 
 	// 4. Initialize Policy Engine — load from file + DB
 	policyEngine := policy.NewPolicyEngine()
@@ -158,13 +185,23 @@ func main() {
 
 // refreshSources re-fetches each enabled source's remote content into the
 // DB (new BlocklistSnapshot + BlocklistEntry rows on a change; a no-op on
-// ETag match). It does not touch the in-memory blocklist set directly —
-// the trailing reloader.Poll() call lets the single-flighted
-// blocklistReloader pick up any resulting DB change (new snapshot, bumped
-// source UpdatedAt) and rebuild memBlocklist, the same path the fast
-// signature-poll ticker uses. Keeping exactly one rebuild path avoids two
-// goroutines racing to call MemoryChecker.Reload concurrently.
+// ETag match). It does not touch the in-memory blocklist set directly — the
+// deferred reloader.ForceRebuild() call lets the single-flighted
+// blocklistReloader pick up any resulting DB change and rebuild
+// memBlocklist, the same path the fast signature-poll ticker uses. Keeping
+// exactly one rebuild path avoids two goroutines racing to call
+// MemoryChecker.Reload concurrently.
+//
+// ForceRebuild (not Poll) is deferred deliberately (M12 in the review,
+// restoring a safety net the signature-based poll loop had removed): this
+// runs on a 6h cadence, so an unconditional rebuild is cheap relative to
+// that, and it's what lets the in-memory set self-heal from any future bug
+// that desyncs it from the DB without a matching signature change. It's a
+// defer so every return path below — including "no sources configured" and
+// the ListSources() error path — still forces the rebuild.
 func refreshSources(ctx context.Context, engine *blocklist.Engine, reloader *blocklistReloader) {
+	defer reloader.ForceRebuild()
+
 	sources, err := engine.ListSources()
 	if err != nil {
 		logger.Log.Errorf("Failed to list blocklist sources: %v", err)
@@ -182,7 +219,6 @@ func refreshSources(ctx context.Context, engine *blocklist.Engine, reloader *blo
 			logger.Log.Errorf("Blocklist update failed for %s: %v", src.Name, err)
 		}
 	}
-	reloader.Poll()
 }
 
 // startQueryLogRetention runs a background loop that bounds the query log

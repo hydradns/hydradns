@@ -37,40 +37,84 @@ type blocklistSource interface {
 // after it finishes, not N. The rebuild itself always runs in its own
 // goroutine so Poll never blocks its caller on a potentially multi-second
 // full-entry-table read.
+//
+// Failure handling (C1 fix): lastSig/haveSig are only advanced *after*
+// mem.Reload() has succeeded for the signature that triggered the rebuild.
+// A List() error leaves them exactly as they were — never a populated set
+// silently replaced by an empty one, and the next Poll() (whether from the
+// signature-poll ticker or the 6h refresh pass) sees the same "changed"
+// condition and retries. The poll interval (default 5s) is the retry
+// cadence; there is no separate backoff timer for the periodic path, so a
+// persistent error costs one List() call per poll tick, not a hot loop.
 type blocklistReloader struct {
 	engine blocklistSource
 	mem    *blocklist.MemoryChecker
 
-	mu         sync.Mutex
-	lastSig    repositories.BlocklistSignature
+	mu      sync.Mutex
+	lastSig repositories.BlocklistSignature
+	// haveSig is true only once a rebuild has actually *succeeded* for
+	// lastSig. This is the crux of the C1 fix: the old code set this (and
+	// lastSig) before the rebuild it triggered had run, so a failed
+	// rebuild was indistinguishable from a successful one to every later
+	// Poll() call.
 	haveSig    bool
 	rebuilding bool
 	pending    bool
+	// pendingSig is the most recently observed signature that still needs
+	// a rebuild attempt — set by whichever of Poll/ForceRebuild most
+	// recently triggered or coalesced into the in-flight rebuild. The
+	// rebuild goroutine reads it at the start of each pass.
+	pendingSig repositories.BlocklistSignature
+	// consecutiveFailures rate-limits error logging: only the first
+	// failure in a streak logs an ERROR line, and a subsequent success
+	// after a streak logs one recovery line. Without this, a persistent
+	// outage would emit one ERROR per poll tick forever.
+	consecutiveFailures int
 }
 
 func newBlocklistReloader(engine blocklistSource, mem *blocklist.MemoryChecker) *blocklistReloader {
 	return &blocklistReloader{engine: engine, mem: mem}
 }
 
-// Poll computes the current blocklist signature and, if it differs from
-// the last one this reloader observed, ensures a rebuild happens (now, or
-// immediately after the in-flight one if a rebuild is already running).
-// It never blocks waiting for the rebuild itself.
+// Poll computes the current blocklist signature and, if it differs from the
+// last one this reloader successfully rebuilt from, ensures a rebuild
+// happens (now, or immediately after the in-flight one if a rebuild is
+// already running). It never blocks waiting for the rebuild itself.
 func (r *blocklistReloader) Poll() {
+	r.poll(false)
+}
+
+// ForceRebuild triggers a rebuild unconditionally, ignoring the signature
+// comparison. This is the safety net the 6h refreshSources pass uses (see
+// main.go): cheap relative to a 6h cadence, and it lets the in-memory set
+// self-heal from any bug that might otherwise desynchronize it from the DB
+// without a matching signature change. Still funnels through the same
+// single-flight/coalescing machinery as Poll, so it never races a
+// concurrently-running rebuild.
+func (r *blocklistReloader) ForceRebuild() {
+	r.poll(true)
+}
+
+func (r *blocklistReloader) poll(force bool) {
 	sig, err := r.engine.Signature()
 	if err != nil {
 		logger.Log.Errorf("blocklist signature check failed: %v", err)
-		return
+		if !force {
+			return
+		}
+		// A forced rebuild's whole point is to resync independent of the
+		// signature check, so still attempt it even without a fresh
+		// signature — worst case it reuses the zero value, which only
+		// risks a spurious "unchanged" skip on some future Poll(), not a
+		// missed or empty rebuild now.
 	}
 
 	r.mu.Lock()
-	if r.haveSig && sig == r.lastSig {
+	if !force && r.haveSig && sig == r.lastSig {
 		r.mu.Unlock()
 		return
 	}
-	r.lastSig = sig
-	r.haveSig = true
-
+	r.pendingSig = sig
 	if r.rebuilding {
 		// A rebuild is already running and started reading the DB before
 		// this change landed, so it won't reflect it. Flag exactly one
@@ -88,10 +132,14 @@ func (r *blocklistReloader) Poll() {
 // runRebuild drives rebuildOnce, looping exactly once more if a change was
 // coalesced in while it was running, then exiting. Only one goroutine can
 // be inside this function at a time (guarded by the rebuilding flag in
-// Poll), so rebuildOnce itself never runs concurrently with itself.
+// poll), so rebuildOnce itself never runs concurrently with itself.
 func (r *blocklistReloader) runRebuild() {
 	for {
-		r.rebuildOnce()
+		r.mu.Lock()
+		sig := r.pendingSig
+		r.mu.Unlock()
+
+		r.rebuildOnce(sig)
 
 		r.mu.Lock()
 		if r.pending {
@@ -105,26 +153,101 @@ func (r *blocklistReloader) runRebuild() {
 	}
 }
 
-func (r *blocklistReloader) rebuildOnce() {
+// rebuildOnce attempts one List()+MemoryChecker.Reload() pass. On success,
+// sig becomes the new lastSig/haveSig — committed only now, never before
+// the rebuild it describes has actually landed in mem (the C1 fix). On
+// failure, mem is left untouched (never swapped for an empty set) and
+// lastSig/haveSig are left exactly as they were, so the condition that
+// causes the next Poll()/ForceRebuild() to trigger a rebuild is unchanged
+// and it will retry.
+func (r *blocklistReloader) rebuildOnce(sig repositories.BlocklistSignature) {
 	start := time.Now()
 	domains, err := r.engine.List()
 	if err != nil {
-		logger.Log.Errorf("failed to load blocklist domains into memory: %v", err)
+		r.mu.Lock()
+		r.consecutiveFailures++
+		streak := r.consecutiveFailures
+		r.mu.Unlock()
+		if streak == 1 {
+			logger.Log.Errorf("failed to load blocklist domains into memory (will retry on next poll): %v", err)
+		}
 		return
 	}
+
 	r.mem.Reload(domains)
-	logger.Log.Infof("blocklist rebuild complete: %d domains in %s", len(domains), time.Since(start))
+
+	r.mu.Lock()
+	recovered := r.consecutiveFailures > 0
+	r.consecutiveFailures = 0
+	r.lastSig = sig
+	r.haveSig = true
+	r.mu.Unlock()
+
+	if recovered {
+		logger.Log.Infof("blocklist rebuild recovered after prior failures: %d domains in %s", len(domains), time.Since(start))
+	} else {
+		logger.Log.Infof("blocklist rebuild complete: %d domains in %s", len(domains), time.Since(start))
+	}
+}
+
+// loaded reports whether a rebuild has ever succeeded. Used by
+// runInitialBlocklistLoad to decide whether to keep retrying.
+func (r *blocklistReloader) loaded() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.haveSig
+}
+
+// pollAndWait triggers Poll() and blocks (busy-polling, this is only ever
+// called from the dedicated startup-retry goroutine, never the DNS hot
+// path) until that rebuild attempt — including any pass coalesced in while
+// it ran — has settled, then reports whether the reloader is loaded.
+func (r *blocklistReloader) pollAndWait() bool {
+	r.Poll()
+	for {
+		r.mu.Lock()
+		rebuilding := r.rebuilding
+		have := r.haveSig
+		r.mu.Unlock()
+		if !rebuilding {
+			return have
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+}
+
+// runInitialBlocklistLoad blocks until the reloader has successfully loaded
+// the blocklist at least once, retrying on failure (C1 fix: previously the
+// startup load was a single fire-and-forget `go reloader.Poll()`, so one
+// transient error — e.g. "database is locked" while the control plane's
+// AutoMigrate runs concurrently against the same SQLite file — left the
+// in-memory blocklist permanently empty). Meant to be run in its own
+// goroutine so it doesn't delay the DNS server starting up. backoff is the
+// delay between attempts; <= 0 falls back to a sensible default so the
+// initial load still retries even when the periodic signature poll is
+// disabled via BLOCKLIST_POLL_INTERVAL=0.
+func runInitialBlocklistLoad(r *blocklistReloader, backoff time.Duration) {
+	if backoff <= 0 {
+		backoff = 5 * time.Second
+	}
+	for {
+		if r.pollAndWait() {
+			return
+		}
+		time.Sleep(backoff)
+	}
 }
 
 // startBlocklistPoll runs reloader.Poll() every interval in the
 // background. interval <= 0 disables the loop entirely: propagation of
 // CRUD changes then falls back to whatever else calls Poll() (the
-// post-fetch call in the network-refresh loop, and the one-time initial
-// call at startup), matching the pre-existing bound.
+// post-fetch call in the network-refresh loop, and the initial load
+// retried by runInitialBlocklistLoad at startup), matching the
+// pre-existing bound.
 //
-// Returns a stop func; production callers can ignore it (the loop is
-// meant to run for the life of the process, like every other dataplane
-// background loop). Tests use it to shut the goroutine down cleanly.
+// Returns a stop func. Production callers must wire this into shutdown
+// (see main.go) rather than discard it, since it's the only handle on the
+// background goroutine; tests use it the same way to shut it down cleanly.
 func startBlocklistPoll(reloader *blocklistReloader, interval time.Duration) (stop func()) {
 	if interval <= 0 {
 		return func() {}

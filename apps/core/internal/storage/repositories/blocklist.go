@@ -3,12 +3,37 @@ package repositories
 
 import (
 	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/hydradns/hydra-core/internal/storage/models"
 	"gorm.io/gorm"
 )
+
+// entryInsertBatchSize bounds how many BlocklistEntry rows go into a single
+// INSERT statement. BlocklistEntry has 6 columns, so 500 rows/batch is
+// 3,000 bound parameters — comfortably under the pure-Go SQLite driver's
+// variable limit (empirically confirmed: a 6,000-row single-shot INSERT
+// with this schema fails with "too many SQL variables"; 500-row batches do
+// not). This also keeps each individual statement — and therefore how long
+// any one step of the transaction runs — bounded regardless of how large a
+// blocklist source's entry count is (millions of rows on a full Pi
+// install).
+const entryInsertBatchSize = 500
+
+// snapshotRetentionPerSource caps how many BlocklistSnapshot *metadata* rows
+// (id/checksum/size/created_at — entries are handled separately, see below)
+// are kept per source, oldest pruned first. Entries always reflect only the
+// current snapshot (see SaveSnapshotWithEntries), so this cap is purely
+// about not growing the snapshots table without bound across years of
+// refreshes while still keeping enough history to see a source's recent
+// ingest activity (size/checksum churn) on the dashboard. 10 was chosen as
+// a simple, generous round number: at the default 6h refresh interval
+// that's 2.5 days of history, or weeks of history for a source that rarely
+// changes content (a no-op/unchanged fetch does not consume a slot — see
+// the checksum short-circuit below).
+const snapshotRetentionPerSource = 10
 
 // Interface (clean, mockable)
 type BlocklistRepository interface {
@@ -124,32 +149,114 @@ func (r *BlocklistRepo) GetAllEnabled() ([]string, error) {
 	return domains, nil
 }
 
+// SaveSnapshotWithEntries persists a freshly-fetched blocklist snapshot and
+// makes it the source's *entire* current entry set (H3 fix): a source's
+// blocklist_entries rows are always exactly its latest snapshot's contents,
+// never the union of every snapshot ever ingested. Concretely, inside one
+// transaction: skip entirely if the content is unchanged since the last
+// successful ingest (checksum match against src.LastHash — this is the
+// belt-and-suspenders path for a server that doesn't support conditional
+// GET; the normal 304/ETag-match case never calls this method at all, see
+// blocklist.Engine.UpdateSource); otherwise create the new snapshot row,
+// delete every prior entry for this source, batch-insert the new entries
+// under the new snapshot, stamp the source's UpdatedAt + LastHash, and
+// prune old snapshot metadata rows down to snapshotRetentionPerSource.
+//
+// Snapshot isolation: readers (the dataplane's GetAllEnabled, run from a
+// separate process/connection over WAL) either see the fully-committed
+// pre-transaction state (all old entries) or the fully-committed
+// post-transaction state (all new entries) — SQLite's WAL mode gives every
+// read its own consistent snapshot as of when it started, so a reader can
+// never observe the DELETE without the following INSERT (a "half-replaced"
+// source). This holds regardless of whether the in-memory rebuild happens
+// to run concurrently with this transaction or strictly after it commits.
 func (r *BlocklistRepo) SaveSnapshotWithEntries(src models.BlocklistSource, checksum string, entries []models.BlocklistEntry) (models.BlocklistSnapshot, error) {
+	if src.LastHash != "" && src.LastHash == checksum {
+		var existing models.BlocklistSnapshot
+		err := r.db.Where("source_id = ?", src.ID).Order("id desc").First(&existing).Error
+		if err == nil {
+			return existing, nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return existing, err
+		}
+		// LastHash was set but no snapshot row exists (shouldn't normally
+		// happen — LastHash is only ever set alongside a snapshot below).
+		// Fall through and ingest normally rather than erroring.
+	}
+
 	tx := r.db.Begin()
+	if tx.Error != nil {
+		return models.BlocklistSnapshot{}, tx.Error
+	}
+	now := time.Now()
 	snapshot := models.BlocklistSnapshot{
-		SourceID: src.ID, CreatedAt: time.Now(), Size: len(entries), Checksum: checksum,
+		SourceID: src.ID, CreatedAt: now, Size: len(entries), Checksum: checksum,
 	}
 	if err := tx.Create(&snapshot).Error; err != nil {
 		tx.Rollback()
 		return snapshot, err
 	}
+
+	// Replace the source's entire entry set. A single DELETE ... WHERE
+	// source_id = ? is one bound parameter regardless of table size (not
+	// subject to the SQLite variable-count limit that batching guards
+	// against for the INSERT below), and with the source_id index (see the
+	// BlocklistEntry model) it's an index scan, not a full table scan.
+	if err := tx.Where("source_id = ?", src.ID).Delete(&models.BlocklistEntry{}).Error; err != nil {
+		tx.Rollback()
+		return snapshot, err
+	}
+
 	for i := range entries {
 		entries[i].SnapshotID = snapshot.ID
-		if err := tx.Create(&entries[i]).Error; err != nil {
+		entries[i].SourceID = src.ID
+	}
+	if len(entries) > 0 {
+		if err := tx.CreateInBatches(&entries, entryInsertBatchSize).Error; err != nil {
 			tx.Rollback()
 			return snapshot, err
 		}
 	}
+
 	// update source metadata
-	src.UpdatedAt = time.Now()
+	src.UpdatedAt = now
+	src.LastHash = checksum
 	if err := tx.Save(&src).Error; err != nil {
 		tx.Rollback()
 		return snapshot, err
 	}
+
+	if err := pruneOldSnapshots(tx, src.ID); err != nil {
+		tx.Rollback()
+		return snapshot, err
+	}
+
 	if err := tx.Commit().Error; err != nil {
 		return snapshot, err
 	}
 	return snapshot, nil
+}
+
+// pruneOldSnapshots deletes BlocklistSnapshot metadata rows for src beyond
+// the newest snapshotRetentionPerSource, keeping the table bounded. It only
+// ever touches snapshot metadata — blocklist_entries rows always belong to
+// whatever is currently the newest snapshot for a source (see
+// SaveSnapshotWithEntries above), so pruning older snapshot rows never
+// orphans a live entry.
+func pruneOldSnapshots(tx *gorm.DB, sourceID string) error {
+	var staleIDs []uint
+	if err := tx.Model(&models.BlocklistSnapshot{}).
+		Where("source_id = ?", sourceID).
+		Order("id desc").
+		Offset(snapshotRetentionPerSource).
+		Pluck("id", &staleIDs).Error; err != nil {
+		return err
+	}
+	if len(staleIDs) == 0 {
+		return nil
+	}
+	return tx.Where("id IN ?", staleIDs).Delete(&models.BlocklistSnapshot{}).Error
 }
 
 func (r *BlocklistRepo) ListSources() ([]models.BlocklistSource, error) {
@@ -241,6 +348,19 @@ func (r *BlocklistRepo) Signature() (BlocklistSignature, error) {
 		EnabledCount int64
 		MaxUpdatedAt sql.NullString
 	}
+	// MAX(updated_at) is a lexicographic (string) MAX, not a temporal one —
+	// SQLite has no native datetime type, and the driver round-trips
+	// time.Time as RFC3339-ish text. That is sufficient here because (a)
+	// this value is only ever compared with == against a prior snapshot of
+	// itself (see BlocklistSignature's doc comment), never ordered, and
+	// (b) every row is written by this process with time.Now() in UTC at
+	// nanosecond precision, so lexicographic and chronological order agree
+	// and same-second collisions do not happen. It would stop agreeing
+	// under a backwards clock step or if rows ever carried mixed UTC
+	// offsets — neither of which this single-writer, UTC-only appliance
+	// does today — and even then SourceCount/EnabledSourceCount/
+	// SnapshotCount/MaxSnapshotID usually still catch the change (see L8 in
+	// docs/internal/launch-kit/review/go-review.md).
 	var sAgg sourceAgg
 	if err := r.db.Model(&models.BlocklistSource{}).
 		Select("COUNT(*) AS count, COALESCE(SUM(CASE WHEN enabled THEN 1 ELSE 0 END), 0) AS enabled_count, MAX(updated_at) AS max_updated_at").

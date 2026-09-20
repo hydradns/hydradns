@@ -31,6 +31,18 @@ func NewMemoryChecker() *MemoryChecker {
 // Reload replaces the blocked-domain set atomically. Domains are
 // normalized (lowercased, trailing dot stripped) to match query-time
 // normalization.
+//
+// Memory note: the old map stays reachable (and readable by concurrent
+// IsBlocked calls) until the new one is fully built and swapped in, so peak
+// usage during a rebuild is roughly double the steady-state set size.
+// Measured (go1.24-ish, linux/amd64, 300k ~35-byte synthetic domains, see
+// TestMemoryChecker_ReloadMemoryFootprint): ~30 bytes/entry heap growth for
+// the map[string]struct{}. Extrapolated, a multi-million-domain aggregated
+// blocklist set is tens to ~100MB steady-state, so roughly double that
+// transiently during a rebuild — comfortably fine on a 1GB Pi for one set.
+// No redesign here; this is why Poll single-flights rebuilds
+// (cmd/dataplane/blocklist_reload.go) rather than ever running two
+// concurrently, which would make that peak worse under a change burst.
 func (m *MemoryChecker) Reload(domains []string) {
 	set := make(map[string]struct{}, len(domains))
 	for _, d := range domains {
