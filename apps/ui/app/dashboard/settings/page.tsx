@@ -13,7 +13,7 @@ import type { Settings } from "@/lib/types"
 import { Shield, Info } from "lucide-react"
 
 // There is no GET/PATCH /settings route on the control plane (see
-// lib/api.ts) — this page shows the intended shape of engine/caching/
+// lib/api.ts). This page shows the intended shape of engine/caching/
 // retention settings as a disabled preview rather than pretending changes
 // here would save. Values are illustrative defaults, not read from the
 // backend.
@@ -109,7 +109,7 @@ export default function SettingsPage() {
         <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
           <Info className="h-4 w-4 mt-0.5 shrink-0 text-[#00D4AA]" />
           <p>
-            Not available yet — the control plane doesn&apos;t have a settings API to read or
+            Not available yet. The control plane doesn&apos;t have a settings API to read or
             save these from the dashboard. The controls below preview the planned settings and
             are disabled.
           </p>

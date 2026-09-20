@@ -151,7 +151,7 @@ func isChecksumName(name string) bool {
 
 // DownloadVerified downloads the OS/Arch asset and its published checksum,
 // verifies the asset against that checksum, and returns the verified bytes. It
-// never touches the running binary — callers pass the result to Apply. A
+// never touches the running binary; callers pass the result to Apply. A
 // checksum mismatch (tampered or corrupt download) returns an error and no data.
 func (u *Updater) DownloadVerified(ctx context.Context, rel *Release) ([]byte, error) {
 	asset, err := u.SelectAsset(rel)

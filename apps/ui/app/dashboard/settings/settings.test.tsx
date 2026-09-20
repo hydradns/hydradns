@@ -5,10 +5,10 @@ import SettingsPage from "./page"
 import { SidebarProvider } from "@/components/ui/sidebar"
 
 // There is no GET/PATCH /settings route on the control plane (see
-// lib/api.ts), so the page no longer calls fetch at all — it renders a
-// disabled preview with a "not available yet" note instead of pretending
-// changes save. This test asserts both halves of that fix: no fetch call,
-// and controls that are visibly disabled.
+// lib/api.ts), so the page never calls fetch. It renders a disabled
+// preview with a "not available yet" note instead of pretending changes
+// save. This test asserts both: no fetch call, and controls that are
+// visibly disabled.
 function renderPage() {
   return render(
     <SidebarProvider>

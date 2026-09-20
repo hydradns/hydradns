@@ -164,12 +164,12 @@ export default function DashboardPage() {
     // gracefully so a missing endpoint never blanks the whole dashboard.
     getDnsMetrics().then(setMetrics).catch(() => {})
     getBlocklists().then(setBlocklists).catch(() => {})
-    // H8: only fetch bypass-attempt data (client IPs, targets, counts) when
-    // the panel that displays it is actually enabled. Otherwise this data
+    // Only fetch bypass-attempt data (client IPs, targets, counts) when the
+    // panel that displays it is actually enabled. Otherwise this data
     // would still be pulled into the browser (Network tab / React
     // DevTools) even though the whole point of hiding the panel by default
     // is that surfacing this limitation is an anti-feature for non-technical
-    // buyers — see the "Invisible Mitigation" product decision.
+    // buyers.
     if (process.env.NEXT_PUBLIC_SHOW_BYPASS_PANEL === "true") {
       getBypassAttempts().then(setBypass).catch(() => {})
     }
@@ -246,7 +246,7 @@ export default function DashboardPage() {
         {/* Error banner */}
         {error && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-            {error} — Is the API running on{" "}
+            {error}. Is the API running on{" "}
             {getApiBaseUrl()}?
           </div>
         )}
@@ -254,7 +254,7 @@ export default function DashboardPage() {
         {/* Stat cards */}
         <SectionCards data={summary} threats={threatCount} />
 
-        {/* Plain-language system health (I-098) */}
+        {/* Plain-language system health */}
         <HealthWidget
           engine={engine}
           metrics={metrics}
@@ -367,7 +367,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Encrypted-DNS bypass attempts (I-108). Hidden by default: for
+        {/* Encrypted-DNS bypass attempts. Hidden by default: for
             non-technical buyers, surfacing a filtering limitation on the
             dashboard is an anti-feature (mitigations should be invisible).
             Set NEXT_PUBLIC_SHOW_BYPASS_PANEL=true to opt in (e.g. for

@@ -5,9 +5,9 @@ function apiUrl(path: string): string {
 }
 
 // The demo password lives in ./demo-credentials, not here, so the login
-// page can load it via a dynamic import() gated on demoMode — that keeps
-// the string out of the login page's main bundle on non-demo installs
-// (H7). See app/login/page.tsx.
+// page can load it via a dynamic import() gated on demoMode. That keeps
+// the string out of the login page's main bundle on non-demo installs.
+// See app/login/page.tsx.
 
 export interface AuthStatus {
   status: "complete" | "needs_setup" | "unreachable"
@@ -32,7 +32,7 @@ export function clearToken() {
 // getAuthStatus is the single call site for GET /api/v1/auth/status
 // (unauthenticated). It reports both whether setup is complete and
 // whether this deployment is a public demo (HYDRA_DEMO_MODE=true on the
-// control plane) — the latter lets the UI show the demo banner and
+// control plane). The latter lets the UI show the demo banner and
 // prefill the login form from one published image, with no build-time
 // flag needed.
 export async function getAuthStatus(): Promise<AuthStatus> {

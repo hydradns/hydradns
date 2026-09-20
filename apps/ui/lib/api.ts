@@ -34,7 +34,7 @@ function apiUrl(path: string): string {
 }
 
 // DEMO_MODE_ERROR is the exact error text the control plane's DemoGuard
-// middleware returns on every rejected mutating request — see
+// middleware returns on every rejected mutating request. See
 // apps/core/cmd/controlplane/middlewares/demo.go:57 (the Go string this
 // must match char-for-char; there's no shared constant across the two
 // languages, so a wording change on either side needs the other updated by
@@ -76,19 +76,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     if (json.status === "error") {
       // Single choke point for the demo-mode rejection: every write in the
       // app funnels through this function, so this is the one place that
-      // needs to know about it (see lib/api.ts callers — none of them
+      // needs to know about it (see lib/api.ts callers; none of them
       // special-case demo mode themselves). The error still throws below
       // so any page-level inline error handling keeps working unchanged;
       // the toast just makes the "why" immediately visible.
       if (res.status === 403 && json.error === DEMO_MODE_ERROR) {
-        toast.error("Read-only demo — changes are disabled. Install your own HydraDNS to try this for real.")
+        toast.error("Read-only demo. Changes are disabled. Install your own HydraDNS to try this for real.")
       }
       throw new Error(json.error || "Unknown API error")
     }
     return json.data
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") {
-      throw new Error("Request timed out — is the API running?")
+      throw new Error("Request timed out. Is the API running?")
     }
     throw e
   } finally {
@@ -169,7 +169,7 @@ export const updatePolicy = (id: string, data: UpdatePolicyRequest) =>
 export const deletePolicy = (id: string) =>
   request<Record<string, unknown>>(`/policies/${id}`, { method: "DELETE" })
 
-// Recent query logs — unpaginated feed backing the dashboard widgets.
+// Recent query logs: unpaginated feed backing the dashboard widgets.
 export const getRecentQueryLogs = () =>
   request<QueryLogEntry[]>("/analytics/audits")
 
@@ -196,7 +196,7 @@ export const updateUser = (id: string, data: UpdateUserRequest) =>
 export const deleteUser = (id: string) =>
   request<Record<string, unknown>>(`/users/${id}`, { method: "DELETE" })
 
-// API tokens. The control plane scopes these to the caller — GET/POST
+// API tokens. The control plane scopes these to the caller: GET/POST
 // /tokens and DELETE /tokens/:id all operate on "your own tokens" (see
 // apps/core/cmd/controlplane/routes/router.go's tokens group and
 // handlers/tokens.go). There is no nested /users/:id/tokens route and no
@@ -232,7 +232,7 @@ export const getAuditEvents = (params: AuditQuery = {}) => {
 // apps/ui/app/dashboard/settings/page.tsx, which renders the controls
 // disabled with a note instead of calling a route that doesn't exist.
 
-// Query Logs — server-side pagination + filtering via GET /analytics/logs.
+// Query Logs: server-side pagination + filtering via GET /analytics/logs.
 // Undefined/empty filter fields are omitted so the backend applies its defaults.
 export const getQueryLogs = (filters: QueryLogFilters = {}) => {
   const params = new URLSearchParams()

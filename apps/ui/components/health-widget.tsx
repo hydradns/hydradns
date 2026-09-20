@@ -175,7 +175,7 @@ export function deriveThreatsSignal(summary: DashboardSummary | null): HealthSig
     detail:
       blocked > 0
         ? "HydraDNS is actively stopping bad domains."
-        : "No threats yet — all clear.",
+        : "No threats yet. All clear.",
     level: "ok",
   }
 }
@@ -222,7 +222,7 @@ function levelStyles(level: HealthLevel) {
 const OVERALL_COPY: Record<HealthLevel, { label: string; help: string }> = {
   ok: { label: "All good", help: "Your network is protected." },
   warn: { label: "Needs attention", help: "Everything still works, but check the items below." },
-  down: { label: "Action required", help: "Protection is affected — see the red items below." },
+  down: { label: "Action required", help: "Protection is affected. See the red items below." },
   pending: { label: "Checking…", help: "Reading live status from the box." },
 }
 

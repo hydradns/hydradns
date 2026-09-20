@@ -17,8 +17,8 @@ function renderPage() {
 }
 
 // The page only touches lib/api; stub the whole module so no real fetch runs.
-// H3 fix: tokens are "my tokens" now (flat /tokens, no nested /users/:id/
-// route, no rotate endpoint) — see lib/api.ts and app/dashboard/users/page.tsx.
+// Tokens are "my tokens" (flat /tokens, no nested /users/:id/route, no
+// rotate endpoint). See lib/api.ts and app/dashboard/users/page.tsx.
 vi.mock("@/lib/api", () => ({
   getUsers: vi.fn(),
   createUser: vi.fn(),

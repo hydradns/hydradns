@@ -100,8 +100,8 @@ describe("DashboardPage bypass panel visibility", () => {
     expect(screen.queryByText("Encrypted-DNS Bypass Attempts")).not.toBeInTheDocument()
   })
 
-  // H8: the fetch itself (not just the rendered panel) must be gated by the
-  // flag — otherwise bypass-attempt data (client IPs, targets, counts)
+  // The fetch itself (not just the rendered panel) must be gated by the
+  // flag. Otherwise bypass-attempt data (client IPs, targets, counts)
   // still lands in the browser's Network tab / component state even when
   // the panel is hidden, which is exactly what the "Invisible Mitigation"
   // decision says not to do.

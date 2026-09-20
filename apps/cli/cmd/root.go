@@ -17,7 +17,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "hydra",
-	Short: "HydraDNS CLI — manage your DNS firewall",
+	Short: "Manage your DNS firewall",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		client = api.New(apiURL, token)
 	},

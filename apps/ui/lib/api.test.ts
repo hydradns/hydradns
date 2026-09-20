@@ -198,8 +198,8 @@ describe("api RBAC methods", () => {
     expect(spy.mock.calls[0][1]?.method).toBe("DELETE")
   })
 
-  // H3 fix: tokens are scoped to the caller via the flat /tokens routes —
-  // there is no nested /users/:id/tokens route and no rotate endpoint (see
+  // Tokens are scoped to the caller via the flat /tokens routes: there is
+  // no nested /users/:id/tokens route and no rotate endpoint (see
   // apps/core/cmd/controlplane/handlers/tokens.go). Field names match the
   // Go DTO exactly (`label`, not `name`; `expiry_days`, not `expires_in_days`).
   it("getMyTokens GETs the flat /tokens collection", async () => {
@@ -354,9 +354,9 @@ describe("demo mode 403 handling", () => {
   })
 
   it("exports DEMO_MODE_ERROR matching the Go DemoGuard string exactly", () => {
-    // apps/core/cmd/controlplane/middlewares/demo.go:57 — kept as a single
-    // exported constant (LOW #2) rather than an inline literal so a future
-    // wording change on either side is a one-place diff to find.
+    // apps/core/cmd/controlplane/middlewares/demo.go:57. Kept as a single
+    // exported constant rather than an inline literal so a future wording
+    // change on either side is a one-place diff to find.
     expect(DEMO_MODE_ERROR).toBe("demo mode: changes are disabled")
   })
 
