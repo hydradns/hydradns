@@ -84,6 +84,21 @@ HTTPS — the derived API URL then defaults to `https://`, but the control
 plane has no TLS of its own, so that setup needs a proxy in front of the API
 too. See `docs/pi-deployment.md` for both.
 
+### Database migrations run automatically, but the first start after this release can be slow on an upgrade
+
+GORM auto-migrates the schema at startup. Both the controlplane and the dataplane call this
+independently against the same SQLite file (they can start at the same time in the combined
+`core` container); `busy_timeout=30s` (`internal/storage/db/db.go`) makes them wait for each
+other instead of one failing with "database is locked."
+
+This release adds two new indexes: `dns_queries.action` and `blocklist_entries.source_id`. On
+a fresh install this is instant — the tables are empty. On an existing installation being
+upgraded to this version, `CREATE INDEX` on a large `dns_queries` or `blocklist_entries` table
+runs synchronously at startup and holds a write lock for the duration, which can take
+noticeably longer than a normal restart on slow storage (an SD card in particular). There is
+no separate migration command to run and nothing to configure — just expect the first start
+after the upgrade to take longer than usual on a large, slow-storage install.
+
 ## Pre-flight checks (before tagging)
 
 Run these from a clean checkout of `main` — not this worktree, not a stale

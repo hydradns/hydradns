@@ -36,9 +36,12 @@ HydraDNS is a DNS-layer security and privacy gateway built as a single monorepo 
 ### CLI (Go / Cobra) — `apps/cli/`
 - `go build -o hydra` — produces the `hydra` binary at the package root
 - `./hydra <command>` — `status`, `engine`, `block`, `unblock`, `blocklists`, `policies`, `metrics`, `logs`, `setup`, `login`, `setup-router`, `mcp`, `update`, `version`
-- `./hydra mcp` — runs the MCP server: stdio JSON-RPC 2.0 by default, or `--http` for an HTTP transport (management traffic only, requires a bearer token via `--http-token`/`HYDRA_MCP_TOKEN`) for driving a fleet remotely. 14 tools registered in `apps/cli/mcp/server.go`: `get_status`, `toggle_engine`, `block_domain`, `unblock_domain`, `list_policies`, `list_blocklists`, `get_query_logs`, `get_metrics`, `create_policy`, `delete_policy`, `bulk_unblock`, `get_weekly_summary`, `explain_anomaly`, `compare_to_last_month`. Tool access is scoped by the `MCP_ROLE` env var (`admin` default, `operator` — can't `toggle_engine`, `reporter` — read-only `get_`/`list_` tools only); see `apps/cli/mcp/roles.go`.
+- `./hydra mcp` — runs the MCP server: stdio JSON-RPC 2.0 by default, or `--http` for an HTTP transport (management traffic only, requires a bearer token via `--http-token`/`HYDRA_MCP_TOKEN`) for driving a fleet remotely. 14 tools registered in `apps/cli/mcp/server.go`: `get_status`, `toggle_engine`, `block_domain`, `unblock_domain`, `list_policies`, `list_blocklists`, `get_query_logs`, `get_metrics`, `create_policy`, `delete_policy`, `bulk_unblock`, `get_weekly_summary`, `explain_anomaly`, `compare_to_last_month`. Tool access is scoped by the `MCP_ROLE` env var (`admin` default, `operator` — can't `toggle_engine`, `reporter` — read-only tools only, per each tool's explicit registration flag in `toolRegistry()`, not a `get_`/`list_` name guess — `explain_anomaly` and `compare_to_last_month` are read-only too); see `apps/cli/mcp/roles.go`.
 - `go test ./...` — Cobra command tests live next to the commands (e.g. `cmd/setup_router_test.go`)
 - API client lives in `apps/cli/api/client.go` and talks to the controlplane on `:8080`
+- The token file (`~/.hydra/token`) is written atomically (temp file, `fsync`, rename), file mode `0600` in a directory forced to `0700`, and a symlinked directory or token path is refused outright rather than followed (`apps/cli/cmd/token_store.go`).
+- `api.New()` prints a one-line stderr warning when the configured API URL is plain `http://` to a non-local (non-loopback/private/link-local) address — the login password and bearer token would otherwise cross the network in cleartext with no indication (`apps/cli/api/client.go`, `warnIfInsecure`).
+- The MCP server's `initialize` response reports the CLI's own `Version` (the same value `hydra version` prints, ldflags-overridable) as `serverInfo.version`, not a hardcoded string (`apps/cli/mcp/server.go`, `apps/cli/cmd/mcp.go`).
 
 ## Architecture
 
@@ -105,9 +108,15 @@ Domain normalization: lowercase + strip trailing dot (e.g., `EXAMPLE.COM.` → `
 
 Sources are fetched with ETag support (304 skip), SHA256 checksum tracking, and atomic persistence (transaction wraps snapshot + entries + metadata). Three format parsers, keyed by the `format` field on `BlocklistSource` (`apps/core/internal/blocklist/parser/`): `hosts`, `adblock`, `domains`. Blocklists auto-refresh on a configurable interval (default 6h, env: `BLOCKLIST_UPDATE_INTERVAL`); creating a source via the API also triggers an immediate async fetch so `domains_count` doesn't sit at 0 waiting for the next cycle.
 
+The source URL must be `http://` or `https://` (`validateBlocklistURL`, `cmd/controlplane/handlers/blocklists.go`); enforced identically on create, update, and the setup wizard's optional blocklist bootstrap. Each new snapshot fully replaces a source's entries in one transaction (delete-then-insert, `SaveSnapshotWithEntries`) — a domain removed upstream stops being blocked after the next fetch, and editing a source's URL only takes effect once that next (immediately-triggered) download completes, not synchronously in the API response. Only the last 10 `BlocklistSnapshot` metadata rows are kept per source (`snapshotRetentionPerSource`, oldest pruned); this caps metadata only, never the live entries. If a dataplane rebuild of the in-memory set fails, it keeps its previous (still-enforced) contents and retries on the next `BLOCKLIST_POLL_INTERVAL` tick rather than going empty (`cmd/dataplane/blocklist_reload.go`).
+
+The fetcher (`internal/blocklist/fetcher/http_client.go`) is a plain `http.Client` with no `CheckRedirect` override, so it follows redirects to any `http(s)` host, including private/internal addresses — there is no SSRF protection. The threat model assumes whoever adds a blocklist source URL is trusted; see `docs/limitations.md`.
+
 ### Policy Format
 
 JSON file at `configs/policies.json`. Array of policies with `id`, `action` (BLOCK/ALLOW/REDIRECT), `domains`, optional `regexes`, `priority` (higher wins). Regexes are compiled/validated on load but **not yet evaluated at query time**. Wildcards also parsed but not evaluated.
+
+The API additionally validates `action` on both create and update (`validatePolicyAction`, `cmd/controlplane/handlers/policies.go`): it must be `BLOCK`, `ALLOW`, or `REDIRECT` (case-insensitive), and `REDIRECT` requires a non-empty, parseable `redirect_ip`. This closes what used to be a create-only check — an update used to accept any string and silently turn a policy into a no-op.
 
 ### Authentication & RBAC
 
@@ -146,10 +155,13 @@ Login without an `email` field falls back to "the one user" if exactly one exist
 - `POST /api/v1/auth/login` — validates credentials, returns a token
 
 Both `/auth/login` and `/auth/setup` are throttled per client IP (fixed window, 10 attempts
-/ 5 minutes by default, shared across the two endpoints), so the correctness of the throttle
-depends on `TRUSTED_PROXIES` being set correctly behind a reverse proxy (see the Configuration
-table below) — otherwise every request behind that proxy is bucketed under one IP. The
-counter is in-memory and resets on restart.
+/ 5 minutes by default, shared across the two endpoints; 100 attempts / 5 minutes when
+`HYDRA_DEMO_MODE=true`), so the correctness of the throttle depends on `TRUSTED_PROXIES`
+being set correctly behind a reverse proxy (see the Configuration table below) — otherwise
+every request behind that proxy is bucketed under one IP. Only a failed attempt (HTTP 4xx —
+bad credentials, a malformed request, setup-already-done) counts against the budget; a
+successful login/setup and a 5xx (the server's own fault) do not. The counter is in-memory
+and resets on restart.
 
 Not implemented: per-user MFA/TOTP, SSO/OIDC/SAML, session timeout beyond the 90-day token
 expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/users` and
@@ -170,7 +182,7 @@ expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/
 | `HYDRA_POLICIES` | `/app/configs/policies.json` | Policy file path (`cmd/dataplane/main.go`) |
 | `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated allowed CORS origins (`cmd/controlplane/middlewares/cors.go`). The shipped `docker-compose.yml` sets `http://localhost:3000`. `*` still works but logs a warning |
 | `CORS_ALLOW_SAME_HOST` | `true` | Also allow an Origin whose hostname equals the request's Host hostname when that hostname is an IP literal or `localhost` (dashboard opened by LAN IP). Named hosts need a `CORS_ORIGINS` entry. Set `false` to disable |
-| `DNS_LISTEN_ADDR` | (from config, normally `0.0.0.0:1053`) | Override DNS listen address |
+| `DNS_LISTEN_ADDR` | (from config, normally `0.0.0.0:1053`) | Override DNS listen address. Not forwarded by `docker-compose.yml` on purpose — the host-facing DNS port mapping there is fixed at `53:1053/...`, so changing this alone inside the container would only break that mapping, not move it |
 | `BLOCKLIST_UPDATE_INTERVAL` | `6h` | How often blocklist sources are re-downloaded |
 | `HYDRA_DEMO_MODE` | `false` | Public read-only demo: a `DemoGuard` middleware rejects every mutation before auth, a `read_only` demo user and synthetic data are seeded (`cmd/controlplane/demoseed`), client IPs are masked in responses. Refuses to start on a database that has real users. See `demo/README.md` |
 | `BLOCKLIST_POLL_INTERVAL` | `5s` | How often the dataplane checks the DB for blocklist changes (add, toggle, delete, finished download) and rebuilds the in-memory set; `0` disables |
@@ -178,7 +190,7 @@ expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
 | `HYDRA_TOKEN` | (none) | CLI/MCP bearer token; if unset the CLI also tries `~/.hydra/token` (`apps/cli/cmd/root.go`) |
 | `HYDRA_MCP_TOKEN` | (none) | Bearer token required by `hydra mcp --http` (or use `--http-token`) |
-| `MCP_ROLE` | `admin` | Scopes which MCP tools a caller may invoke: `admin` (all), `operator` (all but `toggle_engine`), `reporter` (read-only `get_`/`list_` tools). Unrecognized values safe-default to `reporter` (`apps/cli/mcp/roles.go`) |
+| `MCP_ROLE` | `admin` | Scopes which MCP tools a caller may invoke: `admin` (all), `operator` (all but `toggle_engine`), `reporter` (tools flagged read-only in `toolRegistry()`, an explicit per-tool list, not a `get_`/`list_` name guess). Unrecognized values safe-default to `reporter` (`apps/cli/mcp/roles.go`) |
 | `HYDRA_UPDATE_URL` | (built-in release feed) | Override the release feed `hydra update` checks (`apps/cli/cmd/update.go`) |
 | `HYDRA_ANONYMIZE_CLIENT_IPS` | `false` | Opt-in: hash client IPs (HMAC-SHA256, truncated to 64 bits) before writing them to the query log, instead of storing them as-is. Off by default — per-device visibility in the query log is treated as a core feature (`internal/config/config.go`, `internal/dnsengine/anonymize.go`) |
 | `HYDRA_ANON_SECRET` | (generated per-install) | HMAC key for `utils.AnonymizeIP`, only used when anonymization is enabled |
@@ -188,6 +200,33 @@ expiry, and a CLI for user/token management (dashboard-only today, via `/api/v1/
 | `QUERY_LOG_CLEANUP_INTERVAL` | `1h` | How often the retention loop runs |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Dashboard API base URL override, inlined at build time. Left at the default, the dashboard derives the API URL at runtime from the page's own protocol and hostname on port 8080 (`apps/ui/lib/api-base.ts`); set it only for a reverse proxy or a non-default API host/port |
 | `NEXT_PUBLIC_SHOW_BYPASS_PANEL` | unset (hidden) | Build-time flag to show the DoH-bypass-attempts panel on the dashboard; set to `true` for technical/internal deployments (`apps/ui/app/dashboard/page.tsx`) |
+
+The shipped `docker-compose.yml` forwards `BLOCK_RESPONSE`, `BLOCKLIST_UPDATE_INTERVAL`,
+`BLOCKLIST_POLL_INTERVAL`, `QUERY_LOG_RETENTION_DAYS`, `QUERY_LOG_MAX_ROWS`,
+`QUERY_LOG_CLEANUP_INTERVAL`, `HYDRA_ANONYMIZE_CLIENT_IPS`, `HYDRA_ANON_SECRET`, and
+`TRUSTED_PROXIES` from `.env` into the `core` container's environment, each defaulting to
+the code's own default when unset. `DNS_LISTEN_ADDR` is the one exception (see its row
+above). `HYDRA_DEMO_MODE` is deliberately never forwarded by this file — demo mode has its
+own `demo/docker-compose.demo.yml`.
+
+Boolean env vars (`HYDRA_DEMO_MODE`, `CORS_ALLOW_SAME_HOST`, `HYDRA_ANONYMIZE_CLIENT_IPS`) all
+parse through one shared function, `config.ParseBoolEnvValue`/`MustParseBoolEnv`
+(`internal/config/config.go`): accepted spellings are `true/1/yes/on` and `false/0/no/off`,
+case-insensitive, whitespace-trimmed; an unset or empty value keeps the default.
+`HYDRA_DEMO_MODE` and `CORS_ALLOW_SAME_HOST` go through `MustParseBoolEnv`, so an
+unrecognized value (a typo, `"1 "` with unexpected characters, etc.) is fatal at startup,
+naming both the variable and the value in the error.
+`HYDRA_ANONYMIZE_CLIENT_IPS` is parsed the same way but does not use `MustParseBoolEnv` (it
+runs inside `config.DefaultConfig`'s package-level initializer, before `FatalFunc` can be
+overridden in a test); an unrecognized value there logs a warning and keeps the previously
+configured value instead of exiting.
+
+`CORS_ORIGINS` entries are split on commas, trimmed, and each validated as either `*` or an
+`http(s)://host` with no path (`cmd/controlplane/middlewares/cors.go`); an invalid entry stops
+startup with an error naming `CORS_ORIGINS` and the offending entry, instead of reaching
+gin-contrib/cors (which panics). Setting it to `*` disables `Access-Control-Allow-Credentials`
+(a wildcard origin with credentials is invalid per the CORS spec; this API only ever
+authenticates via a Bearer header, never cookies) and logs a startup warning.
 
 Query-log IP note: client IP anonymization is implemented and wired into `Engine.logQuery`
 (`internal/dnsengine/engine.go`, `internal/dnsengine/anonymize.go`) but **off by default**.
@@ -213,7 +252,9 @@ docker exec hydradns-core-1 dig @127.0.0.1 -p 1053 example.com  # ground truth (
 
 ## SQLite Setup
 
-Pure-Go SQLite driver (`glebarez/sqlite`), WAL mode for concurrency, single-writer (`MaxOpenConns=1`). GORM auto-migrates all models on startup (`internal/storage/db/db.go`): Policy, DNSQuery, DomainPolicy, Action, Category, Statistics, SystemState, BlocklistSource, BlocklistSnapshot, BlocklistEntry, AdminCredential (legacy, migration-only), User, Token, AuditEvent.
+Pure-Go SQLite driver (`glebarez/sqlite`), WAL mode for concurrency, single-writer (`MaxOpenConns=1`). `busy_timeout` is set to 30 seconds via `PRAGMA busy_timeout=30000;` (`internal/storage/db/db.go`), so the controlplane and dataplane — which both call `db.InitDB`/`AutoMigrate` independently against the same file and can start at the same time in the combined `core` container — wait for each other instead of one failing with `SQLITE_BUSY`. GORM auto-migrates all models on startup, run by both processes (`internal/storage/db/db.go`): Policy, DNSQuery, DomainPolicy, Action, Category, Statistics, SystemState, BlocklistSource, BlocklistSnapshot, BlocklistEntry, AdminCredential (legacy, migration-only), User, Token, AuditEvent.
+
+Two indexes — `dns_queries.action` and `blocklist_entries.source_id` — are new as of this branch (not present on `origin/main`). On a fresh install this is instant; on an existing large database, `CREATE INDEX` runs synchronously at startup and can make the first start after upgrading noticeably slower than a normal restart, especially on SD-card storage. See the Upgrade notes in `CHANGELOG.md` and `docs/releasing.md`.
 
 ### Query-log retention
 
@@ -302,7 +343,8 @@ Two GitHub Actions workflows (`.github/workflows/`):
 - Resolved: the dashboard's vitest suite (`apps/ui`) previously failed 28 of 47 tests, but
   this was a Node-version artifact, not a product bug — Node 22+ defines global
   `localStorage`/`sessionStorage` that shadow jsdom's under Vitest. Fixed in
-  `apps/ui/vitest.setup.ts`; the suite is 49/49 and the `dashboard` CI job now runs `npm test`.
+  `apps/ui/vitest.setup.ts`; the suite is 77/77 (14 files) as of this branch, and the
+  `dashboard` CI job now runs `npm test`.
 - The `statistics.id` UNIQUE-constraint bug and blocklist ingestion leaving `domains_count`
   at 0 are both fixed: query counting no longer collides (see `internal/storage/repositories`)
   and `CreateBlocklist`/the setup wizard both trigger an immediate async
