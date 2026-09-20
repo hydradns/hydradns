@@ -18,17 +18,28 @@ type APIHandler struct {
 	// Audit records one event per mutating action. Lives on the handler
 	// so every mutation has a single call site (h.Audit.Record(...)).
 	Audit *audit.Recorder
+	// DemoMode mirrors HYDRA_DEMO_MODE. It never gates write access on its
+	// own (that boundary is middlewares.DemoGuard, installed ahead of
+	// Auth) — it only controls two read-side, non-security-critical
+	// behaviors: GET /api/v1/auth/status advertising demo_mode to the UI,
+	// and client-IP redaction on the query-log / audit / bypass responses
+	// (see maskClientIP in common.go). Defaults to false so every existing
+	// caller of NewAPIHandler, and every test constructing &APIHandler{}
+	// directly, is unaffected.
+	DemoMode bool
 }
 
 func NewAPIHandler(
 	store repositories.Store,
 	dataPlaneClient *client.Client,
 	blocklistEngine *blocklist.Engine,
+	demoMode bool,
 ) *APIHandler {
 	return &APIHandler{
 		Store:           store,
 		DataPlaneClient: dataPlaneClient,
 		BlocklistEngine: blocklistEngine,
 		Audit:           audit.New(store.Audit),
+		DemoMode:        demoMode,
 	}
 }

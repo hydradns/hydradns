@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+// Hoisted mock so every `import { toast } from "sonner"` call site (in
+// lib/api.ts) resolves to this spy instead of rendering a real toast in
+// jsdom. vi.mock's factory is itself hoisted above imports, so the spy it
+// references must be created via vi.hoisted() rather than a plain const.
+const { toastErrorMock } = vi.hoisted(() => ({ toastErrorMock: vi.fn() }))
+vi.mock("sonner", () => ({ toast: { error: toastErrorMock } }))
+
 import {
   getBypassAttempts,
   getDashboardSummary,
@@ -344,5 +351,34 @@ describe("allowDomain / blockDomain", () => {
     const body = JSON.parse(String(opts.body))
     expect(body.action).toBe("BLOCK")
     expect(body.domains).toEqual(["evil.com"])
+  })
+})
+
+describe("demo mode 403 handling", () => {
+  beforeEach(() => {
+    toastErrorMock.mockClear()
+  })
+
+  it("shows a friendly toast and still throws when the server returns the demo-mode 403", async () => {
+    stubFetch<Record<string, never>>(
+      { status: "error", data: null as unknown as Record<string, never>, error: "demo mode: changes are disabled" },
+      403,
+    )
+
+    await expect(createUser({ username: "x", password: "y", role: "admin" })).rejects.toThrow(
+      "demo mode: changes are disabled",
+    )
+    expect(toastErrorMock).toHaveBeenCalledTimes(1)
+    expect(toastErrorMock.mock.calls[0][0]).toMatch(/read-only demo/i)
+  })
+
+  it("does not toast for an unrelated 403 (e.g. a role-based forbidden)", async () => {
+    stubFetch<Record<string, never>>(
+      { status: "error", data: null as unknown as Record<string, never>, error: "forbidden" },
+      403,
+    )
+
+    await expect(createUser({ username: "x", password: "y", role: "admin" })).rejects.toThrow("forbidden")
+    expect(toastErrorMock).not.toHaveBeenCalled()
   })
 })
