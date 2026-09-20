@@ -6,6 +6,12 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from v0.1.0
 
 ## [Unreleased]
 
+### Changed
+- `apps/core` now builds with Go 1.25 (was 1.24), matching the CLI and `go.work`; its build image is
+  `golang:1.25-alpine`.
+- Dependency updates: `miekg/dns` 1.1.73, `gin` 1.12.0, `gorm` 1.31.2, `logrus` 1.10.2; dashboard
+  `@radix-ui/react-tabs` 1.1.21, `react-popover` 1.1.23, `react-tooltip` 1.2.16, `@testing-library/jest-dom` 7.0.1.
+
 ## [0.1.0] - 2026-09-20
 
 ### Added
