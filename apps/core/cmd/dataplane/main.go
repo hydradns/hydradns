@@ -50,31 +50,58 @@ func main() {
 
 	// 3. Blocklist Engine — load from DB sources, refresh periodically.
 	// The DNS hot path checks an in-memory set (memBlocklist), never the
-	// DB; refreshBlocklists rebuilds that set after each source update.
+	// DB. Two independent loops keep it current:
+	//   - refreshSources (below) re-fetches each enabled source's remote
+	//     content on BLOCKLIST_UPDATE_INTERVAL (default 6h) — this is
+	//     about the *content* of a source going stale, unrelated to local
+	//     CRUD changes.
+	//   - blocklistReloader.Poll, driven by startBlocklistPoll on
+	//     BLOCKLIST_POLL_INTERVAL (default 5s), watches a cheap DB
+	//     signature and rebuilds memBlocklist within seconds of a
+	//     dashboard/CLI/MCP add, enable, disable, edit, or delete — the
+	//     propagation gap policies didn't have (reloadPolicies below
+	//     already polls every 5s) but blocklists did until this loop.
 	blEngine := blocklist.NewEngine(repos.Blocklist)
 	memBlocklist := blocklist.NewMemoryChecker()
+	blReloader := newBlocklistReloader(blEngine, memBlocklist)
 
-	// Initial load in background so DNS starts immediately
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-		refreshBlocklists(ctx, blEngine, memBlocklist)
-	}()
+	// Initial load in background so DNS starts immediately. This is a
+	// cheap DB-only signature check + rebuild (no network fetch), so it
+	// completes fast even if refreshSources' first pass (below) is still
+	// fetching remote sources.
+	go blReloader.Poll()
 
-	// Periodic refresh
+	// Periodic re-fetch of each enabled source's remote content.
 	interval, err := time.ParseDuration(config.DefaultConfig.DataPlane.BlocklistUpdateInterval)
 	if err != nil || interval == 0 {
 		interval = 6 * time.Hour
 	}
 	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		refreshSources(ctx, blEngine, blReloader)
+	}()
+	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for range ticker.C {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			refreshBlocklists(ctx, blEngine, memBlocklist)
+			refreshSources(ctx, blEngine, blReloader)
 			cancel()
 		}
 	}()
+
+	// Fast signature poll: closes the propagation gap for local CRUD
+	// changes (create/toggle/edit/delete) without waiting for the
+	// refreshSources loop above. BLOCKLIST_POLL_INTERVAL, default 5s; 0
+	// disables it (propagation then only happens via the initial load and
+	// refreshSources passes above — the pre-existing ~6h/restart bound).
+	blocklistPollInterval := envDuration("BLOCKLIST_POLL_INTERVAL", 5*time.Second)
+	if blocklistPollInterval > 0 {
+		startBlocklistPoll(blReloader, blocklistPollInterval)
+	} else {
+		logger.Log.Info("blocklist signature poll disabled (BLOCKLIST_POLL_INTERVAL=0); blocklist changes only propagate via BLOCKLIST_UPDATE_INTERVAL or restart")
+	}
 
 	// 4. Initialize Policy Engine — load from file + DB
 	policyEngine := policy.NewPolicyEngine()
@@ -129,7 +156,15 @@ func main() {
 	srv.Run()
 }
 
-func refreshBlocklists(ctx context.Context, engine *blocklist.Engine, mem *blocklist.MemoryChecker) {
+// refreshSources re-fetches each enabled source's remote content into the
+// DB (new BlocklistSnapshot + BlocklistEntry rows on a change; a no-op on
+// ETag match). It does not touch the in-memory blocklist set directly —
+// the trailing reloader.Poll() call lets the single-flighted
+// blocklistReloader pick up any resulting DB change (new snapshot, bumped
+// source UpdatedAt) and rebuild memBlocklist, the same path the fast
+// signature-poll ticker uses. Keeping exactly one rebuild path avoids two
+// goroutines racing to call MemoryChecker.Reload concurrently.
+func refreshSources(ctx context.Context, engine *blocklist.Engine, reloader *blocklistReloader) {
 	sources, err := engine.ListSources()
 	if err != nil {
 		logger.Log.Errorf("Failed to list blocklist sources: %v", err)
@@ -147,14 +182,7 @@ func refreshBlocklists(ctx context.Context, engine *blocklist.Engine, mem *block
 			logger.Log.Errorf("Blocklist update failed for %s: %v", src.Name, err)
 		}
 	}
-	// Rebuild the in-memory set the DNS hot path reads from.
-	domains, err := engine.List()
-	if err != nil {
-		logger.Log.Errorf("Failed to load blocklist domains into memory: %v", err)
-		return
-	}
-	mem.Reload(domains)
-	logger.Log.Infof("Blocklist refresh complete: %d total domains blocked", mem.Count())
+	reloader.Poll()
 }
 
 // startQueryLogRetention runs a background loop that bounds the query log

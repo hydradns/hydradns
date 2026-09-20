@@ -2,6 +2,7 @@
 package repositories
 
 import (
+	"database/sql"
 	"strings"
 	"time"
 
@@ -13,6 +14,12 @@ import (
 type BlocklistRepository interface {
 	SaveSnapshotWithEntries(src models.BlocklistSource, checksum string, entries []models.BlocklistEntry) (models.BlocklistSnapshot, error)
 	GetAll() ([]string, error)
+	// GetAllEnabled returns domains from enabled sources only. This is what
+	// the DNS hot path's in-memory set should be built from: a disabled
+	// source's rows remain in the DB (only DeleteSource removes them), so
+	// GetAll (unfiltered) would keep blocking through a source the
+	// dashboard/CLI/MCP already toggled off. See blocklist.Engine.List.
+	GetAllEnabled() ([]string, error)
 	IsBlocked(domain string) (bool, error)
 	ListSources() ([]models.BlocklistSource, error)
 	GetSource(id string) (*models.BlocklistSource, error)
@@ -26,6 +33,42 @@ type BlocklistRepository interface {
 	DeleteSource(id string) error
 	CountEntriesBySource(sourceID string) (int64, error)
 	CountEntriesGroupedBySource() (map[string]int64, error)
+	// Signature returns a cheap fingerprint of blocklist DB state, used by
+	// the dataplane's poll loop to detect whether anything relevant to the
+	// in-memory blocklist set changed (source added/edited/toggled/deleted,
+	// or a new snapshot ingested) without paying the cost of reading the
+	// full entries table on every poll tick.
+	Signature() (BlocklistSignature, error)
+}
+
+// BlocklistSignature is a cheap, comparable (==) fingerprint of blocklist
+// state. Every field is chosen to change on at least one relevant write
+// path so the dataplane's poll loop never misses a change:
+//
+//   - SourceCount        — create (+1) / delete (-1) a source
+//   - EnabledSourceCount — toggle enabled on/off (belt-and-suspenders: a
+//     toggle also bumps MaxSourceUpdatedAt, see UpdateBlocklist in the
+//     control-plane handler, but this field makes the "enabled" dimension
+//     explicit and catches it even if that ever changes)
+//   - MaxSourceUpdatedAt — edit (name/url/format/category), toggle, and
+//     ingestion completing (SaveSnapshotWithEntries also stamps the
+//     source's UpdatedAt in the same transaction as the new snapshot)
+//   - SnapshotCount / MaxSnapshotID — a new snapshot ingested (create's
+//     background fetch, an edit's re-fetch, or the periodic refresh);
+//     MaxSnapshotID also catches the edge case where a delete removes the
+//     single most-recently-updated source (SourceCount already catches
+//     the delete itself, this is redundant-but-cheap defense in depth)
+type BlocklistSignature struct {
+	SourceCount        int64
+	EnabledSourceCount int64
+	// MaxSourceUpdatedAt is the raw text the DB driver returns for
+	// MAX(updated_at) (the pure-Go sqlite driver round-trips time.Time as
+	// text, not a value sql.Scan can convert into time.Time from a plain
+	// aggregate query). Only used for equality comparison, never parsed —
+	// an opaque token is all a change-detection signature needs.
+	MaxSourceUpdatedAt string
+	SnapshotCount      int64
+	MaxSnapshotID      uint
 }
 
 // Implementation
@@ -61,6 +104,21 @@ func (r *BlocklistRepo) IsBlocked(domain string) (bool, error) {
 func (r *BlocklistRepo) GetAll() ([]string, error) {
 	var domains []string
 	if err := r.db.Model(&models.BlocklistEntry{}).Pluck("domain", &domains).Error; err != nil {
+		return nil, err
+	}
+	return domains, nil
+}
+
+// GetAllEnabled returns domains belonging only to sources currently marked
+// enabled. See the interface doc: unlike GetAll, this excludes a disabled
+// source's entries even though its rows are still in the DB.
+func (r *BlocklistRepo) GetAllEnabled() ([]string, error) {
+	var domains []string
+	err := r.db.Model(&models.BlocklistEntry{}).
+		Joins("JOIN blocklist_sources ON blocklist_sources.id = blocklist_entries.source_id").
+		Where("blocklist_sources.enabled = ?", true).
+		Pluck("blocklist_entries.domain", &domains).Error
+	if err != nil {
 		return nil, err
 	}
 	return domains, nil
@@ -168,4 +226,43 @@ func (r *BlocklistRepo) CountEntriesGroupedBySource() (map[string]int64, error) 
 		counts[r.SourceID] = r.Count
 	}
 	return counts, nil
+}
+
+// Signature computes BlocklistSignature with two cheap aggregate queries
+// over blocklist_sources and blocklist_snapshots — both tables are small
+// (one row per configured source / per fetch), so this stays fast even
+// when blocklist_entries holds millions of rows for a Raspberry Pi's worth
+// of blocklists. It never touches blocklist_entries.
+func (r *BlocklistRepo) Signature() (BlocklistSignature, error) {
+	var sig BlocklistSignature
+
+	type sourceAgg struct {
+		Count        int64
+		EnabledCount int64
+		MaxUpdatedAt sql.NullString
+	}
+	var sAgg sourceAgg
+	if err := r.db.Model(&models.BlocklistSource{}).
+		Select("COUNT(*) AS count, COALESCE(SUM(CASE WHEN enabled THEN 1 ELSE 0 END), 0) AS enabled_count, MAX(updated_at) AS max_updated_at").
+		Scan(&sAgg).Error; err != nil {
+		return sig, err
+	}
+	sig.SourceCount = sAgg.Count
+	sig.EnabledSourceCount = sAgg.EnabledCount
+	sig.MaxSourceUpdatedAt = sAgg.MaxUpdatedAt.String
+
+	type snapshotAgg struct {
+		Count int64
+		MaxID uint
+	}
+	var snAgg snapshotAgg
+	if err := r.db.Model(&models.BlocklistSnapshot{}).
+		Select("COUNT(*) AS count, COALESCE(MAX(id), 0) AS max_id").
+		Scan(&snAgg).Error; err != nil {
+		return sig, err
+	}
+	sig.SnapshotCount = snAgg.Count
+	sig.MaxSnapshotID = snAgg.MaxID
+
+	return sig, nil
 }

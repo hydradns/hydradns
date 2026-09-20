@@ -85,8 +85,15 @@ func (m *Engine) UpdateSource(ctx context.Context, src models.BlocklistSource, k
 	return nil
 }
 
+// List returns the domains the DNS hot path should treat as blocked: only
+// entries belonging to currently-enabled sources. A disabled source's rows
+// remain in the DB (see repositories.BlocklistRepository.GetAllEnabled),
+// so this must not fall back to the unfiltered GetAll — that was the bug
+// behind a disabled list still blocking (the propagation gap this engine
+// method is one half of; the other half is Signature/the dataplane poll
+// loop that decides *when* to call List again).
 func (e *Engine) List() ([]string, error) {
-	hosts, err := e.repo.GetAll() // assuming repo has GetAll or similar
+	hosts, err := e.repo.GetAllEnabled()
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +103,14 @@ func (e *Engine) List() ([]string, error) {
 // ListSources returns the configured blocklist sources from the repo.
 func (e *Engine) ListSources() ([]models.BlocklistSource, error) {
 	return e.repo.ListSources()
+}
+
+// Signature returns a cheap fingerprint of blocklist DB state. The
+// dataplane's poll loop calls this frequently (default every 5s) and only
+// pays for a full List() (which reads every enabled entry — potentially
+// millions of rows) when the signature changes.
+func (e *Engine) Signature() (repositories.BlocklistSignature, error) {
+	return e.repo.Signature()
 }
 
 // For a quick debug utility:
