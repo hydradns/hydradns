@@ -22,16 +22,16 @@
 //   that case, never a deliberate operator choice, so pinning to it would
 //   silently re-break the LAN case this helper exists to fix.
 //
-// On the server (no `window` — SSR, middleware, route handlers) there is
-// no page location to derive from. Fall back to a plain runtime env var,
-// HYDRA_API_INTERNAL_URL (deliberately not NEXT_PUBLIC_-prefixed, so it can
-// be set per-container without rebuilding the image), defaulting to
-// http://localhost:8080 if unset. As of this writing nothing server-side in
-// this app actually calls the control-plane API: every page that imports
-// lib/api.ts or lib/auth.ts is a "use client" component, and middleware.ts
-// only reads a cookie — it never calls fetch. This branch exists so that
-// whichever server-side code calls the API first has a safe, explicit knob
-// instead of an inlined localhost default.
+// On the server (no `window` — SSR, middleware, route handlers) there is no
+// page location to derive from. Nothing server-side in this app actually
+// calls the control-plane API today — every page that imports lib/api.ts or
+// lib/auth.ts is a "use client" component, and middleware.ts only reads a
+// cookie, never fetch — so this is a boring, safe fallback rather than a
+// real code path. (A previous version of this file added a dedicated
+// HYDRA_API_INTERNAL_URL env var for this branch; it was removed as
+// undocumented dead code with no caller — see docs/internal/launch-kit/
+// review/ui-and-docs-review.md LOW #7. Re-add a real knob here if a server
+// component ever needs to call the API.)
 const LEGACY_DEFAULT = "http://localhost:8080"
 
 function isLoopbackHostname(hostname: string): boolean {
@@ -51,7 +51,7 @@ export function getApiBaseUrl(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL
 
   if (typeof window === "undefined") {
-    return process.env.HYDRA_API_INTERNAL_URL || LEGACY_DEFAULT
+    return LEGACY_DEFAULT
   }
 
   if (configured && configured !== LEGACY_DEFAULT) {

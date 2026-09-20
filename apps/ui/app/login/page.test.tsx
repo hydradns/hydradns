@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({
 }))
 
 import LoginPage from "@/app/login/page"
-import { DEMO_PASSWORD } from "@/lib/auth"
+import { DEMO_PASSWORD } from "@/lib/demo-credentials"
 
 function stubAuthStatus(data: { setup_complete: boolean; demo_mode: boolean }) {
   const fetchMock = vi.fn().mockResolvedValue({
