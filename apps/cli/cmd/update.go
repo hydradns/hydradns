@@ -22,8 +22,9 @@ download it, verify it against the published SHA-256 checksums, and atomically
 replace the current binary. The previous binary is kept at "<binary>.old" for
 rollback.
 
-The feed defaults to the hydra-cli GitHub releases API and can be overridden
-with the HYDRA_UPDATE_URL environment variable or the --url flag.
+The feed defaults to the hydradns/hydradns GitHub releases API (the monorepo
+release that publishes the CLI binaries and a checksums file) and can be
+overridden with the HYDRA_UPDATE_URL environment variable or the --url flag.
 
 This runs only when invoked explicitly; hydra never auto-updates on other
 commands. Use --check to report whether an update is available without applying

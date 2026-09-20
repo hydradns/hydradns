@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -137,6 +138,104 @@ func TestApplyAtomicSwapAndBackup(t *testing.T) {
 	}
 	if fi.Mode().Perm()&0o100 == 0 {
 		t.Errorf("new binary is not executable: mode %v", fi.Mode())
+	}
+}
+
+// TestDefaultFeedURLPointsAtMonorepo guards against DefaultFeedURL regressing
+// to the archived hydradns/hydra-cli repo, which no longer receives releases
+// (release.yml's release-cli job attaches binaries to hydradns/hydradns).
+func TestDefaultFeedURLPointsAtMonorepo(t *testing.T) {
+	const want = "https://api.github.com/repos/hydradns/hydradns/releases/latest"
+	if DefaultFeedURL != want {
+		t.Fatalf("DefaultFeedURL = %q, want %q", DefaultFeedURL, want)
+	}
+}
+
+// realReleaseAssets mirrors exactly what a tagged hydradns/hydradns release
+// carries once release.yml's release-cli matrix and release-cli-checksums job
+// have both run: one hydra-<goos>-<goarch> binary per matrix leg (see
+// .github/workflows/release.yml), a checksums.txt, and GitHub's own
+// automatically attached source archives (present on every release,
+// unrelated to any workflow step).
+func realReleaseAssets() []Asset {
+	names := []string{
+		"hydra-linux-amd64",
+		"hydra-linux-arm64",
+		"hydra-darwin-amd64",
+		"hydra-darwin-arm64",
+		"checksums.txt",
+		"Source code (zip)",
+		"Source code (tar.gz)",
+	}
+	assets := make([]Asset, len(names))
+	for i, n := range names {
+		assets[i] = Asset{Name: n, URL: "https://example.invalid/" + n}
+	}
+	return assets
+}
+
+// TestSelectAssetAgainstRealReleaseLayout checks that every OS/Arch pair the
+// release-cli matrix actually builds resolves to exactly its own binary, with
+// no cross-match between e.g. linux/amd64 and darwin/amd64, and that neither
+// checksums.txt nor GitHub's auto-attached source archives are ever selected
+// as a binary.
+func TestSelectAssetAgainstRealReleaseLayout(t *testing.T) {
+	rel := &Release{TagName: "v0.1.0", Assets: realReleaseAssets()}
+
+	cases := []struct {
+		os, arch, want string
+	}{
+		{"linux", "amd64", "hydra-linux-amd64"},
+		{"linux", "arm64", "hydra-linux-arm64"},
+		{"darwin", "amd64", "hydra-darwin-amd64"},
+		{"darwin", "arm64", "hydra-darwin-arm64"},
+	}
+	for _, tc := range cases {
+		u := New(Config{OS: tc.os, Arch: tc.arch})
+		got, err := u.SelectAsset(rel)
+		if err != nil {
+			t.Errorf("SelectAsset(%s/%s): %v", tc.os, tc.arch, err)
+			continue
+		}
+		if got.Name != tc.want {
+			t.Errorf("SelectAsset(%s/%s) = %q, want %q", tc.os, tc.arch, got.Name, tc.want)
+		}
+	}
+}
+
+// TestSelectAssetNoCLIAssetsIsClear checks that a release with no CLI
+// binaries attached (e.g. a partial or non-CLI release on the shared
+// hydradns/hydradns feed) fails with a message that says so, rather than a
+// bare "not found".
+func TestSelectAssetNoCLIAssetsIsClear(t *testing.T) {
+	rel := &Release{
+		TagName: "v0.2.0",
+		Assets: []Asset{
+			{Name: "checksums.txt", URL: "https://example.invalid/checksums.txt"},
+			{Name: "Source code (zip)", URL: "https://example.invalid/src.zip"},
+		},
+	}
+	u := New(Config{OS: "linux", Arch: "amd64"})
+	_, err := u.SelectAsset(rel)
+	if err == nil {
+		t.Fatal("expected an error when no CLI asset is attached to the release")
+	}
+	if !strings.Contains(err.Error(), "may not include CLI binaries") {
+		t.Fatalf("error should explain the release may lack CLI binaries, got: %v", err)
+	}
+}
+
+// TestSelectChecksumsAgainstRealReleaseLayout checks that the checksums asset
+// is found (and not, e.g., accidentally shadowed by a binary name).
+func TestSelectChecksumsAgainstRealReleaseLayout(t *testing.T) {
+	rel := &Release{TagName: "v0.1.0", Assets: realReleaseAssets()}
+	u := New(Config{OS: "linux", Arch: "amd64"})
+	got, err := u.SelectChecksums(rel)
+	if err != nil {
+		t.Fatalf("SelectChecksums: %v", err)
+	}
+	if got.Name != "checksums.txt" {
+		t.Fatalf("SelectChecksums returned %q, want checksums.txt", got.Name)
 	}
 }
 

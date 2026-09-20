@@ -13,10 +13,14 @@ import (
 	"time"
 )
 
-// DefaultFeedURL is the GitHub "latest release" REST endpoint for hydra-cli. It
-// returns a JSON document matching the Release type below. Override it with the
-// HYDRA_UPDATE_URL env var or the --url flag to point at a private feed.
-const DefaultFeedURL = "https://api.github.com/repos/hydradns/hydra-cli/releases/latest"
+// DefaultFeedURL is the GitHub "latest release" REST endpoint for the
+// hydradns/hydradns monorepo, whose release.yml attaches the CLI binaries
+// (and a checksums.txt) to each tagged release. hydradns/hydra-cli is the
+// old, now-archived standalone CLI repo and no longer receives releases; do
+// not point this back at it. It returns a JSON document matching the Release
+// type below. Override it with the HYDRA_UPDATE_URL env var or the --url flag
+// to point at a private feed.
+const DefaultFeedURL = "https://api.github.com/repos/hydradns/hydradns/releases/latest"
 
 // maxDownloadBytes caps any single download to guard against a hostile feed.
 const maxDownloadBytes = 512 << 20 // 512 MiB
@@ -118,7 +122,12 @@ func (u *Updater) SelectAsset(rel *Release) (*Asset, error) {
 			return &rel.Assets[i], nil
 		}
 	}
-	return nil, fmt.Errorf("no asset for %s/%s in release %s", u.cfg.OS, u.cfg.Arch, rel.TagName)
+	// The feed is the whole hydradns/hydradns product release, not a CLI-only
+	// feed, so a tag can exist (e.g. a docs-only or partial release) without a
+	// hydra-<os>-<arch> binary attached. Say so explicitly rather than just
+	// "not found", since the silent assumption otherwise is that every
+	// release always has one.
+	return nil, fmt.Errorf("no hydra CLI asset for %s/%s in release %s (this release may not include CLI binaries)", u.cfg.OS, u.cfg.Arch, rel.TagName)
 }
 
 // SelectChecksums returns the published checksums asset for the release.
@@ -128,7 +137,7 @@ func (u *Updater) SelectChecksums(rel *Release) (*Asset, error) {
 			return &rel.Assets[i], nil
 		}
 	}
-	return nil, fmt.Errorf("no checksums file in release %s", rel.TagName)
+	return nil, fmt.Errorf("no checksums file in release %s (expected checksums.txt alongside the CLI binaries)", rel.TagName)
 }
 
 func isChecksumName(name string) bool {
