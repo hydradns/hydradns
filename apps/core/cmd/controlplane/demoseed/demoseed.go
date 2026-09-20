@@ -3,7 +3,7 @@
 // Package demoseed provides the startup data (and periodic refresh) for a
 // public, read-only demo deployment (HYDRA_DEMO_MODE=true). It is only
 // ever invoked from cmd/controlplane/main.go when that flag is set, and
-// touches nothing when it isn't — the whole point of keeping this in its
+// touches nothing when it isn't. The whole point of keeping this in its
 // own package is that it can be deleted (this file, its test, and the two
 // call sites in main.go) without touching anything else in the control
 // plane.
@@ -11,7 +11,7 @@
 // It does three things:
 //  1. EnsureDemoUser creates a fixed-password, role=read_only "demo" user
 //     idempotently (see cmd/controlplane/middlewares.DemoGuard for the
-//     actual write-blocking boundary — this package never creates an
+//     actual write-blocking boundary; this package never creates an
 //     account with write access).
 //  2. SeedIfEmpty fills an empty database with deterministic, synthetic
 //     data (policies, blocklist sources + entries, ~7 days of query logs,
@@ -38,7 +38,7 @@ import (
 
 // DemoUserEmail / DemoUserPassword are the fixed, publicly documented
 // demo credentials (see demo/README.md). They are intentionally not
-// secret — the security boundary for a public demo is middlewares.
+// secret; the security boundary for a public demo is middlewares.
 // DemoGuard (every mutating request is rejected before it reaches auth),
 // not the obscurity of this password.
 const (
@@ -48,21 +48,21 @@ const (
 
 // seedRandSource is a fixed seed so the generated dataset is deterministic
 // across restarts and redeployments (same domains, same rough shape, same
-// number of rows every time) — useful for anyone taking screenshots of, or
+// number of rows every time), useful for anyone taking screenshots of, or
 // writing docs against, the public demo.
 const seedRandSource = 42
 
 // EnsureDemoUser idempotently creates the read_only demo user. It refuses
 // to run (returns an error, which main.go treats as fatal) if the users
 // table already contains anything other than exactly that one demo
-// account — see the doc comment below for why.
+// account; see the safety rationale below.
 //
 // Safety rationale: HYDRA_DEMO_MODE is meant to run against a dedicated,
 // disposable volume (see demo/docker-compose.demo.yml). If it were ever
 // set against a real deployment's database by mistake, blindly proceeding
 // would (a) add a publicly-documented-password backdoor account to a real
 // instance, and (b) hand seeded synthetic query-log rows to Refresh, which
-// periodically deletes and re-inserts the entire dns_queries table —
+// periodically deletes and re-inserts the entire dns_queries table,
 // destroying real query history. Refusing to start is the safe failure
 // mode; the fix is "use a fresh volume", which the shipped demo compose
 // file already does.
@@ -78,7 +78,7 @@ func EnsureDemoUser(store *repositories.Store) error {
 		// it through: it's a pre-RBAC volume, or one where migration
 		// hasn't run yet. Proceeding would seed the demo user over it, and
 		// the periodic Refresh loop would then delete that real history on
-		// its very first tick (M7 in the launch-prep review).
+		// its very first tick.
 		if queryCount, qerr := store.QueryLogs.Count(); qerr != nil {
 			return fmt.Errorf("demoseed: counting query logs: %w", qerr)
 		} else if queryCount > 0 {
@@ -114,12 +114,12 @@ func EnsureDemoUser(store *repositories.Store) error {
 		return fmt.Errorf("demoseed: the existing %q user has role %q, not %q — refusing to run demo mode against it",
 			DemoUserEmail, existing.Role, models.RoleReadOnly)
 	}
-	// Exactly the demo account, already present (a restart) — nothing to do.
+	// Exactly the demo account, already present (a restart); nothing to do.
 	return nil
 }
 
 // SeedIfEmpty populates a fresh database with synthetic demo data, but
-// only if the query log is empty — so it never duplicates data on a plain
+// only if the query log is empty, so it never duplicates data on a plain
 // container restart against an already-seeded volume. Call Refresh
 // instead (see below) for the periodic re-anchor.
 func SeedIfEmpty(store *repositories.Store) error {
@@ -138,7 +138,7 @@ func SeedIfEmpty(store *repositories.Store) error {
 // same deterministic generator, just anchored at the current time instead
 // of whenever the container first booted. Policies and blocklist sources
 // are left alone (seedAll only creates those when they don't already
-// exist, and after the first Seed/Refresh they do) — they have no
+// exist, and after the first Seed/Refresh they do); they have no
 // "recency" requirement the way the logs/charts do.
 //
 // This is the "periodic light refresh" approach rather than incrementally
@@ -147,15 +147,14 @@ func SeedIfEmpty(store *repositories.Store) error {
 // on-disk datetime formats, see repositories.parseSQLiteTime) and produces
 // an identical-shaped dataset every time.
 //
-// The whole thing runs inside one transaction (M7 in the launch-prep
-// review): the delete, the statistics reset, and the batched re-insert
-// used to be three independent writes, so a dashboard request landing
-// between them could see an empty or half-populated table — charts
-// dropping to zero mid-demo, for no reason a viewer could tell apart from
-// a real outage. WAL readers see either the pre-refresh or post-refresh
-// state, never a gap, and the batched inserts inside seedQueryLogs
-// (CreateInBatches, 200 rows at a time) keep the transaction itself short
-// — a few thousand rows is comfortably sub-second on SQLite.
+// The whole thing runs inside one transaction: the delete, the statistics
+// reset, and the batched re-insert must land together, or a dashboard
+// request landing between them could see an empty or half-populated
+// table, charts dropping to zero mid-demo, for no reason a viewer could
+// tell apart from a real outage. WAL readers see either the pre-refresh or
+// post-refresh state, never a gap, and the batched inserts inside
+// seedQueryLogs (CreateInBatches, 200 rows at a time) keep the transaction
+// itself short: a few thousand rows is comfortably sub-second on SQLite.
 func Refresh(db *gorm.DB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.DNSQuery{}).Error; err != nil {
@@ -172,7 +171,7 @@ func Refresh(db *gorm.DB) error {
 		}
 		// seedAll (specifically seedQueryLogs) must run against tx, not the
 		// outer db, so its batched inserts join the same transaction as
-		// the delete and the statistics reset above — a tx-scoped store is
+		// the delete and the statistics reset above. A tx-scoped store is
 		// built here (repositories only hold a *gorm.DB handle, and
 		// NewStore(tx) makes every repository method issue its queries
 		// against tx instead of the connection pool).
@@ -182,7 +181,7 @@ func Refresh(db *gorm.DB) error {
 
 // StartRefreshLoop runs Refresh on a ticker until stop is closed. Intended
 // to be launched with `go demoseed.StartRefreshLoop(...)` from main.go
-// only when HYDRA_DEMO_MODE=true. Errors are logged, not fatal — a failed
+// only when HYDRA_DEMO_MODE=true. Errors are logged, not fatal: a failed
 // refresh leaves the previous (still valid, just older) dataset in place
 // rather than crashing a running public demo.
 func StartRefreshLoop(db *gorm.DB, interval time.Duration, stop <-chan struct{}) {
@@ -302,7 +301,7 @@ type blocklistSeed struct {
 
 // seedBlocklists creates a few blocklist sources with real snapshot/entry
 // rows (so GET /blocklists reports non-zero domains_count) if none exist
-// yet. No network fetch happens — entries are generated locally, which is
+// yet. No network fetch happens: entries are generated locally, which is
 // also why this is safe to run with the dataplane's DNS ports unpublished.
 func seedBlocklists(store *repositories.Store) error {
 	existing, err := store.Blocklist.ListSources()

@@ -76,16 +76,15 @@ func engineWithLogWriter(anonymize bool) (*Engine, *fakeQueryLogRepo) {
 
 // --- Tests ---
 
-// TestLogQuery_DisabledStoresBareClientIPWithoutPort documents a fix: this
-// test used to assert that disabled anonymization stored clientIP
-// byte-for-byte, including the ephemeral source port that
-// w.RemoteAddr().String() always includes for UDP/TCP. That locked in a
-// real bug — every stored row carried a random per-connection port,
-// breaking per-device filtering (GET /analytics/logs?client=<ip>) and
-// cluttering the dashboard's Client IP column, since the same device
-// would never produce two rows with the same ClientIP value. The port is
-// now stripped unconditionally in logQuery, whether or not anonymization
-// is enabled; disabled anonymization still does no hashing.
+// TestLogQuery_DisabledStoresBareClientIPWithoutPort verifies the stored
+// clientIP never carries the ephemeral source port that
+// w.RemoteAddr().String() always includes for UDP/TCP. Storing it
+// byte-for-byte would break per-device filtering (GET
+// /analytics/logs?client=<ip>) and clutter the dashboard's Client IP
+// column, since the same device would never produce two rows with the
+// same ClientIP value. The port is stripped unconditionally in logQuery,
+// whether or not anonymization is enabled; disabled anonymization still
+// does no hashing.
 func TestLogQuery_DisabledStoresBareClientIPWithoutPort(t *testing.T) {
 	e, repo := engineWithLogWriter(false)
 
@@ -209,7 +208,7 @@ func TestLogQuery_EnabledIPv6Works(t *testing.T) {
 // TestLogQuery_EnabledWithoutInitSecretDoesNotPanic covers the case where
 // the engine is constructed (or a test runs) without ever calling
 // utils.InitSecret. Behaviour must be defined: AnonymizeIP's no-secret
-// fallback (coarse masking, no hash) applies — never a panic, and never
+// fallback (coarse masking, no hash) applies: never a panic, and never
 // the raw untouched clientIP.
 func TestLogQuery_EnabledWithoutInitSecretDoesNotPanic(t *testing.T) {
 	utils.InitSecret("") // explicitly simulate "never initialized"
@@ -273,10 +272,10 @@ func TestAnonymizeClientIP_PlainIPWithoutPort(t *testing.T) {
 
 // --- DoH bootstrap marker ---
 
-// TestLogQuery_DoHBootstrapMarksDetectionMethod exercises ProcessDNSQuery
-// end-to-end (not just logQuery) so it also proves the port-stripped
-// client IP and the doh_bootstrap marker both land in the persisted row —
-// the two signals GET /analytics/bypass groups by.
+// TestProcessDNSQuery_DoHBootstrapMarksDetectionMethod exercises
+// ProcessDNSQuery end-to-end (not just logQuery) so it also proves the
+// port-stripped client IP and the doh_bootstrap marker both land in the
+// persisted row: the two signals GET /analytics/bypass groups by.
 func TestProcessDNSQuery_DoHBootstrapMarksDetectionMethod(t *testing.T) {
 	repo := &fakeQueryLogRepo{}
 	pe := policy.NewPolicyEngine()

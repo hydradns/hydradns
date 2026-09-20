@@ -76,7 +76,7 @@ func (h *APIHandler) GetAnalyticsSummary(c *gin.Context) {
 // filtered) so the two endpoints can never drift on field mapping.
 //
 // Method (not a free function) so it can consult h.DemoMode and redact
-// client_ip — see maskClientIP in common.go for why this is applied
+// client_ip; see maskClientIP in common.go for why this is applied
 // unconditionally rather than trusting that demo data is always synthetic.
 func (h *APIHandler) queryLogEntryFromModel(q models.DNSQuery) QueryLogEntry {
 	clientIP := q.ClientIP
@@ -120,7 +120,7 @@ func (h *APIHandler) GetAuditLogs(c *gin.Context) {
 // Query-log pagination bounds.
 //
 //   - maxQueryLogPageSize is a hard upper bound regardless of what the
-//     client requests — dns_queries can hold up to ~1,000,000 rows on an
+//     client requests: dns_queries can hold up to ~1,000,000 rows on an
 //     SD-card install, so an unbounded page size would let a single
 //     request force a huge scan+serialize.
 //   - maxQueryLogReach caps page*page_size: OFFSET is still a linear scan
@@ -144,11 +144,11 @@ const (
 // params. Matches apps/ui/lib/api.ts getQueryLogs(): client, action,
 // domain, suspicious, start, end, page, page_size.
 //
-// Method (not a free function) so it can apply h.resolveClientIPFilter —
-// demo mode rejects the client filter outright (see M8: an exact-match
-// filter over masked-on-output-but-unmasked-in-storage rows is an IP
-// recovery oracle), and anonymization hashes it to match the hashed values
-// actually stored in client_ip (see M3).
+// Method (not a free function) so it can apply h.resolveClientIPFilter:
+// demo mode rejects the client filter outright (an exact-match filter
+// over masked-on-output-but-unmasked-in-storage rows is an IP recovery
+// oracle), and anonymization hashes it to match the hashed values
+// actually stored in client_ip.
 func (h *APIHandler) parseQueryLogFilter(c *gin.Context) (repositories.QueryLogFilter, error) {
 	f := repositories.QueryLogFilter{
 		Domain: strings.ToLower(strings.TrimSpace(c.Query("domain"))),
@@ -214,8 +214,8 @@ func (h *APIHandler) parseQueryLogFilter(c *gin.Context) (repositories.QueryLogF
 }
 
 // countQueryLogs uses the bounded-cost count (repositories.QueryLogCapper)
-// when the configured QueryLogRepository implements it — true for the real
-// GormQueryLogRepo — and falls back to plain CountFiltered otherwise. See
+// when the configured QueryLogRepository implements it (true for the real
+// GormQueryLogRepo) and falls back to plain CountFiltered otherwise. See
 // QueryLogCapper's doc comment for why this is a type assertion rather
 // than a new method on QueryLogRepository itself.
 func (h *APIHandler) countQueryLogs(filter repositories.QueryLogFilter) (total int64, capped bool, err error) {
@@ -261,7 +261,7 @@ func (h *APIHandler) GetQueryLogsPage(c *gin.Context) {
 	}
 	if capped {
 		// Extra field, ignored by clients that don't know about it (see
-		// apps/ui/lib/types.ts's QueryLogPage — a plain TS interface with
+		// apps/ui/lib/types.ts's QueryLogPage, a plain TS interface with
 		// no runtime schema validation on the fetch path). Lets the UI
 		// render "100,000+" instead of a number that looks exact but was
 		// deliberately never computed past the cap.

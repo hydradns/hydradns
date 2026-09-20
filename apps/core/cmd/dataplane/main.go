@@ -30,13 +30,13 @@ func main() {
 	dbPath := db.ResolveDBPath(os.Getenv("HYDRA_DB"))
 	db.InitDB(dbPath)
 
-	// 1b. Anonymization secret — HMAC key AnonymizeIP uses to hash client
+	// 1b. Anonymization secret: HMAC key AnonymizeIP uses to hash client
 	// IPs before they're written to the query log, IF anonymization is
 	// enabled (it's off by default: per-device visibility in the query log
 	// is a core feature, so this is opt-in). Resolving/generating a secret
 	// nobody will use is harmless but surprising, so skip it entirely when
 	// disabled. Must run, and InitSecret must be called, before the DNS
-	// server starts accepting queries (srv.Run() below) — utils.secret is
+	// server starts accepting queries (srv.Run() below). utils.secret is
 	// a package global written once here and never again. Never logged.
 	if config.DefaultConfig.DataPlane.Anonymization.Enabled {
 		anonSecret := config.ResolveAnonymizationSecret(config.DefaultConfig.DataPlane.Anonymization.Secret, filepath.Dir(dbPath))
@@ -46,23 +46,24 @@ func main() {
 	// 2. Initialize Repositories
 	repos := repositories.NewStore(db.DB)
 
-	// 2b. Query-log retention — keep the table (and the Pi's SD card)
+	// 2b. Query-log retention: keep the table (and the Pi's SD card)
 	// bounded. Without this the dns_queries table grows without limit.
 	startQueryLogRetention(repos.QueryLogs)
 
-	// 3. Blocklist Engine — load from DB sources, refresh periodically.
+	// 3. Blocklist Engine: load from DB sources, refresh periodically.
 	// The DNS hot path checks an in-memory set (memBlocklist), never the
 	// DB. Two independent loops keep it current:
 	//   - refreshSources (below) re-fetches each enabled source's remote
-	//     content on BLOCKLIST_UPDATE_INTERVAL (default 6h) — this is
+	//     content on BLOCKLIST_UPDATE_INTERVAL (default 6h). This is
 	//     about the *content* of a source going stale, unrelated to local
 	//     CRUD changes.
 	//   - blocklistReloader.Poll, driven by startBlocklistPoll on
 	//     BLOCKLIST_POLL_INTERVAL (default 5s), watches a cheap DB
 	//     signature and rebuilds memBlocklist within seconds of a
-	//     dashboard/CLI/MCP add, enable, disable, edit, or delete — the
-	//     propagation gap policies didn't have (reloadPolicies below
-	//     already polls every 5s) but blocklists did until this loop.
+	//     dashboard/CLI/MCP add, enable, disable, edit, or delete. Without
+	//     it, blocklist changes would only propagate on the slower
+	//     refreshSources/restart cadence; policies close that same gap via
+	//     reloadPolicies's 5s poll below.
 	blEngine := blocklist.NewEngine(repos.Blocklist)
 	memBlocklist := blocklist.NewMemoryChecker()
 	blReloader := newBlocklistReloader(blEngine, memBlocklist)
@@ -76,11 +77,12 @@ func main() {
 	// completes fast even if refreshSources' first pass (below) is still
 	// fetching remote sources.
 	//
-	// C1 fix: runInitialBlocklistLoad retries until it actually succeeds,
-	// rather than a single fire-and-forget Poll() call — a single transient
-	// DB error here (e.g. "database is locked" while the control plane's
-	// AutoMigrate runs concurrently against the same SQLite file) used to
-	// leave the in-memory blocklist empty for the life of the process.
+	// runInitialBlocklistLoad retries until it actually succeeds, rather
+	// than a single fire-and-forget Poll() call: a single transient DB
+	// error here (e.g. "database is locked" while the control plane's
+	// AutoMigrate runs concurrently against the same SQLite file) would
+	// otherwise leave the in-memory blocklist empty for the life of the
+	// process.
 	go runInitialBlocklistLoad(blReloader, blocklistPollInterval)
 
 	// Periodic re-fetch of each enabled source's remote content.
@@ -107,7 +109,8 @@ func main() {
 	// changes (create/toggle/edit/delete) without waiting for the
 	// refreshSources loop above. BLOCKLIST_POLL_INTERVAL, default 5s; 0
 	// disables it (propagation then only happens via the initial load and
-	// refreshSources passes above — the pre-existing ~6h/restart bound).
+	// refreshSources passes above, bound to the ~6h refresh interval or a
+	// restart).
 	var stopBlocklistPoll func()
 	if blocklistPollInterval > 0 {
 		stopBlocklistPoll = startBlocklistPoll(blReloader, blocklistPollInterval)
@@ -116,12 +119,12 @@ func main() {
 		stopBlocklistPoll = func() {}
 	}
 
-	// Wire the blocklist poll loop's stop func into shutdown (previously
-	// discarded — see L4 in the review) rather than leaking the background
-	// goroutine's handle. There's no broader graceful-shutdown sequence in
-	// this binary today (srv.Run() below blocks for the process lifetime),
-	// so this only stops the poll loop cleanly on SIGINT/SIGTERM before the
-	// process exits; it does not attempt to drain in-flight DNS queries.
+	// Wire the blocklist poll loop's stop func into shutdown rather than
+	// leaking the background goroutine's handle. There's no broader
+	// graceful-shutdown sequence in this binary today (srv.Run() below
+	// blocks for the process lifetime), so this only stops the poll loop
+	// cleanly on SIGINT/SIGTERM before the process exits; it does not
+	// attempt to drain in-flight DNS queries.
 	go func() {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
@@ -130,7 +133,7 @@ func main() {
 		stopBlocklistPoll()
 	}()
 
-	// 4. Initialize Policy Engine — load from file + DB
+	// 4. Initialize Policy Engine: load from file + DB
 	policyEngine := policy.NewPolicyEngine()
 	policiesPath := "/app/configs/policies.json"
 	if p := os.Getenv("HYDRA_POLICIES"); p != "" {
@@ -185,20 +188,19 @@ func main() {
 
 // refreshSources re-fetches each enabled source's remote content into the
 // DB (new BlocklistSnapshot + BlocklistEntry rows on a change; a no-op on
-// ETag match). It does not touch the in-memory blocklist set directly — the
+// ETag match). It does not touch the in-memory blocklist set directly: the
 // deferred reloader.ForceRebuild() call lets the single-flighted
 // blocklistReloader pick up any resulting DB change and rebuild
 // memBlocklist, the same path the fast signature-poll ticker uses. Keeping
 // exactly one rebuild path avoids two goroutines racing to call
 // MemoryChecker.Reload concurrently.
 //
-// ForceRebuild (not Poll) is deferred deliberately (M12 in the review,
-// restoring a safety net the signature-based poll loop had removed): this
-// runs on a 6h cadence, so an unconditional rebuild is cheap relative to
-// that, and it's what lets the in-memory set self-heal from any future bug
-// that desyncs it from the DB without a matching signature change. It's a
-// defer so every return path below — including "no sources configured" and
-// the ListSources() error path — still forces the rebuild.
+// ForceRebuild (not Poll) is deferred deliberately: this runs on a 6h
+// cadence, so an unconditional rebuild is cheap relative to that, and it's
+// what lets the in-memory set self-heal from any future bug that desyncs
+// it from the DB without a matching signature change. It's a defer so
+// every return path below, including "no sources configured" and the
+// ListSources() error path, still forces the rebuild.
 func refreshSources(ctx context.Context, engine *blocklist.Engine, reloader *blocklistReloader) {
 	defer reloader.ForceRebuild()
 

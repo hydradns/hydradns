@@ -36,21 +36,20 @@ func main() {
 	// demo: see middlewares.DemoGuard (the actual write-blocking boundary)
 	// and cmd/controlplane/demoseed (the seeded user + synthetic data).
 	// Default is off, and when off none of this file's demo-mode branches
-	// run — behaviour is byte-for-byte the same as before this feature
-	// existed.
+	// run.
 	//
 	// Routed through config.MustParseBoolEnv (not a bespoke
 	// strings.EqualFold(..., "true")) so "1", "yes", "on", or a value with
 	// a stray trailing space from a Docker env_file line are all
-	// recognized instead of silently resolving to "off" — see H1 in the
-	// launch-prep review: that near-miss left a public demo's
-	// /auth/setup unauthenticated and open to the first visitor. An
-	// unrecognized value now fails fast (log.Fatalf naming the variable
-	// and value) rather than silently defaulting to off.
+	// recognized instead of silently resolving to "off": a near-miss here
+	// would leave a public demo's /auth/setup unauthenticated and open to
+	// the first visitor. An unrecognized value fails fast (log.Fatalf
+	// naming the variable and value) rather than silently defaulting to
+	// off.
 	demoMode := config.MustParseBoolEnv("HYDRA_DEMO_MODE", false)
 	if demoMode {
 		// Refuses to proceed (fatal) if this looks like a real deployment's
-		// database rather than a fresh demo volume — see the doc comment
+		// database rather than a fresh demo volume; see the doc comment
 		// on EnsureDemoUser for why that matters.
 		if err := demoseed.EnsureDemoUser(repos); err != nil {
 			log.Fatalf("demo mode startup check failed: %v", err)
@@ -82,7 +81,7 @@ func main() {
 	blocklistEngine := blocklist.NewEngine(repos.Blocklist)
 
 	// Resolve the same anonymization secret the dataplane uses (same env
-	// var, same config value, same <dataDir>/anon_secret file — see
+	// var, same config value, same <dataDir>/anon_secret file; see
 	// config.ResolveAnonymizationSecret) so this process can hash a
 	// client=<ip> filter value the same way the dataplane hashed it before
 	// writing dns_queries.client_ip. Only resolved when anonymization is
@@ -103,11 +102,11 @@ func main() {
 	// spoof its own client IP: dodge the per-IP login throttle, or make
 	// the audit log record a fabricated address for its own actions.
 	// TRUSTED_PROXIES (comma-separated CIDRs/IPs) is empty by default,
-	// meaning "trust none" — c.ClientIP() then always resolves to the
+	// meaning "trust none": c.ClientIP() then always resolves to the
 	// real socket address. Only set it if this API sits behind a reverse
 	// proxy that itself overwrites (never appends to) X-Forwarded-For
 	// before forwarding, and set it to that proxy's address specifically
-	// (the demo's own reverse proxy included — see demo/README.md).
+	// (the demo's own reverse proxy included; see demo/README.md).
 	if err := configureTrustedProxies(r); err != nil {
 		log.Fatalf("invalid TRUSTED_PROXIES: %v", err)
 	}
@@ -121,12 +120,12 @@ func main() {
 // buildMiddlewareChain installs the global middleware stack in the
 // production order: Logger -> CORS -> [DemoGuard] -> Auth. DemoGuard is
 // only appended when demoMode is true, so a disabled demo mode is not
-// merely a no-op guard sitting in the chain — the middleware is not
+// merely a no-op guard sitting in the chain: the middleware is not
 // installed at all, and TestBuildMiddlewareChain_DemoGuardOnlyWhenEnabled
 // asserts exactly that.
 //
 // DemoGuard must run before Auth so it cannot be bypassed by any role,
-// including admin — see the doc comment on middlewares.DemoGuard.
+// including admin; see the doc comment on middlewares.DemoGuard.
 func buildMiddlewareChain(r *gin.Engine, demoMode bool, users repositories.UserRepository, tokens repositories.TokenRepository) {
 	r.Use(middlewares.Logger())
 
@@ -137,14 +136,14 @@ func buildMiddlewareChain(r *gin.Engine, demoMode bool, users repositories.UserR
 		r.Use(middlewares.DemoGuard())
 	}
 
-	// Auth middleware — validates Bearer token on protected routes
+	// Auth middleware: validates Bearer token on protected routes
 	r.Use(middlewares.Auth(users, tokens))
 }
 
 // configureTrustedProxies applies TRUSTED_PROXIES (comma-separated
 // CIDRs/IPs) to r, defaulting to nil (trust no proxies) when unset. nil
 // is a distinct value from an empty-but-non-nil slice for gin's
-// SetTrustedProxies — passing nil is what actually disables proxy
+// SetTrustedProxies: passing nil is what actually disables proxy
 // trust; an empty slice is not equivalent.
 func configureTrustedProxies(r *gin.Engine) error {
 	var proxies []string

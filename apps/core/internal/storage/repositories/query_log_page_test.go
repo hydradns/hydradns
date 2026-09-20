@@ -197,7 +197,7 @@ func TestQueryLog_Filter_TimeRange(t *testing.T) {
 	}
 }
 
-// --- M6: CountFilteredCapped bounds the COUNT query itself ---
+// --- CountFilteredCapped bounds the COUNT query itself ---
 
 func TestQueryLog_CountFilteredCapped_BelowCapReturnsExactTotal(t *testing.T) {
 	db := setupTestDB(t)

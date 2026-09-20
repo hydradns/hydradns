@@ -33,10 +33,9 @@ func openMiddlewareTestDB(t *testing.T) *gorm.DB {
 }
 
 // TestBuildMiddlewareChain_DemoGuardOnlyWhenEnabled proves demo mode's
-// guard is not merely inert when disabled — it is not installed on the
-// engine at all, so disabled behaviour is byte-for-byte what it was before
-// demo mode existed. Structural proof (Handlers count) plus a behavioral
-// check (an actual mutating request) so the test fails if either regresses.
+// guard is not installed on the engine at all when disabled, rather than
+// merely inert. Structural proof (Handlers count) plus a behavioral check
+// (an actual mutating request) so the test fails if either regresses.
 func TestBuildMiddlewareChain_DemoGuardOnlyWhenEnabled(t *testing.T) {
 	db := openMiddlewareTestDB(t)
 	users := repositories.NewUserRepo(db)

@@ -77,9 +77,9 @@ func TestShippedPolicies_NoShoppingPolicy(t *testing.T) {
 	}
 }
 
-// TestShippedPolicies_StillHasAnAdBlockDemo makes sure the fix didn't
-// over-correct into blocking nothing — the first `dig` demo should still
-// show a block against a safe, non-platform ad/tracker domain.
+// TestShippedPolicies_StillHasAnAdBlockDemo makes sure removing the
+// dangerous policies didn't leave nothing to block: the first `dig` demo
+// should still show a block against a safe, non-platform ad/tracker domain.
 func TestShippedPolicies_StillHasAnAdBlockDemo(t *testing.T) {
 	policies, err := LoadPoliciesFromFile(shippedPoliciesPath)
 	if err != nil {

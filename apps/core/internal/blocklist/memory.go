@@ -39,8 +39,8 @@ func NewMemoryChecker() *MemoryChecker {
 // TestMemoryChecker_ReloadMemoryFootprint): ~30 bytes/entry heap growth for
 // the map[string]struct{}. Extrapolated, a multi-million-domain aggregated
 // blocklist set is tens to ~100MB steady-state, so roughly double that
-// transiently during a rebuild — comfortably fine on a 1GB Pi for one set.
-// No redesign here; this is why Poll single-flights rebuilds
+// transiently during a rebuild, comfortably fine on a 1GB Pi for one set.
+// This is why Poll single-flights rebuilds
 // (cmd/dataplane/blocklist_reload.go) rather than ever running two
 // concurrently, which would make that peak worse under a change burst.
 func (m *MemoryChecker) Reload(domains []string) {

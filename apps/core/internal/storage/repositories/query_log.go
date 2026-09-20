@@ -33,7 +33,7 @@ type QueryLogRepository interface {
 // QueryLogCapper is an optional capability of a QueryLogRepository: a
 // bounded-cost count for GET /analytics/logs (see GormQueryLogRepo.
 // CountFilteredCapped). Deliberately NOT part of QueryLogRepository
-// itself — that interface is implemented by hand-written fakes elsewhere
+// itself: that interface is implemented by hand-written fakes elsewhere
 // in the module (internal/dnsengine's tests, outside this change's scope)
 // that have no reason to grow a new method just because the control
 // plane's logs endpoint needs a cheaper count. Callers (see
@@ -74,7 +74,7 @@ type BypassAttemptRow struct {
 	// Blocked is true if at least one attempt in the group was answered
 	// with a block action. Given the dataplane's current design (Step 0
 	// of ProcessDNSQuery unconditionally intercepts every bootstrap
-	// hostname lookup with NXDOMAIN), this is always true today — kept as
+	// hostname lookup with NXDOMAIN), this is always true today. Kept as
 	// a real aggregate rather than a hardcoded constant so it stays
 	// correct if that ever changes.
 	Blocked bool
@@ -197,7 +197,7 @@ func escapeLike(s string) string {
 
 // applyFilter builds the WHERE clauses shared by ListPage and
 // CountFiltered. All user-supplied values are passed as bound parameters
-// (GORM placeholders) — never concatenated into the query string.
+// (GORM placeholders), never concatenated into the query string.
 //
 // Indexing notes (dns_queries can hold up to ~1,000,000 rows on an SD
 // card, and this query runs on every logs-page filter keystroke):
@@ -274,8 +274,8 @@ func (r *GormQueryLogRepo) CountFiltered(f QueryLogFilter) (int64, error) {
 // ~1M rows), it counts rows from a subquery capped at capAt+1 matches
 // ("SELECT COUNT(*) FROM (SELECT 1 FROM dns_queries WHERE ... LIMIT
 // capAt+1)"). If the subquery hits its limit, the true total is unknown
-// (could be anything >= capAt) but doesn't matter for pagination purposes
-// — the UI is told the total is capAt and that it's capped, which is
+// (could be anything >= capAt) but doesn't matter for pagination purposes:
+// the UI is told the total is capAt and that it's capped, which is
 // enough to render "100,000+" instead of computing an exact count nobody
 // can page through anyway (see the reachable-offset cap in
 // handlers.parseQueryLogFilter). capAt<=0 disables capping.
@@ -352,10 +352,10 @@ func (r *GormQueryLogRepo) BypassAttempts(since time.Time, limit int) (BypassSum
 	for _, rr := range rows {
 		lastAttempt, perr := parseSQLiteTime(rr.LastAttempt)
 		if perr != nil {
-			// L7 in the launch-prep review: shipping a row with the zero
-			// time (0001-01-01T00:00:00Z) looks like real, if very old,
-			// data to a caller — the UI would render "25000 years ago"
-			// with no indication anything is wrong. Drop the row instead;
+			// Shipping a row with the zero time (0001-01-01T00:00:00Z)
+			// looks like real, if very old, data to a caller: the UI would
+			// render "25000 years ago" with no indication anything is
+			// wrong. Drop the row instead;
 			// TotalAttempts/UniqueClients above were already computed from
 			// separate queries and are unaffected, so the aggregate counts
 			// stay accurate even though this one group's row is withheld.

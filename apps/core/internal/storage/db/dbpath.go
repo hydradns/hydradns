@@ -20,7 +20,7 @@ const legacyDBFileName = "phantomdns.db"
 // os.Getenv("HYDRA_DB"); an empty string means "use DefaultDBPath."
 //
 // If the resolved path doesn't exist yet but a legacy phantomdns.db sits
-// in the same directory, that legacy file is returned instead — otherwise
+// in the same directory, that legacy file is returned instead: otherwise
 // an in-place upgrade would silently start a brand-new, empty hydradns.db
 // next to an existing install's real data. This covers both:
 //   - no HYDRA_DB set: DefaultDBPath doesn't exist yet, phantomdns.db does.

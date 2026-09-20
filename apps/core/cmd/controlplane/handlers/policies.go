@@ -57,17 +57,16 @@ type CreatePolicyRequest struct {
 
 // validatePolicyAction checks action (and, for REDIRECT, redirectIP)
 // against what the dataplane's policy engine and file loader actually
-// understand — BLOCK/ALLOW/REDIRECT, matched case-insensitively (see
+// understand: BLOCK/ALLOW/REDIRECT, matched case-insensitively (see
 // internal/policy/engine.go's policyDecision switch and
 // internal/policy/loader.go's ValidatePolicy, which apply the identical
 // rule to configs/policies.json). The engine's switch silently falls
 // through to ActionAllow for anything it doesn't recognize, so without
 // this check, POST/PUT with a typo'd action (e.g. "DENY") returns 200 and
 // a policy that was supposed to BLOCK a category starts silently allowing
-// it (M10 in the launch-prep review). REDIRECT additionally requires a
-// real IP in redirect_ip — the field the dataplane forwards matched
-// queries to — since an empty or unparseable target is not a usable
-// redirect either.
+// it. REDIRECT additionally requires a real IP in redirect_ip (the field
+// the dataplane forwards matched queries to), since an empty or
+// unparseable target is not a usable redirect either.
 func validatePolicyAction(action, redirectIP string) (errMsg string, ok bool) {
 	switch strings.ToUpper(strings.TrimSpace(action)) {
 	case "BLOCK", "ALLOW":
@@ -191,12 +190,12 @@ func (h *APIHandler) CreatePolicy(c *gin.Context) {
 }
 
 // UpdatePolicyRequest is deliberately distinct from CreatePolicyRequest:
-// it has no ID field at all (the path :id always wins — there is nowhere
+// it has no ID field at all (the path :id always wins; there is nowhere
 // for a body id to even bind to), but otherwise requires the same fields
 // create does, since the UI's Edit Policy drawer always sends the full
 // resource, not a partial patch (see apps/ui/app/dashboard/policies/page.tsx
-// handleSubmit — the same `payload` object is sent for both create and
-// edit; only the presence of `id` differs).
+// handleSubmit; the same `payload` object is sent for both create and
+// edit, only the presence of `id` differs).
 type UpdatePolicyRequest struct {
 	Name        string   `json:"name" binding:"required"`
 	Description string   `json:"description"`
@@ -214,7 +213,7 @@ type UpdatePolicyRequest struct {
 //
 // Propagation: the dataplane polls PolicyRepository.List() into its
 // in-memory PolicySnapshot every 5s (see cmd/dataplane/main.go's
-// reloadPolicies ticker) — the exact same mechanism CreatePolicy and
+// reloadPolicies ticker), the exact same mechanism CreatePolicy and
 // DeletePolicy already rely on. An edit here needs no new propagation
 // path: the next poll (within 5s) picks up the row this handler wrote.
 func (h *APIHandler) UpdatePolicy(c *gin.Context) {

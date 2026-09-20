@@ -107,7 +107,7 @@ func (h *APIHandler) Setup(c *gin.Context) {
 	var warnings []string
 	for _, bl := range req.Blocklists {
 		// Same scheme check CreateBlocklist and UpdateBlocklist use (see
-		// validateBlocklistURL in blocklists.go) — one validator for every
+		// validateBlocklistURL in blocklists.go): one validator for every
 		// write path that accepts an operator-supplied blocklist URL.
 		if err := validateBlocklistURL(bl.URL); err != nil {
 			warnings = append(warnings, "skipped "+bl.Name+": "+err.Error())

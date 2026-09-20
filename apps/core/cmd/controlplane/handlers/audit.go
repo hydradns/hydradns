@@ -31,7 +31,7 @@ type auditDTO struct {
 // h.DemoMode and redact ClientIP. In practice GET /audit is gated to
 // operator+ (see routes/router.go) and demo mode only ever seeds a
 // read_only user, so this path is unreachable in a stock demo deployment
-// today — the redaction is applied anyway, defensively, so it stays
+// today. The redaction is applied anyway, defensively, so it stays
 // correct if that role gate ever changes. See maskClientIP in common.go.
 func (h *APIHandler) toAuditDTO(evt models.AuditEvent) auditDTO {
 	clientIP := evt.ClientIP

@@ -240,7 +240,7 @@ func TestGetQueryLogsPage_ClientFilterPrecise(t *testing.T) {
 	}
 }
 
-// --- M6: reachable offset is capped, count is capped ---
+// --- reachable offset is capped, count is capped ---
 
 func TestGetQueryLogsPage_PageBeyondReachableOffsetIsBadRequest(t *testing.T) {
 	th := newAnalyticsHarness(t)
@@ -264,7 +264,7 @@ func TestGetQueryLogsPage_PageAtReachableOffsetBoundaryIsOK(t *testing.T) {
 	}
 }
 
-// --- M8: demo mode rejects the client filter (it would otherwise recover
+// --- demo mode rejects the client filter (it would otherwise recover
 // a masked IP by 256-request oracle) ---
 
 func TestGetQueryLogsPage_DemoModeRejectsClientFilter(t *testing.T) {
@@ -298,7 +298,7 @@ func TestGetQueryLogsPage_DemoModeStillServesUnfilteredLogs(t *testing.T) {
 	}
 }
 
-// --- M3: anonymization hashes the client filter to match hashed storage ---
+// --- anonymization hashes the client filter to match hashed storage ---
 
 func TestGetQueryLogsPage_AnonymizedClientFilterMatchesHashedStorage(t *testing.T) {
 	th := newAnalyticsHarness(t)
@@ -402,7 +402,7 @@ func TestGetBypassAttempts_AggregatesByClientAndTarget(t *testing.T) {
 		Domain: "cloudflare-dns.com", ClientIP: "192.168.1.9", Action: "block",
 		DetectionMethod: models.DetectionMethodDoHBootstrap, Timestamp: now,
 	})
-	// An ordinary blocklist block — must NOT be counted as a bypass attempt.
+	// An ordinary blocklist block: must NOT be counted as a bypass attempt.
 	th.db.Create(&models.DNSQuery{
 		Domain: "ads.example.com", ClientIP: "192.168.1.5", Action: "block", Timestamp: now,
 	})
