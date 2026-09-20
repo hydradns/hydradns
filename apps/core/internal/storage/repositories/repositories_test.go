@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -130,6 +131,206 @@ func TestBlocklistRepo_SaveSnapshotWithEntries(t *testing.T) {
 	blocked, _ := repo.IsBlocked("a.com")
 	if !blocked {
 		t.Error("expected a.com to be blocked after snapshot save")
+	}
+}
+
+// H3: a source's entries must be the *current* snapshot's contents, not the
+// union of every snapshot ever ingested. A domain the upstream list dropped
+// must stop being blocked once the next fetch lands.
+func TestBlocklistRepo_SaveSnapshotWithEntries_ReplacesPriorEntries(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBlocklistRepo(db)
+
+	src := models.BlocklistSource{ID: "src1", Name: "Test", URL: "http://example.com/hosts", Format: "hosts", Enabled: true, CreatedAt: time.Now()}
+	db.Create(&src)
+
+	first := []models.BlocklistEntry{
+		{Domain: "a.com", SourceID: "src1"},
+		{Domain: "b.com", SourceID: "src1"},
+	}
+	if _, err := repo.SaveSnapshotWithEntries(src, "checksum-1", first); err != nil {
+		t.Fatal(err)
+	}
+
+	second := []models.BlocklistEntry{
+		{Domain: "b.com", SourceID: "src1"},
+		{Domain: "c.com", SourceID: "src1"},
+	}
+	if _, err := repo.SaveSnapshotWithEntries(src, "checksum-2", second); err != nil {
+		t.Fatal(err)
+	}
+
+	domains, err := repo.GetAllEnabled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"b.com": true, "c.com": true}
+	if len(domains) != len(want) {
+		t.Fatalf("GetAllEnabled() = %v, want exactly %v", domains, want)
+	}
+	for _, d := range domains {
+		if !want[d] {
+			t.Errorf("unexpected stale domain %q survived the second snapshot", d)
+		}
+	}
+	blockedA, _ := repo.IsBlocked("a.com")
+	if blockedA {
+		t.Error("a.com was dropped from the upstream list and must no longer be blocked")
+	}
+
+	count, err := repo.CountEntriesBySource("src1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Errorf("domains_count = %d, want 2 (current snapshot only)", count)
+	}
+}
+
+// H3: a fetch that finds the content unchanged (same checksum as the
+// source's last successful ingest) must be a no-op — it must not delete and
+// re-insert the identical entries.
+func TestBlocklistRepo_SaveSnapshotWithEntries_UnchangedChecksumLeavesEntriesAlone(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBlocklistRepo(db)
+
+	src := models.BlocklistSource{ID: "src1", Name: "Test", URL: "http://example.com/hosts", Format: "hosts", Enabled: true, CreatedAt: time.Now()}
+	db.Create(&src)
+
+	entries := []models.BlocklistEntry{{Domain: "a.com", SourceID: "src1"}, {Domain: "b.com", SourceID: "src1"}}
+	firstSnap, err := repo.SaveSnapshotWithEntries(src, "same-checksum", entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Re-fetch: reload the source as the caller would (LastHash now set),
+	// and save again with the identical checksum.
+	fresh, err := repo.GetSource("src1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondSnap, err := repo.SaveSnapshotWithEntries(*fresh, "same-checksum", entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if secondSnap.ID != firstSnap.ID {
+		t.Errorf("unchanged checksum created a new snapshot row (id %d != %d); expected a no-op", secondSnap.ID, firstSnap.ID)
+	}
+
+	count, err := repo.CountEntriesBySource("src1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Errorf("unchanged fetch touched entries: domains_count = %d, want 2", count)
+	}
+}
+
+// H3: editing a source's URL (or the upstream content changing entirely)
+// followed by a fetch must leave only the new list's domains — none of the
+// old URL's entries survive.
+func TestBlocklistRepo_SaveSnapshotWithEntries_URLEditThenFetchLeavesOnlyNewList(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBlocklistRepo(db)
+
+	src := models.BlocklistSource{ID: "src1", Name: "Test", URL: "http://old.example.com/hosts", Format: "hosts", Enabled: true, CreatedAt: time.Now()}
+	db.Create(&src)
+
+	oldEntries := []models.BlocklistEntry{{Domain: "old-a.com", SourceID: "src1"}, {Domain: "old-b.com", SourceID: "src1"}}
+	if _, err := repo.SaveSnapshotWithEntries(src, "old-checksum", oldEntries); err != nil {
+		t.Fatal(err)
+	}
+
+	// Operator edits the URL (mirrors handlers.UpdateBlocklist's UpdateSourceFields call).
+	src.URL = "http://new.example.com/hosts"
+	if err := repo.UpdateSourceFields(&src); err != nil {
+		t.Fatal(err)
+	}
+
+	// Next fetch (of the new URL) completes with entirely different content.
+	newEntries := []models.BlocklistEntry{{Domain: "new-a.com", SourceID: "src1"}}
+	if _, err := repo.SaveSnapshotWithEntries(src, "new-checksum", newEntries); err != nil {
+		t.Fatal(err)
+	}
+
+	domains, err := repo.GetAllEnabled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(domains) != 1 || domains[0] != "new-a.com" {
+		t.Fatalf("GetAllEnabled() = %v, want [new-a.com] only (old URL's entries must be gone)", domains)
+	}
+	blockedOld, _ := repo.IsBlocked("old-a.com")
+	if blockedOld {
+		t.Error("old-a.com from the pre-edit URL is still blocked after the URL edit's fetch completed")
+	}
+}
+
+// H3 retention: snapshot *metadata* rows are capped per source so the table
+// doesn't grow without bound across years of refreshes, while still keeping
+// some history. The exact cap is an implementation choice (see
+// snapshotRetentionPerSource); this test only asserts it is enforced and
+// that the most recent snapshot is always kept.
+func TestBlocklistRepo_SaveSnapshotWithEntries_PrunesOldSnapshotMetadata(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBlocklistRepo(db)
+
+	src := models.BlocklistSource{ID: "src1", Name: "Test", URL: "http://x", Format: "hosts", Enabled: true, CreatedAt: time.Now()}
+	db.Create(&src)
+
+	var lastSnap models.BlocklistSnapshot
+	for i := 0; i < snapshotRetentionPerSource+5; i++ {
+		fresh, err := repo.GetSource("src1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries := []models.BlocklistEntry{{Domain: "a.com", SourceID: "src1"}}
+		snap, err := repo.SaveSnapshotWithEntries(*fresh, fmt.Sprintf("checksum-%d", i), entries)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lastSnap = snap
+	}
+
+	var count int64
+	if err := db.Model(&models.BlocklistSnapshot{}).Where("source_id = ?", "src1").Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != snapshotRetentionPerSource {
+		t.Errorf("snapshot metadata rows = %d, want %d (retention cap)", count, snapshotRetentionPerSource)
+	}
+
+	var stillThere models.BlocklistSnapshot
+	if err := db.First(&stillThere, "id = ?", lastSnap.ID).Error; err != nil {
+		t.Errorf("most recent snapshot (id %d) was pruned: %v", lastSnap.ID, err)
+	}
+}
+
+// M9: DeleteSource's and H3's replace-on-ingest DELETE both filter by
+// source_id; without an index both are full table scans over
+// blocklist_entries, which can hold millions of rows on a Pi.
+func TestBlocklistRepo_BlocklistEntriesSourceIDIsIndexed(t *testing.T) {
+	db := setupTestDB(t)
+
+	var indexNames []string
+	if err := db.Raw("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'blocklist_entries'").
+		Scan(&indexNames).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	found := false
+	for _, name := range indexNames {
+		var col string
+		if err := db.Raw("SELECT name FROM pragma_index_info(?) LIMIT 1", name).Scan(&col).Error; err != nil {
+			t.Fatal(err)
+		}
+		if col == "source_id" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("no index on blocklist_entries.source_id; found indexes: %v", indexNames)
 	}
 }
 
