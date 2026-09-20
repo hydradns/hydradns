@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hydradns/hydra-cli/api"
+	"github.com/hydradns/hydradns/apps/cli/api"
 )
 
 // JSON-RPC 2.0 types

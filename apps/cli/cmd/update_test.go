@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/hydradns/hydra-cli/selfupdate"
+	"github.com/hydradns/hydradns/apps/cli/selfupdate"
 )
 
 // TestUpdateCheckDoesNotModify verifies that `hydra update --check` reports an

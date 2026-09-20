@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hydradns/hydra-cli/api"
+	"github.com/hydradns/hydradns/apps/cli/api"
 )
 
 // mockClient is a deterministic in-memory implementation of apiClient used to

@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hydradns/hydra-core/internal/blocklist/fetcher"
-	"github.com/hydradns/hydra-core/internal/blocklist/parser"
-	"github.com/hydradns/hydra-core/internal/logger"
-	"github.com/hydradns/hydra-core/internal/storage/models"
-	"github.com/hydradns/hydra-core/internal/storage/repositories"
+	"github.com/hydradns/hydradns/apps/core/internal/blocklist/fetcher"
+	"github.com/hydradns/hydradns/apps/core/internal/blocklist/parser"
+	"github.com/hydradns/hydradns/apps/core/internal/logger"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/models"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/repositories"
 )
 
 // Engine orchestrates fetching, parsing, and persisting blocklist snapshots.

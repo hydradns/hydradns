@@ -12,7 +12,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/hydradns/hydra-core/internal/config"
+	"github.com/hydradns/hydradns/apps/core/internal/config"
 )
 
 // corsFatalf is called when CORS_ORIGINS cannot be turned into a valid

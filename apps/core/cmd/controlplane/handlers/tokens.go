@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hydradns/hydra-core/cmd/controlplane/middlewares"
-	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydradns/apps/core/cmd/controlplane/middlewares"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/models"
 )
 
 // tokenDTO is the wire shape for Token. The stored hash is never

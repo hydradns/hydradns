@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hydradns/hydra-cli/api"
+	"github.com/hydradns/hydradns/apps/cli/api"
 )
 
 // apiClient is the subset of *api.Client the MCP server depends on. It exists

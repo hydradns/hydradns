@@ -7,13 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hydradns/hydra-core/internal/config"
-	"github.com/hydradns/hydra-core/internal/logger"
-	"github.com/hydradns/hydra-core/internal/metrics"
-	"github.com/hydradns/hydra-core/internal/policy"
-	"github.com/hydradns/hydra-core/internal/storage/models"
-	"github.com/hydradns/hydra-core/internal/storage/repositories"
-	"github.com/hydradns/hydra-core/internal/threat"
+	"github.com/hydradns/hydradns/apps/core/internal/config"
+	"github.com/hydradns/hydradns/apps/core/internal/logger"
+	"github.com/hydradns/hydradns/apps/core/internal/metrics"
+	"github.com/hydradns/hydradns/apps/core/internal/policy"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/models"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/repositories"
+	"github.com/hydradns/hydradns/apps/core/internal/threat"
 	"github.com/miekg/dns"
 )
 

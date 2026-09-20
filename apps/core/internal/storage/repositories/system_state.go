@@ -4,7 +4,7 @@ package repositories
 import (
 	"time"
 
-	"github.com/hydradns/hydra-core/internal/storage/models"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/models"
 	"gorm.io/gorm"
 )
 

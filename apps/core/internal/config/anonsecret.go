@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hydradns/hydra-core/internal/logger"
+	"github.com/hydradns/hydradns/apps/core/internal/logger"
 )
 
 // anonSecretPlaceholder is the documented "unset" value for

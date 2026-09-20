@@ -4,7 +4,7 @@ package dnsengine
 import (
 	"net"
 
-	"github.com/hydradns/hydra-core/internal/utils"
+	"github.com/hydradns/hydradns/apps/core/internal/utils"
 )
 
 // anonymizeClientIP hashes clientIP for storage in the query log, when

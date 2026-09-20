@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hydradns/hydra-core/internal/logger"
+	"github.com/hydradns/hydradns/apps/core/internal/logger"
 	"gopkg.in/yaml.v3"
 )
 

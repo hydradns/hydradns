@@ -8,7 +8,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/hydradns/hydra-cli/api"
+	"github.com/hydradns/hydradns/apps/cli/api"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-module github.com/hydradns/hydra-core
+module github.com/hydradns/hydradns/apps/core
 
 go 1.25.0
 

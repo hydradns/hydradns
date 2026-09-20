@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hydradns/hydra-cli/selfupdate"
+	"github.com/hydradns/hydradns/apps/cli/selfupdate"
 	"github.com/spf13/cobra"
 )
 

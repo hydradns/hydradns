@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hydradns/hydra-core/internal/metrics"
-	"github.com/hydradns/hydra-core/internal/policy"
-	"github.com/hydradns/hydra-core/internal/storage/models"
-	"github.com/hydradns/hydra-core/internal/storage/repositories"
-	"github.com/hydradns/hydra-core/internal/threat"
-	"github.com/hydradns/hydra-core/internal/utils"
+	"github.com/hydradns/hydradns/apps/core/internal/metrics"
+	"github.com/hydradns/hydradns/apps/core/internal/policy"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/models"
+	"github.com/hydradns/hydradns/apps/core/internal/storage/repositories"
+	"github.com/hydradns/hydradns/apps/core/internal/threat"
+	"github.com/hydradns/hydradns/apps/core/internal/utils"
 )
 
 // --- Fakes for the query-log path ---

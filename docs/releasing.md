@@ -23,7 +23,7 @@ via `docker/build-push-action@v6` (QEMU + Buildx), for three services:
 
 `hydra-cli`'s image additionally gets a `VERSION` build-arg (`steps.meta.outputs.version`,
 e.g. `0.1.0` for a `v0.1.0` tag push) stamped into the binary via
-`-X github.com/hydradns/hydra-cli/cmd.Version=...`; `core` and `ui` don't take that arg. Its
+`-X github.com/hydradns/hydradns/apps/cli/cmd.Version=...`; `core` and `ui` don't take that arg. Its
 default command runs `hydra mcp` (stdio), for listing in the official MCP registry; see
 `docs/mcp.md`.
 
@@ -157,6 +157,44 @@ git push origin v0.1.0
 Do not use `git push --tags` (pushes every local tag, not just this one).
 Pushing the tag is what triggers `release.yml`. There is no separate
 "publish" step.
+
+### Optional: tagging for `go install` / pkg.go.dev / Go Report Card
+
+The three Go modules now declare `github.com/hydradns/hydradns/apps/core`,
+`github.com/hydradns/hydradns/apps/cli`, and
+`github.com/hydradns/hydradns/apps/scanner` — paths that resolve to this
+monorepo instead of the old, now-archived, per-service repos. Nothing above
+depends on this: `v0.1.0` alone is sufficient to trigger `release.yml` and
+produce the Docker images and cross-compiled CLI binaries.
+
+However, per the Go modules reference
+(https://go.dev/ref/mod#vcs-version, "Mapping versions to commits"), a module
+that lives in a subdirectory of a repository — not at the repo root — needs
+its version tags *prefixed with that subdirectory*, e.g. `apps/cli/v0.1.0`,
+not just `v0.1.0`. A plain `v0.1.0` tag versions the (nonexistent) repo-root
+module; it does not make the `apps/cli` module resolvable to that version.
+
+So `go install github.com/hydradns/hydradns/apps/cli@latest` and
+`go install github.com/hydradns/hydradns/apps/cli@v0.1.0` will not resolve
+until a prefixed tag exists. If Go-toolchain installability (and pkg.go.dev /
+Go Report Card indexing, which awesome-go requires) matters for a release,
+also push, after the `v0.1.0` tag above:
+
+```bash
+git tag -a apps/core/v0.1.0 -m "apps/core v0.1.0"
+git tag -a apps/cli/v0.1.0 -m "apps/cli v0.1.0"
+git tag -a apps/scanner/v0.1.0 -m "apps/scanner v0.1.0"
+git push origin apps/core/v0.1.0 apps/cli/v0.1.0 apps/scanner/v0.1.0
+```
+
+These tags do not trigger `release.yml` (it only matches `v*`, not
+`apps/*/v*`), so they're safe to push independently and don't risk
+re-running the Docker/CLI-binary release. `go install
+github.com/hydradns/hydradns/apps/cli@v0.1.0` (and `pkg.go.dev` for that
+module) starts working once the corresponding prefixed tag is pushed;
+`@latest` picks it up on the next `go` module-proxy refresh. This step is
+optional and independent of the Docker release above — skip it if Go-toolchain
+installability isn't needed for a given release.
 
 ## Verifying the release
 

@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	mcpserver "github.com/hydradns/hydra-cli/mcp"
+	mcpserver "github.com/hydradns/hydradns/apps/cli/mcp"
 	"github.com/spf13/cobra"
 )
 
