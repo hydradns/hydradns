@@ -16,6 +16,9 @@ import (
 // goroutines. listCalls counts List() invocations (i.e. rebuilds).
 // If block is non-nil, List() waits on it before returning, letting tests
 // hold a rebuild "in flight" to exercise coalescing/single-flight.
+// listFailCount lets tests make the next N List() calls fail (C1): each
+// call that observes listFailCount > 0 decrements it and returns errTest
+// instead of a domain list.
 type fakeBlocklistSource struct {
 	mu     sync.Mutex
 	sig    repositories.BlocklistSignature
@@ -25,7 +28,13 @@ type fakeBlocklistSource struct {
 	maxInFlight int32
 	inFlight    int32
 
-	block chan struct{} // if set, List() waits for a send/close before returning
+	block         chan struct{} // if set, List() waits for a send/close before returning
+	listFailCount int32         // atomic: remaining List() calls that should fail
+}
+
+// failNextListCalls makes the next n calls to List() return errTest.
+func (f *fakeBlocklistSource) failNextListCalls(n int32) {
+	atomic.StoreInt32(&f.listFailCount, n)
 }
 
 func (f *fakeBlocklistSource) Signature() (repositories.BlocklistSignature, error) {
@@ -53,6 +62,16 @@ func (f *fakeBlocklistSource) List() ([]string, error) {
 		<-f.block
 	}
 	atomic.AddInt32(&f.inFlight, -1)
+
+	for {
+		remaining := atomic.LoadInt32(&f.listFailCount)
+		if remaining <= 0 {
+			break
+		}
+		if atomic.CompareAndSwapInt32(&f.listFailCount, remaining, remaining-1) {
+			return nil, errTest
+		}
+	}
 	return []string{"blocked.example"}, nil
 }
 
@@ -165,6 +184,137 @@ func TestBlocklistReloader_SignatureErrorDoesNotRebuild(t *testing.T) {
 	if got := fake.calls(); got != 0 {
 		t.Errorf("List() called %d times, want 0 when Signature() errors", got)
 	}
+}
+
+// --- C1 regression tests: a transient List() error must never permanently
+// disable blocklist filtering. ---
+
+// Failure scenario A from the review: the startup load must retry until it
+// succeeds rather than relying on a single fire-and-forget goroutine call.
+func TestRunInitialBlocklistLoad_RetriesUntilSuccess(t *testing.T) {
+	fake := &fakeBlocklistSource{sig: repositories.BlocklistSignature{SourceCount: 1}}
+	fake.failNextListCalls(3) // e.g. "database is locked" a few times at startup
+	mem := blocklist.NewMemoryChecker()
+	r := newBlocklistReloader(fake, mem)
+
+	done := make(chan struct{})
+	go func() {
+		runInitialBlocklistLoad(r, 5*time.Millisecond)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("runInitialBlocklistLoad never converged despite transient List() failures")
+	}
+
+	if !r.loaded() {
+		t.Error("expected reloader.loaded() to be true after the retried load succeeded")
+	}
+	if mem.Count() == 0 {
+		t.Error("expected the in-memory blocklist to be populated after the retried load succeeded")
+	}
+	if got := fake.calls(); got != 4 {
+		t.Errorf("List() called %d times, want 4 (3 failures + 1 success)", got)
+	}
+}
+
+// Failure scenario B from the review: a change lands, the rebuild it
+// triggers fails, and the failure must not be permanent — a later poll
+// (still observing the same "changed" signature, since it was never
+// committed) must retry, and eventually succeed.
+func TestBlocklistReloader_FailedChangeRebuildIsRetried(t *testing.T) {
+	fake := &fakeBlocklistSource{sig: repositories.BlocklistSignature{SourceCount: 1}}
+	mem := blocklist.NewMemoryChecker()
+	r := newBlocklistReloader(fake, mem)
+
+	// Baseline: successful initial load.
+	r.Poll()
+	waitUntil(t, time.Second, func() bool { return fake.calls() == 1 })
+	if mem.Count() == 0 {
+		t.Fatal("baseline load did not populate mem")
+	}
+
+	// An operator adds a blocklist (signature changes); the rebuild that
+	// would pick it up fails twice before succeeding.
+	fake.failNextListCalls(2)
+	fake.setSignature(repositories.BlocklistSignature{SourceCount: 2})
+
+	r.Poll()
+	waitUntil(t, time.Second, func() bool { return fake.calls() == 2 }) // 1st attempt: fails
+
+	// lastSig must not have advanced on the failed attempt: Poll() with the
+	// still-unreflected signature must trigger another attempt, not
+	// short-circuit as "unchanged".
+	time.Sleep(20 * time.Millisecond)
+	r.Poll()
+	waitUntil(t, time.Second, func() bool { return fake.calls() == 3 }) // 2nd attempt: fails
+
+	r.Poll()
+	waitUntil(t, time.Second, func() bool { return fake.calls() == 4 }) // 3rd attempt: succeeds
+
+	waitUntil(t, time.Second, func() bool { return r.loaded() })
+}
+
+// The central C1 assertion: an error must never replace a populated
+// in-memory set with an empty one. Once loaded, mem.Count() must never drop
+// to 0 just because a later rebuild attempt failed.
+func TestBlocklistReloader_ErrorNeverEmptiesAPopulatedSet(t *testing.T) {
+	fake := &fakeBlocklistSource{sig: repositories.BlocklistSignature{SourceCount: 1}}
+	mem := blocklist.NewMemoryChecker()
+	r := newBlocklistReloader(fake, mem)
+
+	r.Poll()
+	waitUntil(t, time.Second, func() bool { return mem.Count() > 0 })
+	if got := mem.Count(); got != 1 {
+		t.Fatalf("baseline mem.Count() = %d, want 1", got)
+	}
+
+	// Every rebuild from here on fails for the remainder of the test.
+	fake.failNextListCalls(1 << 20)
+	fake.setSignature(repositories.BlocklistSignature{SourceCount: 2})
+	r.Poll()
+	waitUntil(t, time.Second, func() bool { return fake.calls() == 2 })
+
+	// Give any (buggy) empty-swap a chance to land, then assert it never did.
+	time.Sleep(30 * time.Millisecond)
+	if got := mem.Count(); got == 0 {
+		t.Fatal("a failed rebuild wiped the previously-populated in-memory blocklist set")
+	}
+
+	// lastSig must still reflect the last *successful* rebuild (SourceCount:
+	// 1), not the failed attempt's signature (SourceCount: 2) — otherwise a
+	// later Poll() observing SourceCount:2 again would wrongly short-circuit
+	// as "unchanged" instead of retrying.
+	r.mu.Lock()
+	got := r.lastSig
+	r.mu.Unlock()
+	if want := (repositories.BlocklistSignature{SourceCount: 1}); got != want {
+		t.Errorf("lastSig = %+v after a failed rebuild, want unchanged %+v", got, want)
+	}
+}
+
+// ForceRebuild must rebuild even when the signature hasn't changed (the 6h
+// refreshSources safety net, M12 in the review) but must still respect
+// single-flight/coalescing.
+func TestBlocklistReloader_ForceRebuildIgnoresUnchangedSignature(t *testing.T) {
+	fake := &fakeBlocklistSource{sig: repositories.BlocklistSignature{SourceCount: 1}}
+	r := newBlocklistReloader(fake, blocklist.NewMemoryChecker())
+
+	r.Poll()
+	waitUntil(t, time.Second, func() bool { return fake.calls() == 1 })
+
+	// Unchanged signature: a plain Poll() must not rebuild again.
+	r.Poll()
+	time.Sleep(20 * time.Millisecond)
+	if got := fake.calls(); got != 1 {
+		t.Fatalf("Poll() rebuilt on an unchanged signature: calls=%d", got)
+	}
+
+	// ForceRebuild() must, regardless of the signature.
+	r.ForceRebuild()
+	waitUntil(t, time.Second, func() bool { return fake.calls() == 2 })
 }
 
 func TestStartBlocklistPoll_ZeroDisables(t *testing.T) {
