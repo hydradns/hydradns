@@ -20,7 +20,7 @@
 | | HydraDNS | Pi-hole |
 |:--|:--|:--|
 | Core | Go, gRPC control/data plane split | C (pihole-FTL), embedded web server |
-| Setup | `docker compose up -d` builds core + dashboard from source and starts both | installer script or Docker |
+| Setup | `docker compose up -d` pulls the published core + dashboard images once a release exists, and builds them from source before that | installer script or Docker |
 | AI management (MCP) | ✅ built in (`hydra mcp`, 14 tools: block/unblock, policies, logs, metrics, anomaly explain) | ❌ third-party community bridges only |
 | DoH bypass blocking | ✅ curated DoH bootstrap endpoints blocked at query time | ⚠️ Firefox canary domain only; add third-party lists for the rest |
 | Policies | priority-based allow/block/redirect via API or UI; CLI covers block/unblock/list/delete (no generic create yet) | groups, regex, and per-client rules (more mature today) |
