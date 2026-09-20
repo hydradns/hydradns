@@ -12,7 +12,7 @@ For **job interviews / portfolio**, Phases 1-3 are the credible PoC. Phases 4-5 
 
 ---
 
-## Phase 1 — Solid Core (Done)
+## Phase 1: Solid Core (Done)
 
 **Goal:** The DNS engine is correct, reliable, and testable.
 
@@ -25,7 +25,7 @@ For **job interviews / portfolio**, Phases 1-3 are the credible PoC. Phases 4-5 
 - Config via env vars for local dev
 - Unit tests for the critical path ✅ (`internal/dnsengine`, `internal/policy`, `internal/blocklist`,
   `internal/storage` all have `_test.go` coverage)
-- Mock handlers wired to real storage ✅ — `blocklists.go`/`policies.go` call the real repos,
+- Mock handlers wired to real storage ✅: `blocklists.go`/`policies.go` call the real repos,
   not in-memory mocks
 - Mock data removed from control plane handlers ✅
 
@@ -34,7 +34,7 @@ For **job interviews / portfolio**, Phases 1-3 are the credible PoC. Phases 4-5 
 
 ---
 
-## Phase 2 — The Dashboard
+## Phase 2: The Dashboard
 
 **Goal:** Non-technical user can see and control everything from the browser.
 
@@ -50,7 +50,7 @@ You can manage HydraDNS entirely from `localhost:3000` without touching any conf
 
 ---
 
-## Phase 3 — Plug-and-Play Deployment
+## Phase 3: Plug-and-Play Deployment
 
 **Goal:** One-command setup on Raspberry Pi, works as network-wide DNS.
 
@@ -63,11 +63,11 @@ You can manage HydraDNS entirely from `localhost:3000` without touching any conf
 - Update mechanism (scheduled blocklist refresh, container self-update)
 
 ### Exit Criteria
-Flash a Pi, run one script, point your router at it — whole network is filtered, survives reboots, updates blocklists automatically.
+Flash a Pi, run one script, and point your router at it. The whole network is filtered, survives reboots, and updates blocklists automatically.
 
 ---
 
-## Phase 4 — CLI + MCP
+## Phase 4: CLI + MCP
 
 **Goal:** Power users and AI agents can manage HydraDNS programmatically.
 
@@ -81,7 +81,7 @@ Flash a Pi, run one script, point your router at it — whole network is filtere
 
 ---
 
-## Phase 5 — Polish & Ship
+## Phase 5: Polish & Ship
 
 **Goal:** It looks and feels like a real product.
 
@@ -97,29 +97,29 @@ Someone lands on the GitHub repo or landing page and can go from zero to running
 
 ---
 
-## Tier 3 — Post-Demo Hardening (April 28+)
+## Tier 3: Post-Demo Hardening (April 28+)
 
 **Goal:** Move from "demoable portfolio piece" to "safe to leave running for a paying customer".
 
-### Live bugs (blocking — fix first)
-- `UNIQUE constraint failed: statistics.id` on every query, logged repeatedly. Breaks stats increment intermittently. ✅ Fixed — the statistics row is seeded once with `INSERT OR IGNORE` on startup (`internal/storage/db/db.go`).
-- Blocklist ingestion persists the source row but `domains_count` never leaves 0. ✅ Fixed — creating a source (via the API or the setup wizard) now triggers an immediate async `BlocklistEngine.UpdateSource` fetch instead of waiting for the next refresh cycle.
+### Live bugs (blocking, fix first)
+- `UNIQUE constraint failed: statistics.id` on every query, logged repeatedly. Breaks stats increment intermittently. ✅ Fixed: the statistics row is seeded once with `INSERT OR IGNORE` on startup (`internal/storage/db/db.go`).
+- Blocklist ingestion persists the source row but `domains_count` never leaves 0. ✅ Fixed: creating a source (via the API or the setup wizard) now triggers an immediate async `BlocklistEngine.UpdateSource` fetch instead of waiting for the next refresh cycle.
 
 ### Operability
-- **Query log retention** — ✅ done: `startQueryLogRetention` runs on startup and on `QUERY_LOG_CLEANUP_INTERVAL`, bounded by `QUERY_LOG_RETENTION_DAYS` and `QUERY_LOG_MAX_ROWS`
-- **TLS on dashboard and gRPC** — still open; gRPC still dials with `grpc.WithInsecure() // TLS later`, dashboard has no HTTPS termination
-- **Update mechanism** — partially done: `hydra update` self-updates the CLI binary; the `core`/`ui` containers still have no self-pull
-- **Remote monitoring** — still open; no heartbeat/alert pipeline anywhere in `apps/core`
-- **Bare-metal systemd unit** for Pi deploys that want to skip Docker — still open
+- **Query log retention**: ✅ done. `startQueryLogRetention` runs on startup and on `QUERY_LOG_CLEANUP_INTERVAL`, bounded by `QUERY_LOG_RETENTION_DAYS` and `QUERY_LOG_MAX_ROWS`
+- **TLS on dashboard and gRPC**: still open; gRPC still dials with `grpc.WithInsecure() // TLS later`, dashboard has no HTTPS termination
+- **Update mechanism**: partially done. `hydra update` self-updates the CLI binary; the `core`/`ui` containers still have no self-pull
+- **Remote monitoring**: still open; no heartbeat/alert pipeline anywhere in `apps/core`
+- **Bare-metal systemd unit** for Pi deploys that want to skip Docker: still open
 
 ### Feature gaps
-- **Regex / wildcard policy evaluation** — still open (parsed but not enforced at query time)
-- **Policy editing** — done end-to-end: `PUT /policies/:id` exists and the dashboard's Edit
-  Policy drawer calls it. **Blocklist editing** — the backend route (`PATCH /blocklists/:id`)
+- **Regex / wildcard policy evaluation**: still open (parsed but not enforced at query time)
+- **Policy editing**: done end-to-end. `PUT /policies/:id` exists and the dashboard's Edit
+  Policy drawer calls it. **Blocklist editing**: the backend route (`PATCH /blocklists/:id`)
   exists, but the dashboard doesn't call it yet; add/enable/disable/delete are wired
-- **Query log pagination** — still open (hard-capped at 100 entries via `ListRecent(100)`, no paging)
-- **Settings page** — still open (UI page exists, no backend route)
-- **`/api/v1/dns/resolvers`** — reads real upstream resolvers from config now (no longer mock data), but is still read-only; wiring upstream editing is still open
+- **Query log pagination**: still open (hard-capped at 100 entries via `ListRecent(100)`, no paging)
+- **Settings page**: still open (UI page exists, no backend route)
+- **`/api/v1/dns/resolvers`**: reads real upstream resolvers from config now (no longer mock data), but is still read-only; wiring upstream editing is still open
 - **Scanner** currently only reads `/etc/resolv.conf`; LAN client enumeration not implemented
 
 ### Polish
@@ -134,13 +134,13 @@ A fresh Pi running HydraDNS for a month doesn't log a single `UNIQUE constraint`
 
 # Commercial Product Roadmap
 
-Phases 6–9 move HydraDNS from "demoable portfolio piece + free homelab tool" to "something a small business will pay for, and eventually an enterprise will evaluate." Sequencing is based on `docs/internal/enterprise-gap-analysis.md` — read that first for the competitive landscape.
+Phases 6–9 move HydraDNS from "demoable portfolio piece + free homelab tool" to "something a small business will pay for, and eventually an enterprise will evaluate." Sequencing is based on `docs/internal/enterprise-gap-analysis.md`. Read that first for the competitive landscape.
 
 **Solo-dev reality check:** each phase below is an eyeball estimate assuming evenings + weekends. Real calendar time depends on whether HydraDNS stays a side project or gets dedicated time.
 
 ---
 
-## Phase 6 — Commercial Floor (est. 2–3 months FTE)
+## Phase 6: Commercial Floor (est. 2–3 months FTE)
 
 **Goal:** HydraDNS stops being a toy. Anyone running >1 user on it has a product they can trust, and a non-technical buyer sees something that looks like a real commercial SKU.
 
@@ -150,9 +150,9 @@ These are the **three non-negotiable gaps** from the gap analysis plus the opera
 - Drop the `AdminCredential` singleton in favour of a proper `User` model with roles: `admin`, `operator`, `read_only` ✅
 - Per-user bearer tokens with rotation ✅
 - Audit log table: `actor_id`, `action`, `target`, `before`, `after`, `ip`, `ts` on every write endpoint ✅
-- Dashboard: user-management page ✅ (`apps/ui/app/dashboard/users/page.tsx`); per-user MFA (TOTP) — still open; session timeout — only the blanket 90-day token expiry, no configurable per-session timeout
+- Dashboard: user-management page ✅ (`apps/ui/app/dashboard/users/page.tsx`); per-user MFA (TOTP) is still open; session timeout has only the blanket 90-day token expiry, with no configurable per-session timeout
 
-Backend and dashboard UI are both merged to main — User/Token/AuditEvent models, repos,
+Backend and dashboard UI are both merged to main: User/Token/AuditEvent models, repos,
 `RequireRole` middleware, audit on every mutating handler, `GET /audit`, user + token CRUD
 API, and a working dashboard page for all of it. Remaining: MFA/TOTP, configurable session
 timeout, and a CLI for user/token management (dashboard/API-only today).
@@ -162,7 +162,7 @@ timeout, and a CLI for user/token management (dashboard/API-only today).
 - Role mapping from IdP group claims onto HydraDNS roles
 - SAML as a follow-up once a prospect asks
 
-### Encrypted DNS — DoH + DoT
+### Encrypted DNS: DoH + DoT
 - DoH listener on `:443` (or `:5443` for coexistence with a reverse proxy)
 - DoT listener on `:853`
 - Outbound upstream support for DoH and DoT resolvers (Cloudflare 1.1.1.1, Quad9, Google)
@@ -178,20 +178,20 @@ timeout, and a CLI for user/token management (dashboard/API-only today).
 - Fix the `statistics.id` UNIQUE bug ✅
 - Fix blocklist ingestion so `domains_count` actually populates ✅
 - Query log retention + rotation ✅
-- TLS on gRPC + dashboard — still open
-- `hydra update` + Docker self-pull — CLI self-update done ✅; container self-pull still open
+- TLS on gRPC + dashboard: still open
+- `hydra update` + Docker self-pull: CLI self-update done ✅; container self-pull still open
 
 ### Bypass mitigations (shipped)
-- DoH/DoT bootstrap blocklist baked into the engine — invisible to the dashboard, defeats default-on browser DoH for >80% of cases ✅
+- DoH/DoT bootstrap blocklist baked into the engine: invisible to the dashboard, defeats default-on browser DoH for >80% of cases ✅
 - Router config script (`hydra setup-router`) generates pfSense/MikroTik/OpenWrt/ASUS firewall rules that lock outbound DNS to the HydraDNS Pi and optionally blackhole known DoH provider IPs on `:443` ✅
 - `BLOCK_RESPONSE` env switch (`zero` / `nxdomain` / `refused`) so operators can A/B test response shapes per deployment ✅
 
 ### Exit Criteria
-A 20-person company's IT admin can set up HydraDNS, hook it to their Okta, give finance "read-only" access, enforce DoH for all laptops, turn on "block malware + phishing + gambling" as categories, and receive a weekly email report — all without touching a config file.
+A 20-person company's IT admin can set up HydraDNS, hook it to their Okta, give finance "read-only" access, enforce DoH for all laptops, turn on "block malware + phishing + gambling" as categories, and receive a weekly email report, all without touching a config file.
 
 ---
 
-## Phase 7 — SMB Competitive (est. 4–6 months FTE)
+## Phase 7: SMB Competitive (est. 4–6 months FTE)
 
 **Goal:** HydraDNS can credibly win head-to-head against DNSFilter and NextDNS Teams for a company of 50–500 people.
 
@@ -225,34 +225,34 @@ A 20-person company's IT admin can set up HydraDNS, hook it to their Okta, give 
 - Active-active with shared state is phase 8; active-passive is good enough for SMB
 
 ### DNS tunneling detection
-- Heuristics ✅ partially done — `internal/threat` scores every query for high entropy,
+- Heuristics ✅ partially done: `internal/threat` scores every query for high entropy,
   DGA-style patterns, excessive length, and subdomain depth; NXDOMAIN bursts and fast-flux
   domain lookups are still open
 - Flag as "suspicious" in logs ✅ (`DNSQuery.IsSuspicious`, dashboard has a "suspicious only"
-  log filter); optional auto-block by threshold — still open (flagged queries still resolve)
+  log filter); optional auto-block by threshold: still open (flagged queries still resolve)
 
 ### Exit Criteria
 HydraDNS wins a side-by-side POC against DNSFilter for a mid-market customer: it matches on filtering quality, wins on price / privacy / self-hostability, and doesn't get knocked out by missing features in procurement's checklist.
 
 ---
 
-## Phase 8 — The MCP Wedge (parallel track, est. 2 months FTE)
+## Phase 8: The MCP Wedge (parallel track, est. 2 months FTE)
 
-**Goal:** Lean into the one place HydraDNS is genuinely ahead of the incumbents: agent-first control. This is a parallel track, not sequential — spin it alongside Phase 6/7 work.
+**Goal:** Lean into the one place HydraDNS is genuinely ahead of the incumbents: agent-first control. This is a parallel track, not sequential, so spin it alongside Phase 6/7 work.
 
 - **MCP tool coverage:** every write operation in the dashboard has an equivalent MCP tool. Today we have 14 (`apps/cli/mcp/server.go`); we'll need closer to 30 as the product grows.
-- **MCP guardrails:** role scoping on tokens ✅ — `MCP_ROLE` (`admin`/`operator`/`reporter`) gates tool access, an `operator` cannot `toggle_engine`, unrecognized roles safe-default to `reporter` (`apps/cli/mcp/roles.go`). Confirmation-required annotations on destructive tools ✅ (`ToolAnnotations.ConfirmationRequired`). Rate limits — still open.
+- **MCP guardrails:** role scoping on tokens ✅. `MCP_ROLE` (`admin`/`operator`/`reporter`) gates tool access, an `operator` cannot `toggle_engine`, unrecognized roles safe-default to `reporter` (`apps/cli/mcp/roles.go`). Confirmation-required annotations on destructive tools ✅ (`ToolAnnotations.ConfirmationRequired`). Rate limits: still open.
 - **Agent-first UX patterns:** `create_policy` batch ops ✅ and `bulk_unblock` ✅ already exist. Still open: `suggest_categories_for_client`, `explain_why_blocked`.
 - **First-party agent experience:** the README documents a ready-to-install Claude Code MCP config block; a Gemini CLI / Cursor config and a dashboard "one-click" registration are still open.
-- **Agent-driven reporting:** ✅ done — `get_weekly_summary`, `explain_anomaly`, `compare_to_last_month` are all live MCP tools.
-- **Marketing play:** put MCP front and center on the landing page (now a separate repo, `hydradns/hydradns-landing` — not verifiable from this repo).
+- **Agent-driven reporting:** ✅ done. `get_weekly_summary`, `explain_anomaly`, `compare_to_last_month` are all live MCP tools.
+- **Marketing play:** put MCP front and center on the landing page (now a separate repo, `hydradns/hydradns-landing`; not verifiable from this repo).
 
 ### Exit Criteria
 A customer's IT admin can manage HydraDNS end-to-end via conversation with Claude. Pitch decks and case studies lead with "the AI-native DNS firewall", not with the feature list.
 
 ---
 
-## Phase 9 — Enterprise Floor (deferred, 12+ months)
+## Phase 9: Enterprise Floor (deferred, 12+ months)
 
 **Goal:** HydraDNS is a credible choice for a 5,000-person enterprise. Reachable only with funding or team.
 

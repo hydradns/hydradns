@@ -28,7 +28,7 @@
 
 Choose Pi-hole today for battle-tested stability, regex rules, and community support. Choose HydraDNS for a hackable Go codebase, an API-first control plane, and AI-agent management over MCP that self-hosted alternatives only get through third-party bridges.
 
-Honest limits: like every DNS-layer filter, HydraDNS cannot stop a client that hardcodes a DoH server by raw IP. Pair it with a firewall rule on 443/853 to close that path. For the fuller list — no TLS on the dashboard/gRPC yet, no DNSSEC, regex/wildcard policies not enforced, and more — see [docs/limitations.md](docs/limitations.md).
+Honest limits: like every DNS-layer filter, HydraDNS cannot stop a client that hardcodes a DoH server by raw IP. Pair it with a firewall rule on 443/853 to close that path. For the fuller list (no TLS on the dashboard/gRPC yet, no DNSSEC, regex/wildcard policies not enforced, and more), see [docs/limitations.md](docs/limitations.md).
 
 
 ---
@@ -70,7 +70,7 @@ open http://localhost:3000
 > server in `/etc/resolv.conf`), or edit the port mapping in `docker-compose.yml`.
 > See [docs/pi-deployment.md](docs/pi-deployment.md) for details.
 
-That's it. DNS filtering is active. Give this machine a static IP and point your router's DNS to it — see [docs/pi-deployment.md](docs/pi-deployment.md) for static IP setup on Linux, macOS, and Windows plus per-router DNS instructions.
+That's it. DNS filtering is active. Give this machine a static IP and point your router's DNS to it. See [docs/pi-deployment.md](docs/pi-deployment.md) for static IP setup on Linux, macOS, and Windows plus per-router DNS instructions.
 
 ---
 
@@ -113,14 +113,14 @@ That's it. DNS filtering is active. Give this machine a static IP and point your
 ### DNS Query Pipeline
 
 Every DNS query is scored by a heuristic threat detector (domain entropy, DGA-pattern,
-length, subdomain depth) — non-blocking, tags the query log only, no auto-block yet — then
-goes through this pipeline with early exit:
+length, subdomain depth); scoring is non-blocking and only tags the query log, with no
+auto-block yet. The query then goes through this pipeline with early exit:
 
-1. **DoH bootstrap interception** — known DoH provider bootstrap hostnames get NXDOMAIN so browsers fall back to system DNS
-2. **Blocklist check** — in-memory membership test; if the domain is blocked, respond per `BLOCK_RESPONSE` (default: A/AAAA → `0.0.0.0`/`::`; `nxdomain` and `refused` also available)
-3. **Policy evaluation** — Bloom filter for O(1) negative lookup, then exact match. Highest priority wins
-4. **Response cache** — TTL-respecting LRU for allowed queries; blocked/redirect responses are never cached
-5. **Upstream forward** — pool-per-resolver with failover (1.5s per-attempt timeout, 2 retries)
+1. **DoH bootstrap interception:** known DoH provider bootstrap hostnames get NXDOMAIN so browsers fall back to system DNS
+2. **Blocklist check:** in-memory membership test; if the domain is blocked, respond per `BLOCK_RESPONSE` (default: A/AAAA → `0.0.0.0`/`::`; `nxdomain` and `refused` also available)
+3. **Policy evaluation:** Bloom filter for O(1) negative lookup, then exact match. Highest priority wins
+4. **Response cache:** TTL-respecting LRU for allowed queries; blocked/redirect responses are never cached
+5. **Upstream forward:** pool-per-resolver with failover (1.5s per-attempt timeout, 2 retries)
 
 ---
 
@@ -227,7 +227,7 @@ Add to your Claude Code MCP config:
 | `explain_anomaly` | Explain a block-rate or volume anomaly |
 | `compare_to_last_month` | Compare current stats against the previous month |
 
-**Example conversation:** "Block all social media domains" — Claude calls `block_domain` for each domain.
+**Example conversation:** Say "Block all social media domains" and Claude calls `block_domain` for each domain.
 
 ---
 
@@ -321,12 +321,12 @@ Then give the device a static IP and point your router's DNS server to it. Full 
 
 ## Documentation
 
-- [Deployment Guide](docs/pi-deployment.md) — install on a Raspberry Pi or any always-on machine; static IP setup (Linux, macOS, Windows), per-router DNS configuration, troubleshooting
-- [Hardware Guide](docs/hardware-guide.md) — choosing a device to run HydraDNS on
-- [Known Limitations](docs/limitations.md) — what's not implemented yet, with impact and workarounds
-- [MCP Server Guide](docs/mcp.md) — the 14 tools, roles, and client configuration for the built-in MCP server
-- [Release Runbook](docs/releasing.md) — what `release.yml` publishes and how tags are cut
-- [Public Demo](demo/README.md) — hosting a read-only, public instance of the dashboard
+- [Deployment Guide](docs/pi-deployment.md): install on a Raspberry Pi or any always-on machine; static IP setup (Linux, macOS, Windows), per-router DNS configuration, troubleshooting
+- [Hardware Guide](docs/hardware-guide.md): choosing a device to run HydraDNS on
+- [Known Limitations](docs/limitations.md): what's not implemented yet, with impact and workarounds
+- [MCP Server Guide](docs/mcp.md): the 14 tools, roles, and client configuration for the built-in MCP server
+- [Release Runbook](docs/releasing.md): what `release.yml` publishes and how tags are cut
+- [Public Demo](demo/README.md): hosting a read-only, public instance of the dashboard
 
 ---
 
@@ -343,8 +343,8 @@ Then give the device a static IP and point your router's DNS server to it. Full 
 | `HYDRA_API_URL` | `http://localhost:8080` | CLI/MCP API target |
 | `HYDRA_TOKEN` | (none; falls back to `~/.hydra/token`) | CLI/MCP bearer token |
 | `MCP_ROLE` | `admin` | Scopes MCP tool access: `admin`, `operator` (no `toggle_engine`), or `reporter` (read-only) |
-| `HYDRA_DEMO_MODE` | `false` | Turns this instance into a public, read-only demo (rejects all mutations, seeds a fixed-password demo user and synthetic data, masks client IPs). See `demo/README.md` — not for a normal install |
-| `HYDRA_ANONYMIZE_CLIENT_IPS` | `false` | Hash (HMAC-SHA256) client IPs before writing them to the query log instead of storing them as-is; pseudonymisation, not anonymisation — off by default |
+| `HYDRA_DEMO_MODE` | `false` | Turns this instance into a public, read-only demo (rejects all mutations, seeds a fixed-password demo user and synthetic data, masks client IPs). See `demo/README.md` (not for a normal install) |
+| `HYDRA_ANONYMIZE_CLIENT_IPS` | `false` | Hash (HMAC-SHA256) client IPs before writing them to the query log instead of storing them as-is. This is pseudonymisation, not anonymisation, and it's off by default |
 | `HYDRA_ANON_SECRET` | (generated per-install) | HMAC key used only when `HYDRA_ANONYMIZE_CLIENT_IPS` is enabled |
 | `BLOCK_RESPONSE` | `zero` | Answer for blocked domains: `zero` (A `0.0.0.0`), `nxdomain`, or `refused` |
 | `BLOCKLIST_UPDATE_INTERVAL` | `6h` | How often blocklist sources are re-downloaded from their URL |

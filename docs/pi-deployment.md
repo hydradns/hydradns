@@ -36,13 +36,13 @@ This will:
 1. Clone the repository
 2. Disable `systemd-resolved` if it's blocking port 53
 3. Create `.env` from `.env.example` if you don't already have one, then
-   start all services — pulling the published `linux/arm64` images from GHCR
+   start all services, pulling the published `linux/arm64` images from GHCR
    if a release exists, or building from source locally as a fallback
    otherwise (see `docs/releasing.md`)
 4. Print your Pi's IP address and dashboard URL
 
 Note: this means the install-script path's `CORS_ORIGINS` default differs from a bare
-`git clone && docker compose up -d` with no `.env` at all — `.env.example` sets
+`git clone && docker compose up -d` with no `.env` at all. `.env.example` sets
 `http://localhost:3000,http://127.0.0.1:3000` (two origins), while `docker-compose.yml`'s own
 fallback (used only when no `.env` exists) is `http://localhost:3000`. Both are safe defaults;
 this is called out here so the difference doesn't look like a bug if you diff the two setups.
@@ -60,7 +60,7 @@ this is called out here so the difference doesn't look like a bug if you diff th
 
 ## Give the Device a Static IP
 
-Your router will forward every DNS query on the network to this device's IP address. If the device gets its address from DHCP, the router can hand it a different IP after a reboot or lease renewal — and DNS for the entire network silently breaks. Pin the IP **before** configuring the router.
+Your router will forward every DNS query on the network to this device's IP address. If the device gets its address from DHCP, the router can hand it a different IP after a reboot or lease renewal, and DNS for the entire network silently breaks. Pin the IP **before** configuring the router.
 
 Whichever method you use, note these values first (from the device's current connection): its IP address, the subnet mask (usually `255.255.255.0`, i.e. `/24`), and the gateway (your router's IP, e.g. `192.168.1.1`).
 
@@ -96,7 +96,7 @@ sudo nmcli con mod "Wired connection 1" \
 sudo nmcli con up "Wired connection 1"
 ```
 
-Older Raspberry Pi OS (Bullseye and earlier) uses `dhcpcd` — append to `/etc/dhcpcd.conf` and reboot:
+Older Raspberry Pi OS (Bullseye and earlier) uses `dhcpcd`: append to `/etc/dhcpcd.conf` and reboot:
 
 ```
 interface eth0
@@ -154,7 +154,7 @@ Point your router's DNS server to your device's static IP address. This makes ev
 1. Open `http://192.168.0.1` or `http://tplinkwifi.net`
 2. Go to **Advanced** > **Network** > **DHCP Server**
 3. Set **Primary DNS** to your device's static IP
-4. Leave **Secondary DNS** empty (or set it to the same IP — see [Critical: DNS Configuration](#critical-dns-configuration))
+4. Leave **Secondary DNS** empty (or set it to the same IP; see [Critical: DNS Configuration](#critical-dns-configuration))
 5. Save and reboot router
 
 ### D-Link
@@ -192,7 +192,7 @@ Point your router's DNS server to your device's static IP address. This makes ev
 
 ## Critical: DNS Configuration
 
-**Do NOT set a secondary/fallback DNS** (like 8.8.8.8) on the router. By default HydraDNS answers a blocked query with `A 0.0.0.0` (`BLOCK_RESPONSE=zero`, the default — see the `BLOCK_RESPONSE` env var), which most clients treat as "connection refused" and stop there. But some clients and routers just move on to the secondary DNS server on *any* non-standard answer, which resolves the domain normally and bypasses the filter entirely — this risk is worse if you switch `BLOCK_RESPONSE` to `refused`, which some OSes and routers explicitly treat as a signal to fail over.
+**Do NOT set a secondary/fallback DNS** (like 8.8.8.8) on the router. By default HydraDNS answers a blocked query with `A 0.0.0.0` (`BLOCK_RESPONSE=zero`, the default; see the `BLOCK_RESPONSE` env var), which most clients treat as "connection refused" and stop there. But some clients and routers just move on to the secondary DNS server on *any* non-standard answer, which resolves the domain normally and bypasses the filter entirely. That risk is worse if you switch `BLOCK_RESPONSE` to `refused`, which some OSes and routers explicitly treat as a signal to fail over.
 
 - **Primary DNS:** Your HydraDNS server IP
 - **Secondary DNS:** Leave empty (or set to the same HydraDNS IP)
@@ -297,7 +297,7 @@ If the page loads but never gets past "loading" (or the browser console shows
 CORS errors), it's one of these two remaining cases:
 
 1. **You're using a named host, not an IP.** `pi.local`, `hydra.lan`, or a
-   reverse-proxy domain don't get the automatic CORS pass — that rule is
+   reverse-proxy domain don't get the automatic CORS pass; that rule is
    restricted to IP literals and `localhost` specifically to avoid DNS
    rebinding (an attacker page rebinding a name to your Pi's IP would
    otherwise pass the same check). Add the exact origin to `.env` and
@@ -315,7 +315,7 @@ CORS errors), it's one of these two remaining cases:
    both dashboard and API behind the same proxy. If your proxy only
    terminates TLS on port 443 (common for a single-port setup), see the
    "runtime API-URL derivation assumes a two-port reverse proxy" entry in
-   [docs/limitations.md](limitations.md) — port 8080 is fixed unless you
+   [docs/limitations.md](limitations.md). Port 8080 is fixed unless you
    rebuild the dashboard image with `NEXT_PUBLIC_API_URL` set at build time.
 
 ### Slow first startup
