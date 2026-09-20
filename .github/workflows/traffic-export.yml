@@ -8,10 +8,10 @@ name: Traffic Export
 # GitHub App token) with repository "Administration" permission (read) on this repo. The
 # traffic endpoints this workflow calls require that permission, and the default GITHUB_TOKEN
 # cannot be granted it under any configuration -- "administration" is not one of the scopes
-# assignable to GITHUB_TOKEN via the `permissions:` block below or anywhere else. See
-# docs/internal/launch-kit/00-roshan-only-checklist.md ("Create the TRAFFIC_TOKEN secret") for
-# the exact click path to create and add one. Without it, this workflow fails fast with a clear
-# message instead of a confusing permissions error partway through.
+# assignable to GITHUB_TOKEN via the `permissions:` block below or anywhere else. Create a
+# fine-grained token under Settings > Developer settings > Personal access tokens, limit it to
+# this repository with Administration: Read-only, and save it as the repository secret
+# TRAFFIC_TOKEN. Without it this workflow fails at the first step with a clear message.
 
 on:
   schedule:
@@ -37,7 +37,7 @@ jobs:
       - name: Require TRAFFIC_TOKEN secret
         run: |
           if [ -z "${{ secrets.TRAFFIC_TOKEN }}" ]; then
-            echo "::error::TRAFFIC_TOKEN secret is not set. The GitHub traffic API needs a token with repository Administration (read) permission, which the default GITHUB_TOKEN cannot be granted. See docs/internal/launch-kit/00-roshan-only-checklist.md, 'Create the TRAFFIC_TOKEN secret', for how to create and add one."
+            echo "::error::TRAFFIC_TOKEN secret is not set. The GitHub traffic API needs a token with repository Administration (read) permission, which the default GITHUB_TOKEN cannot be granted. See the comment at the top of this workflow for how to create and add one."
             exit 1
           fi
 
