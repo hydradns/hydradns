@@ -14,6 +14,10 @@ Two transports:
   remotely. Every request needs a bearer token (`--http-token` or `HYDRA_MCP_TOKEN`). Carries
   management traffic only, never DNS query data.
 
+The `initialize` response's `serverInfo.version` reports the CLI's own version (the same
+string `hydra version` prints), not a hardcoded value — useful for confirming which build an
+agent is actually talking to.
+
 ## Configuration
 
 The MCP server reuses the CLI's own connection settings; there is nothing MCP-specific to

@@ -174,7 +174,10 @@ already have. Given that, this deployment relaxes (does not remove) the
 login endpoint's per-IP rate limit specifically when `HYDRA_DEMO_MODE=true`:
 100 attempts / 5 minutes instead of the normal 10 / 5 minutes (see
 `demoLoginRateLimitAttempts` in
-`apps/core/cmd/controlplane/routes/router.go`). This was a deliberate
+`apps/core/cmd/controlplane/routes/router.go`). Only a failed (4xx) login
+attempt counts against that budget; a successful one does not, so
+visitors logging in and out repeatedly with the correct demo password
+never trip it. This was a deliberate
 trade-off: a public demo is often reached by many visitors behind one
 shared NAT or corporate proxy, and the normal 10-attempt budget — meant to
 slow down a real password-guessing attack — would routinely lock out an

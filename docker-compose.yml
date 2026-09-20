@@ -44,6 +44,21 @@ services:
       # the automatic rule off.
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
       - CORS_ALLOW_SAME_HOST=${CORS_ALLOW_SAME_HOST:-true}
+      # Runtime settings an operator is expected to change. Defaults below
+      # match the code's own defaults (see .env.example for what each does).
+      # DNS_LISTEN_ADDR is intentionally not passed through: the dataplane
+      # binds it inside the container, but the host-facing port mapping
+      # above ("53:1053/...") is fixed, so changing this here would only
+      # break the mapping, not move it.
+      - BLOCK_RESPONSE=${BLOCK_RESPONSE:-zero}
+      - BLOCKLIST_UPDATE_INTERVAL=${BLOCKLIST_UPDATE_INTERVAL:-6h}
+      - BLOCKLIST_POLL_INTERVAL=${BLOCKLIST_POLL_INTERVAL:-5s}
+      - QUERY_LOG_RETENTION_DAYS=${QUERY_LOG_RETENTION_DAYS:-7}
+      - QUERY_LOG_MAX_ROWS=${QUERY_LOG_MAX_ROWS:-1000000}
+      - QUERY_LOG_CLEANUP_INTERVAL=${QUERY_LOG_CLEANUP_INTERVAL:-1h}
+      - HYDRA_ANONYMIZE_CLIENT_IPS=${HYDRA_ANONYMIZE_CLIENT_IPS:-false}
+      - HYDRA_ANON_SECRET=${HYDRA_ANON_SECRET:-}
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-}
     volumes:
       - core-data:/app/data
     healthcheck:
