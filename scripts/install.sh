@@ -27,7 +27,7 @@ echo " |  _  | |_| | (_| | | | (_| || |_| | |\\  |___) |"
 echo " |_| |_|\\__, |\\__,_|_|  \\__,_||____/|_| \\_|____/ "
 echo "        |___/                                     "
 echo ""
-echo "  DNS Security Gateway — Self-Hosted & Private"
+echo "  DNS Security Gateway: Self-Hosted & Private"
 echo ""
 
 # Detect architecture
@@ -83,15 +83,15 @@ if systemctl is-active --quiet systemd-resolved 2>/dev/null; then
 fi
 
 # Start. docker-compose.yml declares both `image:` (a published GHCR release)
-# and `build:` for core/ui, with no explicit pull_policy — Compose's default
+# and `build:` for core/ui, with no explicit pull_policy. Compose's default
 # is to pull the image first and only build from source if it isn't found in
 # the registry or the local cache (see docs/releasing.md). So this pulls
 # once a release exists, and builds automatically as a fallback before the
 # first release, or when offline with no cached image. Do not force
-# `$COMPOSE build` here — that would always compile, even after a release is
+# `$COMPOSE build` here; that would always compile, even after a release is
 # published, which is the multi-minute Pi build time README's Quick Start is
 # trying to avoid.
-info "Starting HydraDNS (pulls a release image if one exists, otherwise builds from source — this may take a few minutes on first run)..."
+info "Starting HydraDNS (pulls a release image if one exists, otherwise builds from source; this may take a few minutes on first run)..."
 $COMPOSE up -d
 
 # Wait for health

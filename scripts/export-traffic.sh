@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# export-traffic.sh — export GitHub repository traffic (views, clones, popular referrers,
+# export-traffic.sh: export GitHub repository traffic (views, clones, popular referrers,
 # popular paths) into dated CSV files.
 #
 # Why this exists: GitHub's Traffic tab / REST API only retains a rolling 14-day window
@@ -15,9 +15,8 @@
 #   REST API docs. The default GITHUB_TOKEN available in a GitHub Actions workflow CANNOT be
 #   granted this permission under any `permissions:` configuration -- "administration" is not
 #   one of the scopes assignable to GITHUB_TOKEN. A fine-grained personal access token (or a
-#   GitHub App token) with Administration: Read-only on this repo is required instead. See
-#   00-roshan-only-checklist.md ("Create the TRAFFIC_TOKEN secret") for the exact click path to
-#   create one.
+#   GitHub App token) with Administration: Read-only on this repo is required instead. See the
+#   header of .github/workflows/traffic-export.yml for how to create one.
 #
 # Usage:
 #   REPO=hydradns/hydradns OUT_DIR=traffic-data GH_TOKEN=<token with Administration:read> \
@@ -54,7 +53,7 @@ granted this permission under any configuration -- a fine-grained personal acces
 GitHub App token) with Administration: Read-only on this repo is required instead.
 
 In CI, this script expects a repository secret named TRAFFIC_TOKEN (see
-.github/workflows/traffic-export.yml and 00-roshan-only-checklist.md for how to create one).
+.github/workflows/traffic-export.yml for how to create one).
 
 Locally, export GH_TOKEN=<your fine-grained PAT> before running this script.
 EOF
