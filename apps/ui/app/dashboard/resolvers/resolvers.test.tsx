@@ -6,11 +6,10 @@ import { SidebarProvider } from "@/components/ui/sidebar"
 import * as api from "@/lib/api"
 import type { Resolver } from "@/lib/types"
 
+// Resolvers are read-only in the dashboard (no create/update/delete route
+// on the control plane — see lib/api.ts), so only getResolvers is mocked.
 vi.mock("@/lib/api", () => ({
   getResolvers: vi.fn(),
-  createResolver: vi.fn(),
-  updateResolver: vi.fn(),
-  deleteResolver: vi.fn(),
 }))
 
 const RESOLVERS: Resolver[] = [
@@ -42,5 +41,20 @@ describe("ResolversPage", () => {
 
     // Column headers present -> a real table rendered.
     expect(screen.getByRole("columnheader", { name: /address/i })).toBeInTheDocument()
+  })
+
+  it("has no add/edit/delete controls and shows the config.yaml note", async () => {
+    render(
+      <SidebarProvider>
+        <ResolversPage />
+      </SidebarProvider>,
+    )
+
+    await screen.findByText("Cloudflare")
+
+    expect(screen.queryByRole("button", { name: /add resolver/i })).not.toBeInTheDocument()
+    expect(screen.queryByTitle("Edit resolver")).not.toBeInTheDocument()
+    expect(screen.queryByTitle("Remove resolver")).not.toBeInTheDocument()
+    expect(screen.getByText(/configs\/config\.yaml/)).toBeInTheDocument()
   })
 })

@@ -4,15 +4,10 @@ function apiUrl(path: string): string {
   return `${getApiBaseUrl()}/api/v1${path}`
 }
 
-// DEMO_PASSWORD is the fixed, publicly documented password for the
-// read-only demo account (see demo/README.md). It must match
-// apps/core/cmd/controlplane/demoseed.DemoUserPassword exactly — that Go
-// constant is the source of truth; this is duplicated here only because
-// the UI and control plane are separate submodules/deploys with no shared
-// build-time config. It is not a secret: the demo's actual security
-// boundary is the server-side DemoGuard middleware, which rejects every
-// mutating request regardless of credentials.
-export const DEMO_PASSWORD = "hydradns-demo"
+// The demo password lives in ./demo-credentials, not here, so the login
+// page can load it via a dynamic import() gated on demoMode — that keeps
+// the string out of the login page's main bundle on non-demo installs
+// (H7). See app/login/page.tsx.
 
 export interface AuthStatus {
   status: "complete" | "needs_setup" | "unreachable"

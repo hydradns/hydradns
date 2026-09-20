@@ -85,17 +85,14 @@ describe("getApiBaseUrl (browser)", () => {
   })
 })
 
+// LOW #7 fix: HYDRA_API_INTERNAL_URL was undocumented, code-only, dead
+// (nothing server-side calls getApiBaseUrl — every caller is a "use client"
+// component's effect/handler). Removed rather than documented; this is now
+// just a boring, safe fallback in case a server component calls this
+// someday.
 describe("getApiBaseUrl (server, no window)", () => {
-  it("falls back to HYDRA_API_INTERNAL_URL when set", () => {
+  it("falls back to the legacy default", () => {
     vi.stubGlobal("window", undefined)
-    vi.stubEnv("HYDRA_API_INTERNAL_URL", "http://core-internal:9090")
-
-    expect(getApiBaseUrl()).toBe("http://core-internal:9090")
-  })
-
-  it("falls back to the legacy default when HYDRA_API_INTERNAL_URL is unset", () => {
-    vi.stubGlobal("window", undefined)
-    vi.stubEnv("HYDRA_API_INTERNAL_URL", "")
 
     expect(getApiBaseUrl()).toBe("http://localhost:8080")
   })

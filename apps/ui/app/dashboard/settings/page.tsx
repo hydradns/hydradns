@@ -1,21 +1,23 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList,
   BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { getSettings, updateSettings } from "@/lib/api"
 import type { Settings } from "@/lib/types"
-import { Shield, Save, CheckCircle2, AlertTriangle } from "lucide-react"
+import { Shield, Info } from "lucide-react"
 
-const DEFAULT_SETTINGS: Settings = {
+// There is no GET/PATCH /settings route on the control plane (see
+// lib/api.ts) — this page shows the intended shape of engine/caching/
+// retention settings as a disabled preview rather than pretending changes
+// here would save. Values are illustrative defaults, not read from the
+// backend.
+const PREVIEW_SETTINGS: Settings = {
   engine_enabled: true,
   block_page_enabled: true,
   cache_enabled: true,
@@ -25,44 +27,14 @@ const DEFAULT_SETTINGS: Settings = {
 }
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
-  const [loaded, setLoaded] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
-
-  useEffect(() => {
-    getSettings()
-      .then((s) => { setSettings(s); setError(null) })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoaded(true))
-  }, [])
-
-  const setField = <K extends keyof Settings>(key: K, value: Settings[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: value }))
-    setSaved(false)
-  }
-
-  const handleSave = async () => {
-    setSaving(true)
-    setError(null)
-    setSaved(false)
-    try {
-      await updateSettings(settings)
-      setSaved(true)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save settings")
-    } finally {
-      setSaving(false)
-    }
-  }
+  const settings = PREVIEW_SETTINGS
 
   const toggleRow = (
     key: keyof Settings,
     title: string,
     description: string,
   ) => (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card p-5">
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card p-5 opacity-60">
       <div>
         <Label htmlFor={`setting-${key}`} className="text-sm font-semibold text-foreground">
           {title}
@@ -72,7 +44,7 @@ export default function SettingsPage() {
       <Switch
         id={`setting-${key}`}
         checked={Boolean(settings[key])}
-        onCheckedChange={(v) => setField(key, v as Settings[typeof key])}
+        disabled
         aria-label={title}
       />
     </div>
@@ -84,7 +56,7 @@ export default function SettingsPage() {
     description: string,
     unit: string,
   ) => (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card p-5">
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card p-5 opacity-60">
       <div>
         <Label htmlFor={`setting-${key}`} className="text-sm font-semibold text-foreground">
           {title}
@@ -96,7 +68,7 @@ export default function SettingsPage() {
           id={`setting-${key}`}
           type="number"
           value={settings[key]}
-          onChange={(e) => setField(key, Number(e.target.value) as Settings[typeof key])}
+          disabled
           className="w-28 bg-background border-border rounded-lg text-right font-mono"
         />
         <span className="text-xs text-muted-foreground w-8">{unit}</span>
@@ -124,39 +96,24 @@ export default function SettingsPage() {
             </Breadcrumb>
           </div>
         </div>
-
-        <Button
-          size="sm"
-          onClick={handleSave}
-          disabled={saving || !loaded}
-          className="bg-[#00D4AA] hover:bg-[#00BD98] text-[#1A1D23] font-semibold gap-2"
-        >
-          <Save className="h-4 w-4" />
-          {saving ? "Saving..." : "Save Changes"}
-        </Button>
       </header>
 
       <div className="flex flex-1 flex-col gap-6 py-6">
         <div>
           <h2 className="font-headline text-3xl font-bold tracking-tight">Settings</h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            Configure the DNS engine, caching, and data retention for this gateway.
+            Engine, caching, and data retention settings for this gateway.
           </p>
         </div>
 
-        {error && (
-          <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            {error}
-          </div>
-        )}
-
-        {saved && (
-          <div className="flex items-center gap-3 rounded-lg border border-green-500/40 bg-green-500/10 p-4 text-sm text-green-500">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            Settings saved.
-          </div>
-        )}
+        <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <Info className="h-4 w-4 mt-0.5 shrink-0 text-[#00D4AA]" />
+          <p>
+            Not available yet — the control plane doesn&apos;t have a settings API to read or
+            save these from the dashboard. The controls below preview the planned settings and
+            are disabled.
+          </p>
+        </div>
 
         <section className="space-y-3">
           <div className="flex items-center gap-2 px-1">

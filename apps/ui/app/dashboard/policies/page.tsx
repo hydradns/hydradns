@@ -15,7 +15,7 @@ import { getPolicies, createPolicy, updatePolicy, deletePolicy } from "@/lib/api
 import type { Policy, PolicyListData } from "@/lib/types"
 import {
   Plus, Trash2, Shield, ShieldCheck, ArrowRightLeft,
-  Globe, ChevronDown, Pencil, Clock, Users,
+  Globe, ChevronDown, Pencil,
 } from "lucide-react"
 
 const actionConfig: Record<string, { label: string; badge: string; icon: string; bg: string }> = {
@@ -63,8 +63,6 @@ export default function PoliciesPage() {
   const [formAction, setFormAction] = useState("BLOCK")
   const [formDomains, setFormDomains] = useState("")
   const [formPriority, setFormPriority] = useState("100")
-  const [formSchedule, setFormSchedule] = useState("")
-  const [formClientScope, setFormClientScope] = useState("")
 
   const [error, setError] = useState<string | null>(null)
 
@@ -79,8 +77,6 @@ export default function PoliciesPage() {
     setFormAction("BLOCK")
     setFormDomains("")
     setFormPriority("100")
-    setFormSchedule("")
-    setFormClientScope("")
     setFormError(null)
     setEditingId(null)
   }
@@ -96,8 +92,6 @@ export default function PoliciesPage() {
     setFormAction(p.action)
     setFormDomains((p.domains || []).join("\n"))
     setFormPriority(String(p.priority ?? 100))
-    setFormSchedule(p.schedule ?? "")
-    setFormClientScope(p.client_scope ?? "")
     setFormError(null)
     setShowForm(true)
   }
@@ -115,8 +109,6 @@ export default function PoliciesPage() {
       action: formAction,
       domains,
       priority: parseInt(formPriority) || 100,
-      schedule: formSchedule || undefined,
-      client_scope: formClientScope || undefined,
     }
     try {
       if (editingId) {
@@ -243,38 +235,6 @@ export default function PoliciesPage() {
                   onChange={(e) => setFormPriority(e.target.value)}
                 />
                 <p className="text-[10px] text-muted-foreground mt-2 italic">Higher numbers override lower priorities.</p>
-              </div>
-
-              <div>
-                <label className={labelClass}>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Clock className="w-3 h-3" /> Schedule
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  className={inputClass}
-                  placeholder="e.g. Mon-Fri 09:00-17:00 (optional)"
-                  value={formSchedule}
-                  onChange={(e) => setFormSchedule(e.target.value)}
-                />
-                <p className="text-[10px] text-muted-foreground mt-2 italic">Leave blank to apply the policy at all times.</p>
-              </div>
-
-              <div>
-                <label className={labelClass}>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Users className="w-3 h-3" /> Client Scope
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  className={inputClass}
-                  placeholder="e.g. 192.168.1.0/24 or all (optional)"
-                  value={formClientScope}
-                  onChange={(e) => setFormClientScope(e.target.value)}
-                />
-                <p className="text-[10px] text-muted-foreground mt-2 italic">Restrict this policy to specific clients or subnets.</p>
               </div>
             </div>
 
