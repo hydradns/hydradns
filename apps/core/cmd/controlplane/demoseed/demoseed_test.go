@@ -110,6 +110,33 @@ func TestEnsureDemoUser_RefusesMultipleUsers(t *testing.T) {
 	}
 }
 
+// TestEnsureDemoUser_RefusesExistingQueryLogHistoryWithNoUsers is the
+// regression test for M7: a DB with query-log rows but zero users (a
+// pre-RBAC volume, or one where migration hasn't run) is not a fresh demo
+// volume, even though "zero users" alone would let it through — and
+// proceeding would hand that history to the periodic Refresh loop, which
+// deletes dns_queries on its very first tick.
+func TestEnsureDemoUser_RefusesExistingQueryLogHistoryWithNoUsers(t *testing.T) {
+	db := openSeedTestDB(t)
+	store := newTestStore(db)
+
+	if err := store.QueryLogs.Save(&models.DNSQuery{Domain: "real-device.example", ClientIP: "10.0.0.5", Action: "allow"}); err != nil {
+		t.Fatalf("seed real query log row: %v", err)
+	}
+
+	if err := EnsureDemoUser(store); err == nil {
+		t.Error("expected EnsureDemoUser to refuse a database with query log history but no users")
+	}
+
+	n, err := store.Users.Count()
+	if err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("expected no demo user to be created when refusing, got %d users", n)
+	}
+}
+
 func TestSeedIfEmpty_PopulatesEverything(t *testing.T) {
 	db := openSeedTestDB(t)
 	store := newTestStore(db)
@@ -190,7 +217,7 @@ func TestRefresh_ReanchorsWithoutDuplicatingRowsOrPolicies(t *testing.T) {
 	policiesBefore, _ := store.Policies.List()
 	sourcesBefore, _ := store.Blocklist.ListSources()
 
-	if err := Refresh(store, db); err != nil {
+	if err := Refresh(db); err != nil {
 		t.Fatalf("Refresh: %v", err)
 	}
 
@@ -217,5 +244,45 @@ func TestRefresh_ReanchorsWithoutDuplicatingRowsOrPolicies(t *testing.T) {
 	}
 	if stats[0].TotalQueries != uint64(totalDemoQueryRows) {
 		t.Errorf("statistics.total_queries after Refresh = %d, want %d (reset then rebuilt, not accumulated)", stats[0].TotalQueries, totalDemoQueryRows)
+	}
+}
+
+// TestRefresh_FailurePartwayThroughRollsBackTheDelete is the regression
+// test for M7's transaction wrap: before this fix, the DNSQuery delete and
+// the statistics reset were two independent writes, so a failure between
+// them left the query log deleted but statistics untouched (or vice
+// versa) — a reader in that window sees an empty table. Forcing the
+// statistics step to fail (by dropping the table it targets) and then
+// asserting the delete never took effect proves both writes are now one
+// atomic unit.
+func TestRefresh_FailurePartwayThroughRollsBackTheDelete(t *testing.T) {
+	db := openSeedTestDB(t)
+	store := newTestStore(db)
+
+	if err := SeedIfEmpty(store); err != nil {
+		t.Fatalf("SeedIfEmpty: %v", err)
+	}
+	before, err := store.QueryLogs.Count()
+	if err != nil || before == 0 {
+		t.Fatalf("expected seeded rows before Refresh, count=%d err=%v", before, err)
+	}
+
+	// Make the statistics-reset step (the second write inside the
+	// transaction) fail, so Refresh must roll back the delete that already
+	// ran as the first write.
+	if err := db.Exec("DROP TABLE statistics").Error; err != nil {
+		t.Fatalf("test setup: drop statistics table: %v", err)
+	}
+
+	if err := Refresh(db); err == nil {
+		t.Fatal("expected Refresh to fail once the statistics table is gone")
+	}
+
+	after, err := store.QueryLogs.Count()
+	if err != nil {
+		t.Fatalf("QueryLogs.Count after failed Refresh: %v", err)
+	}
+	if after != before {
+		t.Errorf("expected the delete to roll back on failure (count unchanged at %d), got %d", before, after)
 	}
 }

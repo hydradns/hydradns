@@ -177,6 +177,43 @@ func TestUpdateBlocklist_NameAndCategoryEdit(t *testing.T) {
 	}
 }
 
+// --- M4: CreateBlocklist must validate URL scheme, same as UpdateBlocklist ---
+
+func TestCreateBlocklist_URLMustBeHTTP(t *testing.T) {
+	th := newBlocklistsHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+
+	rec := th.do("POST", "/api/v1/blocklists", tok, gin.H{
+		"id": "evil", "name": "Evil", "url": "http://169.254.169.254/latest/meta-data/", "format": "hosts",
+	})
+	if rec.Code != http.StatusOK && rec.Code != http.StatusCreated {
+		t.Fatalf("expected an internal-looking http:// URL to still be accepted (no IP allowlisting), got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	rec = th.do("POST", "/api/v1/blocklists", tok, gin.H{
+		"id": "ftp-src", "name": "FTP", "url": "ftp://example.com/list", "format": "hosts",
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400 for a non-http(s) scheme", rec.Code)
+	}
+
+	if _, err := th.store.Blocklist.GetSource("ftp-src"); err == nil {
+		t.Error("expected no source to be created for the rejected scheme")
+	}
+}
+
+func TestCreateBlocklist_FileSchemeRejected(t *testing.T) {
+	th := newBlocklistsHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+
+	rec := th.do("POST", "/api/v1/blocklists", tok, gin.H{
+		"id": "file-src", "name": "File", "url": "file:///etc/passwd", "format": "hosts",
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400 for file:// scheme", rec.Code)
+	}
+}
+
 func TestUpdateBlocklist_URLMustBeHTTP(t *testing.T) {
 	th := newBlocklistsHarness(t)
 	tok := th.seedUser(t, "op@x.com", models.RoleOperator)

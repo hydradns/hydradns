@@ -2,6 +2,7 @@
 package middlewares
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/url"
@@ -11,7 +12,16 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/hydradns/hydra-core/internal/config"
 )
+
+// corsFatalf is called when CORS_ORIGINS cannot be turned into a valid
+// configuration. Overridable in tests so the fatal path can be asserted
+// without exiting the test binary — see H2 in the launch-prep review: a
+// human-typed list ("http://a, http://b" with a space, or a trailing
+// comma) used to reach gin-contrib/cors unmodified and panic at startup
+// with a message naming neither the env var nor the offending entry.
+var corsFatalf = log.Fatalf
 
 // CORS returns a gin middleware that applies CORS configuration.
 //
@@ -20,39 +30,117 @@ import (
 // development. Setting it to "*" allows any website to call the API — a
 // startup warning is logged, but it still works, for operators who
 // understand the tradeoff (e.g. a fully isolated dev environment).
+// AllowCredentials is disabled whenever "*" is present: browsers reject
+// ACAO:* combined with credentialed requests, and this API only ever uses
+// Bearer-header auth (no cookies), so there's nothing lost by making that
+// combination spec-valid instead of merely harmless-today.
+//
+// Each entry is trimmed and validated (must be "*", or a bare http(s) URL
+// with a host and no path) before it ever reaches gin-contrib/cors, which
+// otherwise panics on the first entry that isn't a wildcard and doesn't
+// start with a known scheme. An entry that fails validation calls
+// corsFatalf naming both CORS_ORIGINS and the offending entry.
 //
 // On top of the explicit allowlist, an automatic same-host rule is applied
 // so a dashboard reached over the LAN works without editing CORS_ORIGINS.
-// Disable it with CORS_ALLOW_SAME_HOST=false. See sameHostOriginAllowed for
-// exactly what it allows and why it is safe against DNS rebinding.
+// Disable it with CORS_ALLOW_SAME_HOST=false (or any other recognized
+// falsy spelling — see config.MustParseBoolEnv). See sameHostOriginAllowed
+// for exactly what it allows and why it is safe against DNS rebinding.
 func CORS() gin.HandlerFunc {
 	origins := []string{"http://localhost:3000", "http://127.0.0.1:3000"}
 	if env := os.Getenv("CORS_ORIGINS"); env != "" {
-		origins = strings.Split(env, ",")
+		parsed, err := parseCORSOrigins(env)
+		if err != nil {
+			corsFatalf("%v", err)
+			// Unreachable when corsFatalf actually exits (the production
+			// default, log.Fatalf). Only relevant to tests that override
+			// corsFatalf to record the call instead of exiting — returning
+			// an inert handler here keeps them from continuing on with a
+			// zero-value config.
+			return func(c *gin.Context) { c.Next() }
+		}
+		origins = parsed
 	}
+
+	allowAll := false
 	for _, o := range origins {
 		if o == "*" {
-			log.Printf("WARNING: CORS_ORIGINS=* — any website can call this API. Only use this for local development or if you understand the risk.")
+			allowAll = true
 			break
 		}
+	}
+	if allowAll {
+		log.Printf("WARNING: CORS_ORIGINS=* — any website can call this API. Only use this for local development or if you understand the risk. Access-Control-Allow-Credentials is disabled while this is set (a wildcard origin combined with credentials is invalid per the CORS spec, and this API only ever authenticates via a Bearer header, never cookies).")
 	}
 
 	cfg := cors.Config{
 		AllowOrigins:     origins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		AllowCredentials: true,
+		AllowCredentials: !allowAll,
 		MaxAge:           12 * time.Hour,
 	}
 
-	// CORS_ALLOW_SAME_HOST defaults to on; only the literal value "false"
-	// turns it off, matching the design doc's "disable with
-	// CORS_ALLOW_SAME_HOST=false" wording.
-	if os.Getenv("CORS_ALLOW_SAME_HOST") != "false" {
+	// CORS_ALLOW_SAME_HOST defaults to on. Previously only the literal
+	// value "false" turned it off (so "0", "no", "off", or a typo'd
+	// "False" all silently left it enabled) — now routed through the same
+	// shared boolean parser as every other boolean env var in the control
+	// plane (see H1), which also fails fast on a genuinely unrecognized
+	// value instead of guessing.
+	if config.MustParseBoolEnv("CORS_ALLOW_SAME_HOST", true) {
 		cfg.AllowOriginWithContextFunc = sameHostOriginAllowed
 	}
 
 	return cors.New(cfg)
+}
+
+// parseCORSOrigins splits a raw CORS_ORIGINS value on commas, trims
+// whitespace, drops empty entries (a trailing comma, or a value that was
+// only whitespace), and validates every remaining entry with
+// validateCORSOrigin. Returns an error naming CORS_ORIGINS and the first
+// offending entry — never lets an invalid entry reach gin-contrib/cors,
+// which panics instead of returning an error.
+func parseCORSOrigins(raw string) ([]string, error) {
+	var out []string
+	for _, part := range strings.Split(raw, ",") {
+		o := strings.TrimSpace(part)
+		if o == "" {
+			continue
+		}
+		if err := validateCORSOrigin(o); err != nil {
+			return nil, fmt.Errorf("CORS_ORIGINS entry %q %s", o, err)
+		}
+		out = append(out, o)
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("CORS_ORIGINS was set but contained no usable entries (all blank/whitespace)")
+	}
+	return out, nil
+}
+
+// validateCORSOrigin reports whether o is a usable CORS_ORIGINS entry:
+// either the literal wildcard "*", or an http(s) URL with a host and no
+// path. A trailing "/" is tolerated (net/url parses it as Path "/", which
+// is equivalent to no path for an Origin, since browsers never send a
+// path in the Origin header anyway).
+func validateCORSOrigin(o string) error {
+	if o == "*" {
+		return nil
+	}
+	u, err := url.Parse(o)
+	if err != nil {
+		return fmt.Errorf("is not a valid URL: %v", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("must start with http:// or https:// (or be exactly \"*\")")
+	}
+	if u.Host == "" {
+		return fmt.Errorf("must include a host")
+	}
+	if u.Path != "" && u.Path != "/" {
+		return fmt.Errorf("must not include a path")
+	}
+	return nil
 }
 
 // sameHostOriginAllowed is the automatic same-host CORS rule.

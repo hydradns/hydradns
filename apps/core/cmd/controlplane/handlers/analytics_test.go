@@ -27,6 +27,10 @@ type analyticsHarness struct {
 	db     *gorm.DB
 	store  *repositories.Store
 	router *gin.Engine
+	// h is the same *APIHandler the routes below are bound to; tests may
+	// mutate its fields (DemoMode, AnonymizeSecret) after construction to
+	// exercise those code paths without a second harness.
+	h *APIHandler
 }
 
 func newAnalyticsHarness(t *testing.T) *analyticsHarness {
@@ -53,7 +57,7 @@ func newAnalyticsHarness(t *testing.T) *analyticsHarness {
 	analytics.GET("/audits", h.GetAuditLogs)
 	analytics.GET("/summary", h.GetAnalyticsSummary)
 
-	return &analyticsHarness{db: db, store: store, router: r}
+	return &analyticsHarness{db: db, store: store, router: r, h: h}
 }
 
 func (th *analyticsHarness) seedUser(t *testing.T, email, role string) string {
@@ -233,6 +237,104 @@ func TestGetQueryLogsPage_ClientFilterPrecise(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
 	if resp.Data.Total != 1 || resp.Data.Items[0].ClientIP != "192.168.1.5" {
 		t.Errorf("expected exact client match only, got %+v", resp.Data)
+	}
+}
+
+// --- M6: reachable offset is capped, count is capped ---
+
+func TestGetQueryLogsPage_PageBeyondReachableOffsetIsBadRequest(t *testing.T) {
+	th := newAnalyticsHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+
+	// page * page_size = 100001 * 200 far exceeds the 100,000 cap.
+	rec := th.do("GET", "/api/v1/analytics/logs?page=100001&page_size=200", tok)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400 for an unreachable offset", rec.Code)
+	}
+}
+
+func TestGetQueryLogsPage_PageAtReachableOffsetBoundaryIsOK(t *testing.T) {
+	th := newAnalyticsHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+
+	// 500 * 200 = 100,000, exactly at the cap: must still be served.
+	rec := th.do("GET", "/api/v1/analytics/logs?page=500&page_size=200", tok)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got %d body=%s, want 200 at the exact offset boundary", rec.Code, rec.Body.String())
+	}
+}
+
+// --- M8: demo mode rejects the client filter (it would otherwise recover
+// a masked IP by 256-request oracle) ---
+
+func TestGetQueryLogsPage_DemoModeRejectsClientFilter(t *testing.T) {
+	th := newAnalyticsHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+	th.h.DemoMode = true
+
+	th.db.Create(&models.DNSQuery{Domain: "a.com", ClientIP: "192.168.1.5", Action: "allow", Timestamp: time.Now()})
+
+	rec := th.do("GET", "/api/v1/analytics/logs?client=192.168.1.5", tok)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400 (client filter unavailable in demo mode)", rec.Code)
+	}
+}
+
+func TestGetQueryLogsPage_DemoModeStillServesUnfilteredLogs(t *testing.T) {
+	th := newAnalyticsHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+	th.h.DemoMode = true
+
+	th.db.Create(&models.DNSQuery{Domain: "a.com", ClientIP: "192.168.1.5", Action: "allow", Timestamp: time.Now()})
+
+	rec := th.do("GET", "/api/v1/analytics/logs", tok)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200 for an unfiltered request in demo mode", rec.Code)
+	}
+	var resp queryLogPageResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	if resp.Data.Total != 1 || resp.Data.Items[0].ClientIP != "192.168.1.x" {
+		t.Errorf("expected 1 masked row, got %+v", resp.Data)
+	}
+}
+
+// --- M3: anonymization hashes the client filter to match hashed storage ---
+
+func TestGetQueryLogsPage_AnonymizedClientFilterMatchesHashedStorage(t *testing.T) {
+	th := newAnalyticsHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+
+	const secret = "test-anon-secret"
+	th.h.AnonymizeSecret = secret
+
+	hashed, ok := hashClientIPForFilter(secret, "192.168.1.5")
+	if !ok {
+		t.Fatal("expected 192.168.1.5 to hash successfully")
+	}
+	th.db.Create(&models.DNSQuery{Domain: "a.com", ClientIP: hashed, Action: "allow", Timestamp: time.Now()})
+	// A different client's hash must not collide.
+	otherHashed, _ := hashClientIPForFilter(secret, "192.168.1.6")
+	th.db.Create(&models.DNSQuery{Domain: "b.com", ClientIP: otherHashed, Action: "allow", Timestamp: time.Now()})
+
+	rec := th.do("GET", "/api/v1/analytics/logs?client=192.168.1.5", tok)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp queryLogPageResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	if resp.Data.Total != 1 || len(resp.Data.Items) != 1 || resp.Data.Items[0].Domain != "a.com" {
+		t.Errorf("expected exactly the row matching the hashed filter, got %+v", resp.Data)
+	}
+}
+
+func TestGetQueryLogsPage_AnonymizedClientFilterInvalidValueIsBadRequest(t *testing.T) {
+	th := newAnalyticsHarness(t)
+	tok := th.seedUser(t, "op@x.com", models.RoleOperator)
+	th.h.AnonymizeSecret = "test-anon-secret"
+
+	rec := th.do("GET", "/api/v1/analytics/logs?client=not-an-ip", tok)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400 for an unparseable client filter under anonymization", rec.Code)
 	}
 }
 

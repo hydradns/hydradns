@@ -197,6 +197,98 @@ func TestQueryLog_Filter_TimeRange(t *testing.T) {
 	}
 }
 
+// --- M6: CountFilteredCapped bounds the COUNT query itself ---
+
+func TestQueryLog_CountFilteredCapped_BelowCapReturnsExactTotal(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewGormQueryLogRepo(db)
+
+	for i := 0; i < 5; i++ {
+		db.Create(&models.DNSQuery{Domain: "a.com", ClientIP: "1.1.1.1", Action: "allow", Timestamp: time.Now()})
+	}
+
+	total, capped, err := repo.CountFilteredCapped(QueryLogFilter{}, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || capped {
+		t.Errorf("expected total=5 capped=false, got total=%d capped=%v", total, capped)
+	}
+}
+
+func TestQueryLog_CountFilteredCapped_AboveCapReturnsCappedTotal(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewGormQueryLogRepo(db)
+
+	for i := 0; i < 10; i++ {
+		db.Create(&models.DNSQuery{Domain: "a.com", ClientIP: "1.1.1.1", Action: "allow", Timestamp: time.Now()})
+	}
+
+	total, capped, err := repo.CountFilteredCapped(QueryLogFilter{}, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !capped {
+		t.Error("expected capped=true when actual rows exceed the cap")
+	}
+	if total != 3 {
+		t.Errorf("expected the reported total to be clamped to the cap (3), got %d", total)
+	}
+}
+
+func TestQueryLog_CountFilteredCapped_ExactlyAtCapIsNotCapped(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewGormQueryLogRepo(db)
+
+	for i := 0; i < 3; i++ {
+		db.Create(&models.DNSQuery{Domain: "a.com", ClientIP: "1.1.1.1", Action: "allow", Timestamp: time.Now()})
+	}
+
+	total, capped, err := repo.CountFilteredCapped(QueryLogFilter{}, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if capped {
+		t.Error("expected capped=false when the actual count exactly equals the cap")
+	}
+	if total != 3 {
+		t.Errorf("expected total=3, got %d", total)
+	}
+}
+
+func TestQueryLog_CountFilteredCapped_RespectsFilter(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewGormQueryLogRepo(db)
+
+	db.Create(&models.DNSQuery{Domain: "a.com", ClientIP: "1.1.1.1", Action: "block", Timestamp: time.Now()})
+	db.Create(&models.DNSQuery{Domain: "b.com", ClientIP: "1.1.1.1", Action: "allow", Timestamp: time.Now()})
+
+	total, capped, err := repo.CountFilteredCapped(QueryLogFilter{Action: "block"}, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || capped {
+		t.Errorf("expected total=1 capped=false, got total=%d capped=%v", total, capped)
+	}
+}
+
+func TestQueryLog_CountFilteredCapped_ZeroCapMeansUnbounded(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewGormQueryLogRepo(db)
+
+	for i := 0; i < 5; i++ {
+		db.Create(&models.DNSQuery{Domain: "a.com", ClientIP: "1.1.1.1", Action: "allow", Timestamp: time.Now()})
+	}
+
+	total, capped, err := repo.CountFilteredCapped(QueryLogFilter{}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || capped {
+		t.Errorf("expected total=5 capped=false with capAt=0 (unbounded), got total=%d capped=%v", total, capped)
+	}
+}
+
 func TestQueryLog_ListPage_StableOrderingOnTies(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewGormQueryLogRepo(db)

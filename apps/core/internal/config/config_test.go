@@ -2,6 +2,8 @@
 package config
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -19,18 +21,92 @@ func TestParseBoolEnvValue(t *testing.T) {
 		{"TRUE", true, true, "case-insensitive"},
 		{" yes ", true, true, "trims whitespace"},
 		{"on", true, true, "on"},
+		{"ON", true, true, "on, case-insensitive"},
 		{"false", false, true, "canonical false"},
 		{"0", false, true, "numeric false"},
 		{"no", false, true, "no"},
 		{"off", false, true, "off"},
+		{" off ", false, true, "off, trims whitespace"},
 		{"", false, false, "empty means unset"},
 		{"maybe", false, false, "garbage means unset"},
+		{"true ", true, true, "trailing space (the exact near-miss H1 flagged for HYDRA_DEMO_MODE)"},
 	}
 	for _, tt := range tests {
-		got, ok := parseBoolEnvValue(tt.raw)
+		got, ok := ParseBoolEnvValue(tt.raw)
 		if got != tt.want || ok != tt.wantOk {
-			t.Errorf("parseBoolEnvValue(%q) = (%v, %v), want (%v, %v) [%s]", tt.raw, got, ok, tt.want, tt.wantOk, tt.comment)
+			t.Errorf("ParseBoolEnvValue(%q) = (%v, %v), want (%v, %v) [%s]", tt.raw, got, ok, tt.want, tt.wantOk, tt.comment)
 		}
+	}
+}
+
+func TestMustParseBoolEnv_UnsetUsesDefault(t *testing.T) {
+	t.Setenv("HYDRA_TEST_BOOL", "")
+	if got := MustParseBoolEnv("HYDRA_TEST_BOOL", true); !got {
+		t.Errorf("expected default true when unset, got %v", got)
+	}
+	if got := MustParseBoolEnv("HYDRA_TEST_BOOL", false); got {
+		t.Errorf("expected default false when unset, got %v", got)
+	}
+}
+
+func TestMustParseBoolEnv_RecognizedValues(t *testing.T) {
+	cases := []struct {
+		raw  string
+		want bool
+	}{
+		{"1", true}, {"true", true}, {"yes", true}, {"on", true},
+		{"0", false}, {"false", false}, {"no", false}, {"off", false},
+	}
+	for _, tc := range cases {
+		t.Setenv("HYDRA_TEST_BOOL", tc.raw)
+		if got := MustParseBoolEnv("HYDRA_TEST_BOOL", !tc.want); got != tc.want {
+			t.Errorf("MustParseBoolEnv(%q) = %v, want %v", tc.raw, got, tc.want)
+		}
+	}
+}
+
+// TestMustParseBoolEnv_UnrecognizedValueCallsFatalFunc proves the fatal
+// path fires exactly on an unrecognized value, without exiting the test
+// binary — see H1: a near-miss value must fail loudly, not silently take
+// the default.
+func TestMustParseBoolEnv_UnrecognizedValueCallsFatalFunc(t *testing.T) {
+	orig := FatalFunc
+	defer func() { FatalFunc = orig }()
+
+	var gotFormat string
+	var gotArgs []interface{}
+	called := false
+	FatalFunc = func(format string, args ...interface{}) {
+		called = true
+		gotFormat = format
+		gotArgs = args
+	}
+
+	t.Setenv("HYDRA_DEMO_MODE", "tru") // near-miss typo: not a recognized token
+	MustParseBoolEnv("HYDRA_DEMO_MODE", false)
+
+	if !called {
+		t.Fatal("expected FatalFunc to be called for an unrecognized value")
+	}
+	msg := fmt.Sprintf(gotFormat, gotArgs...)
+	if !strings.Contains(msg, "HYDRA_DEMO_MODE") {
+		t.Errorf("expected the fatal message to name the variable, got %q", msg)
+	}
+	if !strings.Contains(msg, "tru") {
+		t.Errorf("expected the fatal message to include the offending value, got %q", msg)
+	}
+}
+
+func TestMustParseBoolEnv_RecognizedValueDoesNotCallFatalFunc(t *testing.T) {
+	orig := FatalFunc
+	defer func() { FatalFunc = orig }()
+	FatalFunc = func(format string, args ...interface{}) {
+		t.Fatalf("FatalFunc must not be called for a recognized value: "+format, args...)
+	}
+
+	t.Setenv("HYDRA_DEMO_MODE", "true")
+	if !MustParseBoolEnv("HYDRA_DEMO_MODE", false) {
+		t.Error("expected true")
 	}
 }
 

@@ -30,6 +30,20 @@ type QueryLogRepository interface {
 	BypassAttempts(since time.Time, limit int) (BypassSummary, error)
 }
 
+// QueryLogCapper is an optional capability of a QueryLogRepository: a
+// bounded-cost count for GET /analytics/logs (see GormQueryLogRepo.
+// CountFilteredCapped). Deliberately NOT part of QueryLogRepository
+// itself — that interface is implemented by hand-written fakes elsewhere
+// in the module (internal/dnsengine's tests, outside this change's scope)
+// that have no reason to grow a new method just because the control
+// plane's logs endpoint needs a cheaper count. Callers (see
+// handlers.APIHandler.countQueryLogs) type-assert for this interface and
+// fall back to plain CountFiltered when a repository doesn't implement
+// it.
+type QueryLogCapper interface {
+	CountFilteredCapped(filter QueryLogFilter, capAt int64) (total int64, capped bool, err error)
+}
+
 // QueryLogFilter narrows ListPage/CountFiltered. Zero-value fields are
 // ignored. Page is 1-indexed; PageSize is expected to already be clamped
 // by the caller (see handlers.parseQueryLogFilter).
@@ -254,6 +268,37 @@ func (r *GormQueryLogRepo) CountFiltered(f QueryLogFilter) (int64, error) {
 	return n, err
 }
 
+// CountFilteredCapped is CountFiltered but bounds the work SQLite actually
+// does: rather than "SELECT COUNT(*) FROM dns_queries WHERE ..." (a full
+// scan for an unindexed filter like Suspicious, over a table that can hold
+// ~1M rows), it counts rows from a subquery capped at capAt+1 matches
+// ("SELECT COUNT(*) FROM (SELECT 1 FROM dns_queries WHERE ... LIMIT
+// capAt+1)"). If the subquery hits its limit, the true total is unknown
+// (could be anything >= capAt) but doesn't matter for pagination purposes
+// — the UI is told the total is capAt and that it's capped, which is
+// enough to render "100,000+" instead of computing an exact count nobody
+// can page through anyway (see the reachable-offset cap in
+// handlers.parseQueryLogFilter). capAt<=0 disables capping.
+func (r *GormQueryLogRepo) CountFilteredCapped(f QueryLogFilter, capAt int64) (total int64, capped bool, err error) {
+	if capAt <= 0 {
+		n, err := r.CountFiltered(f)
+		return n, false, err
+	}
+
+	sub := r.applyFilter(r.db.Model(&models.DNSQuery{}), f).
+		Select("1").
+		Limit(int(capAt + 1))
+
+	var n int64
+	if err := r.db.Table("(?) as capped_rows", sub).Count(&n).Error; err != nil {
+		return 0, false, err
+	}
+	if n > capAt {
+		return capAt, true, nil
+	}
+	return n, false, nil
+}
+
 // bypassFiltered is the shared WHERE clause for the bypass-attempts
 // aggregation: rows the dataplane tagged as DoH/DoT/DoQ bootstrap
 // interceptions, within the given window. Timestamp is indexed, so this
@@ -307,7 +352,15 @@ func (r *GormQueryLogRepo) BypassAttempts(since time.Time, limit int) (BypassSum
 	for _, rr := range rows {
 		lastAttempt, perr := parseSQLiteTime(rr.LastAttempt)
 		if perr != nil {
-			logger.Log.Warnf("bypass attempts: unparseable last_attempt %q for %s/%s: %v", rr.LastAttempt, rr.ClientIP, rr.Target, perr)
+			// L7 in the launch-prep review: shipping a row with the zero
+			// time (0001-01-01T00:00:00Z) looks like real, if very old,
+			// data to a caller — the UI would render "25000 years ago"
+			// with no indication anything is wrong. Drop the row instead;
+			// TotalAttempts/UniqueClients above were already computed from
+			// separate queries and are unaffected, so the aggregate counts
+			// stay accurate even though this one group's row is withheld.
+			logger.Log.Warnf("bypass attempts: dropping row for %s/%s, unparseable last_attempt %q: %v", rr.ClientIP, rr.Target, rr.LastAttempt, perr)
+			continue
 		}
 		summary.Rows = append(summary.Rows, BypassAttemptRow{
 			ClientIP:    rr.ClientIP,
