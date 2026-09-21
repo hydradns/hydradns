@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 module github.com/hydradns/hydra-core
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0
@@ -11,7 +11,7 @@ require (
 	github.com/miekg/dns v1.1.73
 	github.com/sirupsen/logrus v1.10.2
 	github.com/willf/bloom v2.0.3+incompatible
-	golang.org/x/crypto v0.54.0
+	golang.org/x/crypto v0.57.0
 	google.golang.org/grpc v1.76.0
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1
@@ -51,9 +51,9 @@ require (
 	github.com/willf/bitset v1.1.11 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect
 	golang.org/x/arch v0.22.0 // indirect
-	golang.org/x/net v0.57.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect
 	modernc.org/libc v1.22.5 // indirect
 	modernc.org/mathutil v1.5.0 // indirect
