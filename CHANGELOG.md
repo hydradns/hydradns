@@ -6,6 +6,10 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from v0.1.0
 
 ## [Unreleased]
 
+### Added
+- `apps/cli/server.json` and a manual **Publish to MCP Registry** workflow that lists the MCP
+  server in the official registry using GitHub OIDC.
+
 ### Changed
 - `apps/core` now builds with Go 1.25 (was 1.24), matching the CLI and `go.work`; its build image is
   `golang:1.25-alpine`.
