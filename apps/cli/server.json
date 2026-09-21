@@ -1,0 +1,59 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.hydradns/hydra-mcp",
+  "description": "Manage a self-hosted DNS firewall: block domains, create policies, read query logs and metrics.",
+  "title": "HydraDNS",
+  "version": "0.1.0",
+  "websiteUrl": "https://github.com/hydradns/hydradns",
+  "repository": {
+    "url": "https://github.com/hydradns/hydradns",
+    "source": "github",
+    "subfolder": "apps/cli"
+  },
+  "packages": [
+    {
+      "registryType": "oci",
+      "registryBaseUrl": "https://ghcr.io",
+      "identifier": "ghcr.io/hydradns/hydra-cli:0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeHint": "docker",
+      "packageArguments": [
+        {
+          "type": "positional",
+          "valueHint": "mcp",
+          "value": "mcp"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "HYDRA_API_URL",
+          "description": "Base URL of the HydraDNS controlplane API. Inside a container, 'localhost' means the container itself, not the host running the controlplane. On Docker Desktop (Mac/Windows) the default below resolves automatically. On plain Docker Engine (Linux) either run the container with --add-host=host.docker.internal:host-gateway, or use --network host with http://localhost:8080 instead. Full instructions: docs/mcp.md in the repo, 'Running it -> As the container image'.",
+          "default": "http://host.docker.internal:8080",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "HYDRA_TOKEN",
+          "description": "Bearer token for the HydraDNS API, obtained via `hydra login` or the setup wizard. Grants whatever access the token's account has; MCP_ROLE narrows what the MCP tool layer will call, not what the token itself can do against the API directly.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "MCP_ROLE",
+          "description": "Permission scope for this MCP session: admin (default, every tool), operator (every mutating tool except toggle_engine), or reporter (read-only tools only). Any unrecognized value safe-defaults to reporter.",
+          "default": "admin",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "tool": "manual",
+      "version": "0.1.0"
+    }
+  }
+}

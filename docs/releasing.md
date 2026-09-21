@@ -337,3 +337,17 @@ If the release is broken (bad image, wrong assets, tagged the wrong commit):
 
 3. **Re-run pre-flight, fix the underlying issue, and re-tag** once the
    broken artifacts are cleaned up.
+
+## Listing the MCP server in the MCP registry
+
+`apps/cli/server.json` describes the MCP server for the official registry
+(`io.github.hydradns/hydra-mcp`, the `ghcr.io/hydradns/hydra-cli` image). After a release:
+
+1. Make sure the release's `hydra-cli` image is public on GHCR.
+2. Set `version` and the image tag in `apps/cli/server.json` to the release and merge that.
+3. Run the **Publish to MCP Registry** workflow from the Actions tab.
+
+The workflow logs in with GitHub OIDC, which proves to the registry that it runs in the
+`hydradns` organisation, so it needs no token. An interactive `mcp-publisher login github`
+only grants a personal namespace unless the registry's GitHub App is installed on the
+organisation. A published version cannot be edited; publish a new version instead.
