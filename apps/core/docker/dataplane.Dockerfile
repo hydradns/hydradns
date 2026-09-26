@@ -1,5 +1,5 @@
 # --- Builder stage ---
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 FROM golang:1.24-alpine AS builder
 WORKDIR /app
 

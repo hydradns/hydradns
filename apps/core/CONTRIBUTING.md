@@ -175,7 +175,7 @@ Contributors are recognized through:
 
 ## 📜 License
 
-By contributing to HydraCore, you agree that your contributions will be licensed under the project's [MIT License](LICENSE).
+By contributing to HydraDNS, you agree that your contributions will be licensed under the project's [Apache License 2.0](LICENSE).
 
 ---
 

@@ -46,7 +46,7 @@ Once running, HydraDNS provides two main services:
 - **Purpose**: Configuration and monitoring interface
 
 [![Hacktoberfest 2025](https://img.shields.io/badge/Hacktoberfest-2025-orange.svg)](https://hacktoberfest.com)
-[![License](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](./LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Contributors Welcome](https://img.shields.io/badge/contributors-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 HydraDNS is a powerful DNS-layer security & privacy gateway designed to protect your network from threats while maintaining your privacy. Whether you're running it on a Raspberry Pi at home or deploying it in the cloud, HydraDNS has got you covered.
@@ -143,7 +143,7 @@ Look for issues tagged with `good-first-issue` - these are perfect for newcomers
 
 ## 📝 License
 
-HydraDNS CE is licensed under the GNU General Public License v3.0 (GPLv3).  
+HydraDNS CE is licensed under the Apache License 2.0.  
 See the [LICENSE](./LICENSE) file for details.
 
 ## ⭐ Show Your Support

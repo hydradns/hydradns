@@ -14,7 +14,7 @@
     {
       "guid": "hydradns",
       "name": "HydraDNS",
-      "description": "Network-wide DNS filtering rebuilt in Go: a gRPC control/data plane split, a web dashboard, DoH-bypass blocking, and a built-in Model Context Protocol server exposing 14 tools so an AI agent can manage the DNS firewall directly. Self-hosted and GPL-3.0.",
+      "description": "Network-wide DNS filtering rebuilt in Go: a gRPC control/data plane split, a web dashboard, DoH-bypass blocking, and a built-in Model Context Protocol server exposing 14 tools so an AI agent can manage the DNS firewall directly. Self-hosted and Apache-2.0.",
       "webpageUrl": {
         "url": "https://github.com/hydradns/hydradns"
       },
@@ -22,7 +22,7 @@
         "url": "https://github.com/hydradns/hydradns",
         "wellKnown": "https://github.com/hydradns/hydradns/blob/main/funding.json"
       },
-      "licenses": ["spdx:GPL-3.0-only"],
+      "licenses": ["spdx:Apache-2.0"],
       "tags": ["dns", "network-security", "self-hosted", "golang", "privacy", "adblocking", "mcp"]
     }
   ],

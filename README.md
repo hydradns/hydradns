@@ -7,7 +7,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-000?logo=next.js)](https://nextjs.org)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)](https://docs.docker.com/compose/)
 [![CI](https://github.com/hydradns/hydradns/actions/workflows/ci.yml/badge.svg)](https://github.com/hydradns/hydradns/actions/workflows/ci.yml)
-[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 **[Screenshots and product site at hydradns.app](https://hydradns.app)** (a marketing site with static screenshots, not an interactive demo)
 
@@ -372,4 +372,4 @@ Contributions are welcome, HydraDNS is pre-1.0 and there is a lot to build.
 
 ## License
 
-[GPL-3.0](LICENSE)
+[Apache-2.0](LICENSE)

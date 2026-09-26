@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 
 // Package demoseed provides the startup data (and periodic refresh) for a
 // public, read-only demo deployment (HYDRA_DEMO_MODE=true). It is only

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 module github.com/hydradns/hydradns/apps/core
 
 go 1.25.0

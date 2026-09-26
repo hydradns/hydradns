@@ -22,7 +22,7 @@ func InitDB(path string) *gorm.DB {
 	}
 
 	// Connection pool tuning
-	// SPDX-License-Identifier: GPL-3.0-or-later
+	// SPDX-License-Identifier: Apache-2.0
 	sqlDB, _ := db.DB()
 	sqlDB.SetMaxOpenConns(1) // SQLite is single-writer
 	sqlDB.SetMaxIdleConns(1)

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 //
 // Package audit is a thin helper that every mutating handler calls to
 // record who did what, against which target, from where. The helper owns
