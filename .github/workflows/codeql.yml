@@ -24,7 +24,7 @@ jobs:
           - language: javascript-typescript
             build-mode: none
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # The runner's default Go is older than the version go.work requires,
       # which makes the CodeQL Go autobuilder fail before it extracts anything.
       - uses: actions/setup-go@v7
