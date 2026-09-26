@@ -13,7 +13,7 @@ require (
 	github.com/willf/bloom v2.0.3+incompatible
 	golang.org/x/crypto v0.54.0
 	google.golang.org/grpc v1.76.0
-	google.golang.org/protobuf v1.36.10
+	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/gorm v1.31.2
 )
